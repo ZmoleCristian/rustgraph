@@ -258,7 +258,7 @@ impl ServerHandler for RustgraphServer {
                 name: "rustgraph".into(),
                 title: Some("rustgraph — AST-aware Rust codebase navigation".into()),
                 version: env!("CARGO_PKG_VERSION").into(),
-                website_url: Some("https://github.com/tragdate/rustgraph".into()),
+                website_url: Some("https://github.com/ZmoleCristian/rustgraph".into()),
                 icons: None,
             },
             instructions: Some(

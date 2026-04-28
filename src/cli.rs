@@ -184,6 +184,16 @@ Shell quoting trap (most-common cause of cryptic regex errors):\n  \
         subcommand_negates_reqs = true
     )]
     Mcp(McpCommand),
+    #[command(
+        about = "Emit a shell completion script for the chosen shell to stdout. Pipe to the canonical path: `rustgraph completions zsh > ~/.zsh/completions/_rustgraph`."
+    )]
+    Completions(CompletionsCommand),
+    #[command(
+        name = "generate-man",
+        about = "Emit a clap-derived man page (roff) to stdout. Useful for cargo-install users who don't get the AUR-shipped curated man page. Hidden subcommand.",
+        hide = true
+    )]
+    GenerateMan,
 }
 
 /// Arguments for the `inventory` subcommand (dump all symbols with optional
@@ -205,14 +215,20 @@ pub struct McpCommand {
     pub action: Option<McpAction>,
 }
 
+/// Arguments for the `completions` subcommand (shell-completion generator).
+#[derive(clap::Args, Debug, Clone)]
+pub struct CompletionsCommand {
+    #[arg(value_enum, help = "Target shell")]
+    pub shell: clap_complete::Shell,
+}
+
 /// Sub-actions for the `mcp` subcommand.
 #[derive(Subcommand, Debug, Clone)]
 pub enum McpAction {
     #[command(
-        about = "Detect installed AI clients (claude/codex/gemini) and register the rustgraph MCP server in each one's config. Idempotent. Atomic write with backup. AUR post_install runs this."
+        about = "Detect installed AI clients (claude/codex/gemini) and register the rustgraph MCP server in each one's config. Idempotent. Atomic write with backup."
     )]
     Install {
-
         #[arg(long)]
         quiet: bool,
     },
@@ -224,9 +240,13 @@ pub enum McpAction {
         quiet: bool,
     },
     #[command(
-        about = "Show MCP registration state across detected AI clients."
+        about = "List MCP registration state across detected AI clients (default action when `mcp` is invoked with no sub-action)."
     )]
-    Status,
+    List,
+    #[command(
+        about = "Serve MCP over stdio JSON-RPC. Spawned by AI clients after registration; not for interactive human use."
+    )]
+    Serve,
 }
 
 
@@ -863,7 +883,7 @@ pub struct ImplsCommand {
 #[command(about = "AST-aware Rust codebase navigation.\n\n\
 MCP (Claude / Codex / Gemini integration):\n  \
   rustgraph mcp install\n  \
-  rustgraph mcp status\n  \
+  rustgraph mcp list\n  \
   rustgraph mcp uninstall\n  \
   rustgraph mcp                      # serve stdio (spawned by client)")]
 pub struct Args {

@@ -1,0 +1,169 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: install musl-tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          STAGE="rustgraph-${{ matrix.target }}"
+          mkdir -p "$STAGE"
+          cp "target/${{ matrix.target }}/release/rustgraph" "$STAGE/"
+          strip "$STAGE/rustgraph" || true
+          cp LICENSE README.md "$STAGE/"
+          [ -f man/rustgraph.1 ] && mkdir -p "$STAGE/man" && cp man/rustgraph.1 "$STAGE/man/" || true
+          tar czf "$STAGE.tar.gz" "$STAGE"
+          shasum -a 256 "$STAGE.tar.gz" > "$STAGE.tar.gz.sha256"
+
+      - name: package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = "rustgraph-${{ matrix.target }}"
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/rustgraph.exe" "$stage/"
+          Copy-Item LICENSE,README.md "$stage/"
+          Compress-Archive -Path "$stage/*" -DestinationPath "$stage.zip"
+          $hash = (Get-FileHash "$stage.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  $stage.zip" | Out-File -Encoding ascii "$stage.zip.sha256"
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustgraph-${{ matrix.target }}
+          path: |
+            rustgraph-${{ matrix.target }}.tar.gz
+            rustgraph-${{ matrix.target }}.tar.gz.sha256
+            rustgraph-${{ matrix.target }}.zip
+            rustgraph-${{ matrix.target }}.zip.sha256
+          if-no-files-found: ignore
+
+  release:
+    name: github release + crates.io + scoop bump
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      win_hash: ${{ steps.vars.outputs.win_hash }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: collect release files
+        id: vars
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.sha256' \) -exec cp {} release/ \;
+          ls -la release/
+          VERSION="${GITHUB_REF_NAME#v}"
+          WIN_HASH=$(awk '{print $1}' release/rustgraph-x86_64-pc-windows-msvc.zip.sha256)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "win_hash=$WIN_HASH" >> "$GITHUB_OUTPUT"
+
+      - name: create github release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+
+      - name: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --locked
+
+      - name: bump scoop manifest
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.vars.outputs.version }}"
+          WIN_HASH="${{ steps.vars.outputs.win_hash }}"
+          jq --arg v "$VERSION" --arg h "$WIN_HASH" \
+             '.version = $v
+              | .architecture."64bit".hash = $h
+              | .architecture."64bit".url = "https://github.com/ZmoleCristian/rustgraph/releases/download/v\($v)/rustgraph-x86_64-pc-windows-msvc.zip"' \
+             bucket/rustgraph.json > bucket/rustgraph.json.tmp
+          mv bucket/rustgraph.json.tmp bucket/rustgraph.json
+
+      - name: commit + push manifest bump
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/rustgraph.json
+          if git diff --staged --quiet; then
+            echo "no manifest changes"
+          else
+            git commit -m "scoop: bump to ${GITHUB_REF_NAME}"
+            git push origin HEAD:main
+          fi
+
+  aur:
+    name: aur push (rustgraph + rustgraph-bin)
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: aur — rustgraph (source)
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: rustgraph
+          pkgbuild: aur/rustgraph/PKGBUILD
+          commit_username: ZmoleCristian
+          commit_email: tragdate@gmail.com
+          ssh_private_key: ${{ secrets.AUR_SSH_KEY }}
+          commit_message: "release ${{ needs.release.outputs.version }}"
+          updpkgsums: true
+          test: false
+
+      - name: aur — rustgraph-bin
+        uses: KSXGitHub/github-actions-deploy-aur@v3
+        with:
+          pkgname: rustgraph-bin
+          pkgbuild: aur/rustgraph-bin/PKGBUILD
+          commit_username: ZmoleCristian
+          commit_email: tragdate@gmail.com
+          ssh_private_key: ${{ secrets.AUR_SSH_KEY }}
+          commit_message: "release ${{ needs.release.outputs.version }}"
+          updpkgsums: true
+          test: false

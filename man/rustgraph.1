@@ -1,0 +1,744 @@
+.\" Man page for rustgraph (AST-aware Rust codebase navigation)
+.\" Copyright (c) 2026 Zmole Cristian. License: 0BSD.
+.TH RUSTGRAPH 1 "April 2026" "rustgraph 0.7.7" "User Commands"
+.SH NAME
+rustgraph \- AST\-aware Rust codebase navigation built for AiDX
+.SH SYNOPSIS
+.B rustgraph
+.RI [ GLOBAL-OPTIONS ]
+.I COMMAND
+.RI [ ARGS ...]
+.PP
+.B rustgraph find
+.RB [ \-\-func | \-\-struct | \-\-enum ]
+.I QUERY
+.br
+.B rustgraph callers
+.RB [ \-C
+.IR N ]
+.RB [ \-\-depth
+.IR N ]
+.I FN
+.br
+.B rustgraph ensemble
+.RB [ \-\-view
+.IR V ]
+.RB [ \-\-preset
+.IR P ]
+.I FN
+.br
+.B rustgraph paths\-between
+.RB [ \-\-show\-call\-sites ]
+.I FROM
+.I TO
+.br
+.B rustgraph slice
+.IR PATH.rs : LINE [ \- END ]
+.br
+.B rustgraph mcp
+.RB [ install | uninstall | list | serve ]
+.SH DESCRIPTION
+\fBrustgraph\fR is an AST\-aware Rust source navigator. It parses Rust
+crates with \fBsyn\fR(3), builds a symbol index and a call graph, and
+exposes both through a CLI, a Rust library, and a Model Context
+Protocol (MCP) server.
+.PP
+The tool is designed AiDX\-first \(em "AI Developer Experience". When
+the caller is a model, every redundant token costs money and every
+false positive in \fBgrep\fR(1) wastes a turn. Output, errors,
+defaults, and help text are shaped so an agent can finish a navigation
+task in one call instead of six. Humans get a fast, deterministic CLI
+as a side effect.
+.PP
+Because resolution happens on the parsed AST, results do not match
+string literals, comments, attribute arguments, or unrelated tokens
+that share a name. For raw text search across those surfaces, use
+\fBrustgraph grep\fR (documented below) which still skips non\-Rust
+files.
+.SH GLOBAL OPTIONS
+These flags are accepted before any subcommand. Most are
+.IR global ,
+i.e. accepted in any position. Run
+.B rustgraph \-\-help
+for the full reference.
+.SS Resolution
+.TP
+\fB\-p\fR, \fB\-\-path\fR \fIPATH\fR
+Crate root path (default \fI.\fR). Cargo.toml auto\-discovery walks
+upward from this path.
+.TP
+.B \-\-no\-auto\-path
+Disable Cargo.toml auto\-discovery; use the value of
+.B \-p
+verbatim.
+.TP
+.B \-\-absolute\-paths
+Emit absolute file paths instead of paths relative to
+.BR \-p .
+.TP
+\fB\-\-also\fR \fIPATH\fR
+Extra crate root(s) to merge for cross\-crate analysis. Repeat to add
+more than one.
+.TP
+.B \-\-strict\-resolution
+Drop call edges where type\-strict matching returned 0 candidates
+instead of falling back to bare\-name match. Reduces false positives at
+the cost of hiding some legitimate edges. The dropped count is reported
+on stderr. Affects \fBcallers\fR, \fBcall\-graph\fR, \fBpaths\-between\fR.
+.SS Output
+.TP
+\fB\-o\fR, \fB\-\-output\fR \fIFILE\fR
+Write to \fIFILE\fR instead of standard output.
+.TP
+\fB\-j\fR, \fB\-\-json\fR
+Emit JSON with a stable schema; pipes cleanly to \fBjq\fR(1).
+.TP
+.B \-\-include\-ignored
+Include files normally excluded by \fI.gitignore\fR (typically
+\fItarget/\fR, \fIbuild/\fR).
+.TP
+\fB\-\-color\fR, \fB\-\-no\-color\fR
+Force colored / disable colored output (default off). Mutually exclusive.
+.SS Search
+.TP
+\fB\-\-search\fR \fIQUERY\fR
+Fuzzy search across functions, structs, and enums. Use \(lq|\(rq inside
+the query for OR alternatives.
+.TP
+\fB\-\-search\-threshold\fR \fIF\fR
+Fuzzy match threshold in [0.0, 1.0]. Default \fB0.85\fR; raise toward
+\fB1.0\fR for stricter matches.
+.TP
+.B \-\-match\-signature
+Additive: union name\-tier hits with hits whose signature (params /
+return) or file path fuzzy\-matches the query (deduped; name wins on
+collision). A summary like \(lqnote: \fIX\fR name + \fIY\fR sig/path
+matches\(rq is emitted on stderr.
+.TP
+.B \-\-exclude\-tests
+Drop matches whose enclosing function is a test. Honored by \fBgrep\fR,
+\fBrefs\fR, \fBfind\fR, \fBdead\-code\fR, \fBcallers\fR, \fBensemble\fR,
+\fBusages\fR.
+.TP
+.B \-\-public\-only
+Filter to public items only (skip \fBpub(crate)\fR and private). Applies
+to \fBinventory\fR and \fBfind\fR.
+.SS Diff
+.TP
+.B \-\-changed
+Filter to symbols whose enclosing fn/struct/enum was changed since
+\fB\-\-since\fR (default \fBHEAD~1\fR). Requires \fBgit\fR(1).
+.TP
+\fB\-\-since\fR \fIGIT_REF\fR
+Diff base for \fB\-\-changed\fR. Any git ref (branch, tag, sha).
+.SS Inventory mode (no subcommand)
+.TP
+\fB\-\-analyze\fR \fIMODE\fR
+One of \fBfunctions\fR, \fBstructs\fR, \fBenums\fR, \fBboth\fR (default).
+Inventory mode only \(em for lookup use \fBfind\fR.
+.TP
+\fB\-\-func\fR, \fB\-\-struct\fR, \fB\-\-enum\fR
+Inventory shortcuts: list only the named symbol class.
+.SS Help and version
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help. Use \fB\-\-help\fR for the long form.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version.
+.SH COMMANDS
+Each subcommand accepts the global options above. Unless noted,
+list\-producing subcommands take \fB\-n\fR/\fB\-\-max\-results\fR to cap
+output (with a footer reporting the original total when truncated) and
+\fB\-\-in\fR \fIPATH_SUBSTR\fR to scope to files whose path contains
+\fIPATH_SUBSTR\fR.
+.SS find
+\fBrustgraph find\fR [\fB\-\-func\fR|\fB\-\-struct\fR|\fB\-\-enum\fR]
+[\fB\-\-exact\fR] [\fB\-\-show\-ids\fR] [\fB\-n\fR \fIN\fR]
+[\fB\-\-in\fR \fIPATH_SUBSTR\fR] \fIQUERY\fR
+.PP
+Short alias for symbol lookup; roughly equivalent to \fB\-\-search\fR
+\fIQUERY\fR \fB\-\-search\-threshold 0.85\fR across functions, structs,
+and enums. Muscle\-memory replacement for \(lq\fBrg\fR \fI<name>\fR\(rq.
+\fIQUERY\fR is name\-only or \(lq\fI<a>\fR|\fI<b>\fR\(rq alternatives \(em
+\fInot\fR \fIpath.rs\fR:\fILINE\fR (use \fBslice\fR or \fBcallers\fR for
+that).
+.TP
+\fB\-\-func\fR, \fB\-\-struct\fR, \fB\-\-enum\fR
+Restrict to one symbol class.
+.TP
+.B \-\-exact
+Exact (case\-insensitive) name match with no fuzz expansion. Does not
+error on 0 or many matches.
+.TP
+.B \-\-show\-ids
+Append \(lq[id: \fIsymbol_id\fR]\(rq to each text\-mode line. Use when
+round\-tripping through \fBslice \-\-symbol\-id\fR (or just pass \fB\-j\fR).
+.PP
+\fBExample:\fR \fBrustgraph find handle_request \-\-func\fR
+.SS def
+\fBrustgraph def\fR [\fB\-\-func\fR|\fB\-\-struct\fR|\fB\-\-enum\fR]
+[\fB\-\-in\fR \fIPATH_SUBSTR\fR] \fINAME\fR
+.PP
+Go\-to\-definition: print exact symbol location as
+\fIpath\fR:\fIline\fR:\fIname\fR. Exits \fB1\fR if 0 or more than 1
+match. Use this when \fBfind\fR is too fuzzy and a single deterministic
+answer is required. \fINAME\fR matches case\-sensitively.
+.PP
+\fBExample:\fR \fBrustgraph def DaemonState \-\-struct\fR
+.SS callers
+\fBrustgraph callers\fR [\fB\-C\fR \fIN\fR | \fB\-A\fR \fIN\fR \fB\-B\fR
+\fIN\fR] [\fB\-\-depth\fR \fIN\fR] [\fB\-\-flat\fR]
+[\fB\-\-target\-in\fR \fIPATH_SUBSTR\fR]
+[\fB\-\-callers\-in\fR \fIPATH_SUBSTR\fR] [\fB\-\-symbol\-id\fR \fIID\fR]
+[\fB\-\-all\fR] [\fB\-\-ambiguity\-cap\fR \fIN\fR] \fIFN\fR
+.PP
+List functions calling \fIFN\fR. \fIFN\fR accepts a name,
+\fIpath.rs\fR:\fILINE\fR, or a canonical \fIsymbol_id\fR. On ambiguous
+queries (more than \fB\-\-ambiguity\-cap\fR matches, default \fB7\fR)
+the candidate list is printed and the process exits non\-zero; pass
+\fB\-\-all\fR to process them anyway, or disambiguate with
+\fB\-\-target\-in\fR or \fB\-\-symbol\-id\fR.
+.TP
+\fB\-A\fR, \fB\-B\fR, \fB\-C\fR \fIN\fR
+Trailing / leading / symmetric context lines around each call site
+(default \fB0\fR). \fB\-C\fR overrides the individual flags when set.
+.TP
+\fB\-\-depth\fR \fIN\fR
+Caller chain depth. Default \fB1\fR (direct callers); set \fB2+\fR for
+transitive chains; \fB0\fR for unlimited (cycle\-safe). Output gains a
+depth field per node and a tree view in text mode.
+.TP
+.B \-\-flat
+Emit all transitive callers as a deduplicated
+\fIpath\fR:\fIline\fR:\fIname\fR list (no tree). Pipe\-friendly.
+Mutually exclusive with \fB\-j\fR.
+.TP
+\fB\-\-target\-in\fR / \fB\-\-callers\-in\fR \fIPATH_SUBSTR\fR
+Filter target functions (\fB\-\-target\-in\fR) or caller functions
+(\fB\-\-callers\-in\fR) by file\-path substring. \fB\-\-callers\-in\fR
+filters at every depth.
+.TP
+\fB\-\-symbol\-id\fR \fIID\fR
+Resolve target by exact \fIsymbol_id\fR (from \fBfind \-j\fR or
+\fBcallers \-j\fR). Bypasses fuzzy matching. When set, \fIFN\fR is
+optional.
+.PP
+\fBExample:\fR \fBrustgraph callers \-C 2 \-\-depth 2 build_ledger\fR
+.SS usages
+\fBrustgraph usages\fR [\fB\-\-in\fR \fIPATH_SUBSTR\fR]
+[\fB\-n\fR \fIN\fR] \fINAME\fR
+.PP
+Combined \(lqcallers \fI<name>\fR\(rq + \(lqrefs \fI<name>\fR\(rq. One
+stop for "what touches this name" when you do not yet know whether
+\fINAME\fR is a function (use \fBcallers\fR) or a type/field (use
+\fBrefs\fR). Default cap \fB100\fR.
+.PP
+\fBExample:\fR \fBrustgraph usages SessionDocument\fR
+.SS refs
+\fBrustgraph refs\fR [\fB\-\-kind\fR \fIKIND\fR]... [\fB\-\-by\-function\fR]
+[\fB\-\-in\fR \fIPATH_SUBSTR\fR] [\fB\-n\fR \fIN\fR] \fIIDENT\fR
+.PP
+Find every reference to \fIIDENT\fR: type uses, field reads, struct
+construction, pattern matches, method calls, plain paths. Complement to
+\fBcallers\fR (which only walks function\-call edges). Matched by exact
+last\-segment name.
+.TP
+\fB\-\-kind\fR \fIKIND\fR
+Filter by classification tag. Allowed: \fBfield\fR, \fBpath\fR,
+\fBassoc_call\fR, \fBvariant\fR, \fBtype\fR, \fBstruct\fR, \fBpattern\fR,
+\fBmethod\fR, \fBcall\fR. Repeat to allow multiple. \fBvariant\fR matches
+enum\-variant qualifiers (e.g. \fIColor\fR::\fIRed\fR); \fBassoc_call\fR
+matches associated functions (e.g. \fISessionDocument\fR::\fIload\fR);
+\fBmethod\fR matches \fI.method()\fR calls regardless of receiver type.
+\fBassoc_call\fR and \fBvariant\fR filter on the \fIqualifier\fR
+(Type/Enum), not the leaf name.
+.TP
+.B \-\-by\-function
+Group references by enclosing function (similar to
+\fBgrep \-\-by\-function\fR).
+.PP
+\fBExample:\fR \fBrustgraph refs SymbolContext \-\-kind type \-\-kind assoc_call\fR
+.SS members
+\fBrustgraph members\fR [\fB\-\-in\fR \fIPATH_SUBSTR\fR]
+[\fB\-n\fR \fIN\fR] \fITYPE\fR
+.PP
+List every access site for each field of \fITYPE\fR. Closes the gap
+where \(lqrefs \fI<Type>\fR \-\-kind field\(rq returns \fB0\fR because
+\fB\-\-kind field\fR filters on the field \fIname\fR, not the owner
+type. Each field's site list is truncated independently (default
+\fB50\fR per field); the header counts stay un\-capped. For enums, use
+\(lqrefs \fI<Enum>\fR \-\-kind variant\(rq instead.
+.PP
+\fBExample:\fR \fBrustgraph members ProjectSummary\fR
+.SS impls
+\fBrustgraph impls\fR [\fB\-\-derived\-only\fR | \fB\-\-handwritten\-only\fR]
+[\fB\-\-in\fR \fIPATH_SUBSTR\fR] [\fB\-n\fR \fIN\fR] \fITRAIT\fR
+.PP
+List every type that implements \fITRAIT\fR, both via
+\fB#[derive(Trait)]\fR and hand\-written \fBimpl Trait for X\fR blocks.
+Resolves the trait name by its last path segment, so \fBSerialize\fR
+matches \fBserde::Serialize\fR; pass the fully qualified name to
+disambiguate.
+.TP
+\fB\-\-derived\-only\fR / \fB\-\-handwritten\-only\fR
+Restrict to derive\-generated or hand\-written impls.
+.PP
+\fBExample:\fR \fBrustgraph impls Serialize \-\-handwritten\-only\fR
+.SS paths-between
+\fBrustgraph paths\-between\fR [\fB\-\-depth\fR \fIN\fR]
+[\fB\-n\fR \fIN\fR] [\fB\-\-show\-call\-sites\fR]
+[\fB\-\-target\-in\fR \fIPATH_SUBSTR\fR]
+[\fB\-\-to\-module\fR \fIPATH_SUBSTR\fR] \fIFROM\fR [\fITO\fR]
+.PP
+Aliased as \fBwhy\fR. DFS through the call graph to enumerate paths
+from \fIFROM\fR to \fITO\fR. Answers "does \fIA\fR actually reach
+\fIB\fR, and through what?". Both arguments accept a name,
+\fIpath.rs\fR:\fILINE\fR, or \fIsymbol_id\fR.
+.TP
+\fB\-\-depth\fR \fIN\fR
+Maximum path length in nodes (default \fB8\fR; \fB0\fR for unlimited).
+High values explode combinatorially in dense graphs.
+.TP
+\fB\-n\fR, \fB\-\-max\-results\fR \fIN\fR
+Cap on the number of paths emitted (default \fB10\fR; \fB0\fR for
+unlimited).
+.TP
+.B \-\-show\-call\-sites
+Annotate each hop with the source line where the next call happens.
+First lookup wins when a function calls the same callee from multiple
+sites.
+.TP
+\fB\-\-to\-module\fR \fIPATH_SUBSTR\fR
+Blast\-radius mode: search to \fIany\fR function whose file path
+contains \fIPATH_SUBSTR\fR, not just one \fITO\fR. When set, \fITO\fR is
+optional. If both are given, the destination set is the union.
+.PP
+\fBExample:\fR \fBrustgraph paths\-between handle_request build_budget \-\-show\-call\-sites\fR
+.SS ensemble
+\fBrustgraph ensemble\fR [\fB\-\-view\fR \fIV\fR] [\fB\-\-preset\fR \fIP\fR]
+[\fB\-\-section\fR \fIS\fR]... [\fB\-\-lifecycle\-types\fR \fILIST\fR]
+[\fB\-\-no\-boundaries\fR] [\fB\-\-boundaries\-min\-score\fR \fIF\fR]
+[\fB\-\-target\-in\fR \fIPATH_SUBSTR\fR] [\fB\-\-symbol\-id\fR \fIID\fR]
+[\fB\-\-all\fR] [\fB\-\-ambiguity\-cap\fR \fIN\fR] \fIFN\fR
+.PP
+Build a function context bundle: source code, structs touched, call
+sites, neighborhood (upstream + downstream), value\-flow hints, type
+lifecycles, and I/O boundaries. One ensemble call typically replaces
+4\(en6 grep + read cycles. Functions only \(em for structs/enums use
+\fBslice\fR.
+.TP
+\fB\-\-view\fR \fIV\fR
+High\-level output view: \fBsummary\fR (default; structs, call\-sites,
+neighborhood, dataflow with abbreviated neighborhood), \fBusage\fR
+(call\-sites + neighborhood), \fBflow\fR (neighborhood + lifecycle +
+dataflow + boundaries), or \fBfull\fR (every section, often 300+ lines).
+.TP
+\fB\-\-preset\fR \fIP\fR
+Depth profile: \fBquick\fR (tightest limits), \fBbalanced\fR (default),
+or \fBdeep\fR (largest limits, deeper neighborhood, no call\-site cap).
+.TP
+\fB\-\-section\fR \fIS\fR
+Cherry\-pick which sections render. Repeat for multiple. Valid:
+\fBcode\fR, \fBstructs\fR, \fBcall\-sites\fR, \fBneighborhood\fR,
+\fBlifecycle\fR, \fBdataflow\fR, \fBboundaries\fR, \fBall\fR. Overrides
+\fB\-\-view\fR when set.
+.TP
+\fB\-\-lifecycle\-types\fR \fILIST\fR
+Pipe\-separated list of type names to analyze. Defaults to structs used
+by the matched function.
+.TP
+\fB\-\-no\-boundaries\fR / \fB\-\-boundaries\-min\-score\fR \fIF\fR
+Suppress the I/O boundaries section, or set its minimum confidence
+score in [0.0, 1.0]. Default \fB0.7\fR drops noisy 0.5\(en0.65 entries;
+\fB0.0\fR for the unfiltered firehose.
+.TP
+\fB\-\-symbol\-id\fR \fIID\fR
+Resolve target by exact \fIsymbol_id\fR; positional \fIFN\fR becomes
+optional.
+.PP
+\fBExample:\fR \fBrustgraph ensemble handle_request \-\-view full\fR
+.SS slice
+\fBrustgraph slice\fR [\fB\-C\fR \fIN\fR] [\fB\-\-symbol\-id\fR \fIID\fR]
+[\fB\-\-file\fR \fIPATH\fR \fB\-\-start\-line\fR \fIS\fR
+\fB\-\-end\-line\fR \fIE\fR] [\fIQUERY\fR]
+.PP
+Print exact source for a function, struct, enum, or arbitrary file
+range. Three positional query forms:
+.IP \(bu 2
+\(lqslice \fI<name>\fR\(rq \(em symbol query (resolves to a single
+fn/struct/enum)
+.IP \(bu 2
+\(lqslice \fIpath.rs\fR:\fILINE\fR\(rq \(em slice the symbol enclosing
+\fILINE\fR
+.IP \(bu 2
+\(lqslice \fIpath.rs\fR:\fISTART\fR\-\fIEND\fR\(rq \(em literal
+line\-range slice (no symbol resolution)
+.TP
+\fB\-C\fR, \fB\-\-around\fR \fIN\fR
+Line\-centered context window: \fIN\fR lines before and after. For
+\fIpath.rs\fR:\fILINE\fR queries, returns \fILINE\-N..LINE+N\fR instead
+of the enclosing function. For \fIpath.rs\fR:\fISTART\fR\-\fIEND\fR
+queries, expands the range by \fIN\fR on each side.
+.TP
+\fB\-\-symbol\-id\fR \fIID\fR
+Exact \fIsymbol_id\fR from a prior \fB\-\-json\fR run. Functions are
+\fI<path>\fR:\fI<line>\fR:\fI<name>\fR; structs/enums prefix with
+\fBstruct:\fR or \fBenum:\fR. Round\-trips with \fBfind \-j\fR,
+\fBcallers \-j\fR, \fBensemble \-j\fR.
+.TP
+\fB\-\-file\fR \fIPATH\fR \fB\-\-start\-line\fR \fIS\fR \fB\-\-end\-line\fR \fIE\fR
+Explicit file\-range form when the positional query is too clever.
+.PP
+\fBExample:\fR \fBrustgraph slice src/foo.rs:120\-180\fR
+.SS dead-code
+\fBrustgraph dead\-code\fR [\fB\-\-in\fR \fIPATH_SUBSTR\fR]
+[\fB\-\-verbose\fR] [\fB\-n\fR \fIN\fR]
+.PP
+Aliased as \fBorphans\fR. Find public functions with zero non\-test
+callers. Skips re\-exported items, items inside \fBcfg(test)\fR,
+runtime entrypoints, framework handlers, and ambiguous resolutions.
+Pair with \fB\-\-exclude\-tests\fR to also drop test functions
+themselves from the audit set.
+.TP
+.B \-\-verbose
+Show the skip\-reason summary line (re\-exported / inside \fBcfg(test)\fR /
+runtime entrypoints / ambiguous / framework\-handler counts). Useful once
+for debugging a missed entry.
+.PP
+\fBExample:\fR \fBrustgraph dead\-code \-\-in src/daemon \-\-exclude\-tests\fR
+.SS call-graph
+\fBrustgraph call\-graph\fR [\fB\-\-root\fR \fIFN\fR | \fIROOT\fR]
+[\fB\-\-depth\fR \fIN\fR] [\fB\-\-include\-callers\fR]
+[\fB\-\-detail\fR \fID\fR] [\fB\-\-show\-external\fR] [\fB\-\-dot\fR]
+[\fB\-\-all\fR]
+.PP
+Generate a rooted or full project call graph. Default output is an
+indented text tree (terminal\-friendly). Pass \fB\-\-dot\fR for graphviz
+output.
+.TP
+.I ROOT
+Anchor function as a positional argument; equivalent to \fB\-\-root\fR
+\fIROOT\fR.
+.TP
+\fB\-\-root\fR \fIFN\fR
+Anchor the graph at \fIFN\fR (name or \fIpath.rs\fR:\fILINE\fR) and
+walk outgoing call edges to emit a subgraph instead of the full project.
+.TP
+\fB\-\-depth\fR \fIN\fR
+When \fB\-\-root\fR is set, cap the BFS depth (default \fB3\fR; \fB0\fR
+for unlimited). Ignored without \fB\-\-root\fR.
+.TP
+.B \-\-include\-callers
+When \fB\-\-root\fR is set, also include callers of root up to
+\fB\-\-depth\fR hops up. Default is downstream\-only.
+.TP
+\fB\-\-detail\fR \fID\fR
+Edge detail: \fBinternal\fR (default; intra\-crate only), \fBexternal\fR
+(cross\-crate or unresolved only), or \fBall\fR (every edge).
+.TP
+.B \-\-show\-external
+Show the \fB<external>\fR rollup line listing unresolved callees (std
+iterator chains, method calls, cross\-crate fns). Hidden by default in
+text mode. No effect in \fB\-\-dot\fR mode.
+.TP
+.B \-\-all
+Render the whole project graph (no scope filter). Required when no
+\fB\-\-root\fR or \fB\-\-search\fR is set on a project with more than 50
+functions. Small projects (<= 50 fns) auto\-render without this flag.
+.PP
+\fBExample:\fR \fBrustgraph call\-graph main \-\-depth 4 \-\-dot > graph.dot\fR
+.SS tree
+\fBrustgraph tree\fR [\fB\-\-files\-only\fR] [\fIPREFIX\fR]
+.PP
+Print the module/file tree of the project, with symbol counts per file.
+Replaces \fBls\fR(1) and \fBtree\fR(1) for code navigation. \fIPREFIX\fR
+limits the output to a subtree.
+.TP
+.B \-\-files\-only
+Hide symbol counts; show files only.
+.PP
+\fBExample:\fR \fBrustgraph tree src/daemon\fR
+.SS grep
+\fBrustgraph grep\fR [\fB\-i\fR] [\fB\-F\fR] [\fB\-C\fR \fIN\fR |
+\fB\-A\fR \fIN\fR \fB\-B\fR \fIN\fR] [\fB\-\-enclosing\-function\fR]
+[\fB\-\-by\-function\fR | \fB\-\-by\-file\fR]
+[\fB\-\-in\fR \fIPATH_SUBSTR\fR] [\fB\-n\fR \fIN\fR] \fIPATTERN\fR
+.PP
+Text/regex search across Rust source files. Catches everything
+\fB\-\-search\fR does not see (comments, string literals, attribute
+args). Skips non\-Rust files.
+.PP
+Regex flavor is the Rust \fBregex\fR crate \(em not PCRE. No
+backreferences or lookarounds; use \fB\eb\fR for word boundaries,
+\fB(?i)\fR inline for case\-insensitive (or pass \fB\-i\fR); char
+classes \fB[abc]\fR, \fB[^abc]\fR, \fB\ed\fR, \fB\ew\fR, \fB\es\fR and
+friends. See
+.UR https://docs.rs/regex/latest/regex/#syntax
+.UE
+for the full grammar.
+.TP
+\fB\-i\fR, \fB\-\-ignore\-case\fR / \fB\-F\fR, \fB\-\-fixed\-string\fR
+Case\-insensitive match / treat \fIPATTERN\fR as a literal string.
+.TP
+\fB\-A\fR, \fB\-B\fR, \fB\-C\fR \fIN\fR
+Trailing / leading / symmetric context, identical to \fBcallers\fR.
+.TP
+.B \-\-enclosing\-function
+For each match, also report the enclosing function name and its
+\fIfile\fR:\fIstart\fR\-\fIend\fR range. Folds the grep \(rA fn\-mapping
+pipeline into one call.
+.TP
+.B \-\-by\-function
+Token\-saver: skip the per\-line dump, emit only the per\-function
+summary table (count desc, with \fB[test]\fR tags). Implies
+\fB\-\-enclosing\-function\fR. Mutually exclusive with \fB\-\-by\-file\fR.
+Aliased as \fB\-\-rollup\fR.
+.TP
+.B \-\-by\-file
+Token\-saver: skip per\-line dump, emit only a per\-file rollup
+(\fI<path>\fR: \fIN\fR matches). JSON envelope: \fBby_file\fR array of
+\fB{path, count}\fR. Mutually exclusive with \fB\-\-by\-function\fR.
+.PP
+Default cap is \fB200\fR matches. Always single\-quote the pattern in
+your shell to keep \fB$\fR and \fB!\fR literal.
+.PP
+\fBExample:\fR \fBrustgraph grep '\eb.unwrap\e(\e)' \-\-by\-function\fR
+.SS inventory
+\fBrustgraph inventory\fR [\fB\-\-func\fR | \fB\-\-struct\fR | \fB\-\-enum\fR]
+.PP
+Dump every fn/struct/enum in the project (parse\-only baseline).
+Equivalent to invoking \fBrustgraph\fR with no subcommand and
+\fB\-\-func\fR/\fB\-\-struct\fR/\fB\-\-enum\fR. Useful for piping to
+\fBwc\fR(1) for symbol counts.
+.PP
+\fBExample:\fR \fBrustgraph inventory \-\-func | wc \-l\fR
+.SS mcp
+\fBrustgraph mcp\fR [install [\fB\-\-quiet\fR] | uninstall [\fB\-\-quiet\fR] | list | serve]
+.PP
+MCP (Model Context Protocol) server plus self\-registration. With no
+sub\-action, defaults to \fBlist\fR (read\-only registration state).
+The \fBserve\fR sub\-action is what AI clients spawn after registration
+to talk MCP over stdio JSON\-RPC \(em it is not for interactive human use.
+.TP
+.B install
+Detect installed AI clients (Claude, Codex, Gemini) and register the
+rustgraph MCP server in each one's config. Idempotent. Atomic write
+with timestamped backup.
+.TP
+.B uninstall
+Remove the rustgraph MCP entry from every detected client config.
+.TP
+.B list
+Show MCP registration state across detected clients (read\-only). This
+is the default action when \fBmcp\fR is invoked with no sub\-action.
+.TP
+.B serve
+Serve MCP over stdio JSON\-RPC. Spawned by AI clients via the
+\fBcommand\fR/\fBargs\fR pair written by \fBmcp install\fR. Not intended
+for interactive use.
+.TP
+.B \-\-quiet
+Suppress per\-client status lines on \fBinstall\fR and \fBuninstall\fR.
+The exit code still reflects success.
+.PP
+See \fBMCP SERVER\fR below for the protocol details and the list of
+exposed tools.
+.PP
+\fBExample:\fR \fBrustgraph mcp install\fR
+.SS completions
+\fBrustgraph completions\fR \fISHELL\fR
+.PP
+Generate a shell completion script for \fISHELL\fR on standard output.
+Supported shells: \fBbash\fR, \fBzsh\fR, \fBfish\fR, \fBelvish\fR,
+\fBpowershell\fR.
+.PP
+\fBExample:\fR \fBrustgraph completions zsh > "${fpath[1]}/_rustgraph"\fR
+.SS generate-man
+\fBrustgraph generate\-man\fR [\fB\-\-output\fR \fIDIR\fR]
+.PP
+Generate this man page (and any subcommand pages) from the live clap
+definition and write the \fBgroff\fR source to \fIDIR\fR (default:
+standard output). Useful for packagers regenerating \fBrustgraph.1\fR
+at build time.
+.PP
+\fBExample:\fR \fBrustgraph generate\-man \-\-output ./man\fR
+.SH MCP SERVER
+\fBrustgraph\fR ships an MCP (Model Context Protocol) server that
+exposes the most common navigation operations as agent\-callable tools
+over stdio JSON\-RPC. The server is the same binary; it is spawned by
+the client on demand.
+.PP
+Run \fBrustgraph mcp install\fR to register the server with every
+detected client. The install is idempotent and writes atomically; each
+modified config is backed up to a timestamped sibling
+(\fI<config-file>.rustgraph-bak.<unix-ts>\fR) before the new contents
+are renamed into place.
+.PP
+Detected client config files:
+.TP
+.B Claude Code
+\fI~/.claude.json\fR \(em added under \fBmcpServers.rustgraph\fR with
+\fBtype = stdio\fR. Honors \fBCLAUDE_CONFIG_DIR\fR (see
+\fBENVIRONMENT\fR).
+.TP
+.B Codex
+\fI~/.codex/config.toml\fR \(em added as a \fB[mcp_servers.rustgraph]\fR
+TOML table.
+.TP
+.B Gemini CLI
+\fI~/.gemini/settings.json\fR \(em added under \fBmcpServers.rustgraph\fR
+with \fBtrust = true\fR.
+.PP
+Each entry invokes the binary as \(lq\fBrustgraph mcp serve\fR\(rq. The server
+announces itself as \fBrustgraph\fR on the MCP wire and exposes five
+tools that map to the highest\-leverage CLI subcommands. Agents should
+reach for the MCP tools over text \fBgrep\fR(1) when navigating Rust
+because they resolve on the parsed AST and never match string literals
+or comments.
+.TP
+.B rustgraph_find
+Locate a Rust symbol (fn/struct/enum) by name. AST\-aware. Returns
+\fIfile\fR:\fIline\fR range plus signature plus a match\-kind tag.
+Default fuzzy threshold \fB0.85\fR; auto\-relaxes to \fB0.7\fR on 0
+results. Pick this when the agent needs to know \fIwhere\fR something
+lives.
+.TP
+.B rustgraph_callers
+List every function calling a target, with call\-site lines and
+enclosing\-fn context. Handles \fIType\fR::\fImethod\fR collisions.
+\fBdepth: 0\fR = unlimited transitive (cycle\-safe). \fBflat: true\fR =
+deduplicated \fIpath\fR:\fIline\fR:\fIname\fR list. Pick this for "who
+depends on this fn" questions.
+.TP
+.B rustgraph_ensemble
+Function context bundle: structs touched, call sites, neighborhood,
+dataflow, I/O boundaries. Views: \fBsummary\fR (default), \fBusage\fR,
+\fBflow\fR, \fBfull\fR. Presets: \fBquick\fR, \fBbalanced\fR (default),
+\fBdeep\fR. Pick this when the agent needs to \fIunderstand\fR a function
+before editing, not just locate it. One ensemble call typically replaces
+4\(en6 grep + read cycles.
+.TP
+.B rustgraph_paths_between
+Enumerate distinct call\-graph paths from \fIFROM\fR to \fITO\fR via DFS.
+Answers "does \fIA\fR reach \fIB\fR, and through what?". Default
+\fBmax_results: 8\fR; pass \fB0\fR for full enumeration.
+\fBshow_call_sites: true\fR annotates each hop with the source line.
+.TP
+.B rustgraph_slice
+Print exact source of one Rust symbol. Accepts a name,
+\fIpath.rs\fR:\fILINE\fR (enclosing symbol), or
+\fIpath.rs\fR:\fISTART\fR\-\fIEND\fR (literal range). \fBcontext: N\fR
+adds \fIN\fR lines on either side. Pick this over reading the file when
+the agent only needs one definition.
+.PP
+For everything else (def, refs, usages, members, impls, dead\-code,
+call\-graph, tree, grep, inventory) the agent should fall back to the
+CLI on PATH.
+.SH FILES
+.TP
+.I ~/.claude.json
+Claude Code MCP registry. Modified by \fBrustgraph mcp install\fR /
+\fBuninstall\fR. Path is overridden by \fBCLAUDE_CONFIG_DIR\fR if set;
+rustgraph then reads/writes \fI$CLAUDE_CONFIG_DIR/.claude.json\fR.
+.TP
+.I ~/.codex/config.toml
+Codex MCP registry. Modified by \fBrustgraph mcp install\fR /
+\fBuninstall\fR.
+.TP
+.I ~/.gemini/settings.json
+Gemini CLI MCP registry. Modified by \fBrustgraph mcp install\fR /
+\fBuninstall\fR.
+.TP
+.IB <config-file> .rustgraph-bak. <unix-ts>
+Per\-config timestamped backup written before any \fBinstall\fR or
+\fBuninstall\fR mutation. Safe to delete once the change has been
+verified.
+.TP
+.IB <config-file> .rustgraph-tmp
+Atomic\-write staging file, renamed onto the target. Should never
+persist; if it does, the previous run was interrupted mid\-write and
+the file may be safely removed.
+.TP
+.I ~/.config/rustgraph/no-nudge
+Planned opt\-out marker. When this file exists, periodic
+\(lqmcp install\(rq nudges (printed by the CLI when it detects an
+installed AI client with no rustgraph entry) are suppressed for the
+current user. Touch the file to silence the nudge.
+.TP
+.I ./Cargo.toml
+Crate manifest discovered upward from \fB\-p\fR unless
+\fB\-\-no\-auto\-path\fR is set. Drives crate\-root resolution.
+.SH ENVIRONMENT
+.TP
+.B CLAUDE_CONFIG_DIR
+Overrides the directory containing \fI.claude.json\fR. When set,
+\fBrustgraph mcp install\fR reads and writes
+\fI$CLAUDE_CONFIG_DIR/.claude.json\fR instead of \fI~/.claude.json\fR.
+Useful for parallelizing multiple Claude accounts (e.g.
+\(lqCLAUDE_CONFIG_DIR=~/.claude\-alt rustgraph mcp install\(rq).
+.SH EXAMPLES
+.TP
+Trace upstream callers of a function with two\-line context:
+\fBrustgraph callers \-C 2 \-\-depth 2 build_ledger\fR
+.TP
+Find dead public functions, scoped to one layer, ignoring tests:
+\fBrustgraph dead\-code \-\-in src/daemon \-\-exclude\-tests\fR
+.TP
+Show every call site of a function, deduplicated and pipe\-friendly:
+\fBrustgraph callers handle_request \-\-depth 0 \-\-flat\fR
+.TP
+Register the MCP server with every detected AI client:
+\fBrustgraph mcp install\fR
+.TP
+Get the full context bundle for one function in JSON:
+\fBrustgraph \-j ensemble handle_request \-\-view full\fR
+.TP
+List every type implementing a trait, hand\-written impls only:
+\fBrustgraph impls Serialize \-\-handwritten\-only\fR
+.TP
+Slice an exact line range out of a file:
+\fBrustgraph slice src/foo.rs:120\-180\fR
+.TP
+Cross\-crate caller lookup against a sibling crate:
+\fBrustgraph \-p ../sibling\-crate callers handle_request\fR
+.TP
+Per\-function rollup of every \fB.unwrap()\fR call in the codebase:
+\fBrustgraph grep '\eb.unwrap\e(\e)' \-\-by\-function\fR
+.SH EXIT STATUS
+.TP
+.B 0
+Success. The query produced output (possibly empty) and no error
+occurred.
+.TP
+.B 1
+Generic failure. Most commonly: 0 matches when 1 was required (e.g.
+\fBdef\fR), ambiguous match when \fB\-\-all\fR was not passed (e.g.
+\fBcallers\fR, \fBensemble\fR), unscoped \fBcall\-graph\fR on a project
+with more than 50 functions without \fB\-\-all\fR, parse error in the
+target crate, or invalid argument combination.
+.TP
+.B 2
+Argument parse error from clap (unknown flag, missing required value,
+mutually exclusive flags both set).
+.PP
+Diagnostics are written to stderr. Resolution\-quality notes (e.g. "X%
+of edges resolved by name fallback", \(lqnote: \fIX\fR name + \fIY\fR
+sig/path matches\(rq) are also written to stderr so they do not
+contaminate \fB\-j\fR output on stdout.
+.SH SEE ALSO
+\fBgrep\fR(1), \fBripgrep\fR(1), \fBcargo\fR(1), \fBjq\fR(1),
+\fBpacman\fR(8), \fBgit\fR(1).
+.PP
+Project home and issue tracker:
+.UR https://github.com/ZmoleCristian/rustgraph
+.UE
+.SH AUTHOR
+Zmole Cristian.
+.PP
+Bug reports and patches via the GitHub issue tracker linked under
+\fBSEE ALSO\fR.
+.SH LICENSE
+\fBrustgraph\fR is distributed under the BSD Zero Clause License (0BSD):
+do whatever you want, no attribution required, no warranty. The full
+text is in the \fBLICENSE\fR file at the top of the source tree.

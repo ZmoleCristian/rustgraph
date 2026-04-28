@@ -77,12 +77,12 @@ pub fn uninstall_all() -> Vec<ClientReg> {
 /// Query the current MCP registration state for every detected AI client.
 ///
 /// Read-only; no config files are written.
-pub fn status_all() -> Vec<ClientReg> {
+pub fn list_all() -> Vec<ClientReg> {
     vec![status_claude(), status_codex(), status_gemini()]
 }
 
 fn home() -> PathBuf {
-    PathBuf::from(std::env::var("HOME").unwrap_or_default())
+    dirs::home_dir().unwrap_or_default()
 }
 
 fn claude_config_path() -> PathBuf {
@@ -108,7 +108,7 @@ fn target_command() -> &'static str {
 }
 
 fn target_args() -> Vec<String> {
-    vec!["mcp".into()]
+    vec!["mcp".into(), "serve".into()]
 }
 
 fn backup(path: &Path) -> io::Result<PathBuf> {
@@ -444,6 +444,32 @@ fn check_gemini(path: &Path) -> io::Result<bool> {
     Ok(json.get("mcpServers").and_then(|m| m.get("rustgraph")).is_some())
 }
 
+
+/// Print the MCP-not-registered nudge banner to stderr if [`nudge_needed`] is true.
+pub fn print_nudge_if_needed() {
+    if nudge_needed() {
+        eprintln!("[!] MCP server not registered with any detected AI client.");
+        eprintln!("    Run `rustgraph mcp install` to enable agent integration.");
+        eprintln!("    (silence: touch ~/.config/rustgraph/no-nudge)");
+        eprintln!();
+    }
+}
+
+/// Returns true if the user should be nudged to run `rustgraph mcp install`:
+/// at least one AI client config exists, none of them register rustgraph yet,
+/// and the user has not opted out via `~/.config/rustgraph/no-nudge`.
+pub fn nudge_needed() -> bool {
+    if dirs::config_dir().map(|d| d.join("rustgraph/no-nudge").exists()).unwrap_or(false) {
+        return false;
+    }
+    let regs = list_all();
+    let any_client = regs.iter().any(|r| r.status != RegStatus::NotFound);
+    if !any_client {
+        return false;
+    }
+    let any_registered = regs.iter().any(|r| r.status == RegStatus::AlreadyRegistered);
+    !any_registered
+}
 
 /// Print a formatted status report for a slice of [`ClientReg`] results.
 ///

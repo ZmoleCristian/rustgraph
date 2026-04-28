@@ -94,7 +94,7 @@ fn install_codex_writes_toml_entry() {
     assert!(after.contains("model = \"gpt-5.5\""), "preserved existing keys: {}", after);
     assert!(after.contains("[mcp_servers.rustgraph]"), "added section: {}", after);
     assert!(after.contains("command = \"rustgraph\""), "command line: {}", after);
-    assert!(after.contains("args = [\"mcp\"]"), "args line: {}", after);
+    assert!(after.contains("args = [\"mcp\", \"serve\"]"), "args line: {}", after);
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn status_shows_per_client_state() {
     fs::write(&claude_path, r#"{}"#).unwrap();
 
 
-    let out = run_with_home(home.path(), &["mcp", "status"]);
+    let out = run_with_home(home.path(), &["mcp", "list"]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("entry not present"), "should report claude unregistered: {}", stdout);
@@ -182,7 +182,7 @@ fn status_shows_per_client_state() {
 
 
     let _ = run_with_home(home.path(), &["mcp", "install"]);
-    let out2 = run_with_home(home.path(), &["mcp", "status"]);
+    let out2 = run_with_home(home.path(), &["mcp", "list"]);
     let stdout2 = String::from_utf8_lossy(&out2.stdout);
     assert!(stdout2.contains("already registered"), "post-install status: {}", stdout2);
 }

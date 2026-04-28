@@ -123,6 +123,7 @@ fn no_action_specified(args: &Args) -> bool {
 /// `ProjectData`, applies filters, then dispatches to the appropriate subcommand runner.
 pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
     if no_action_specified(&args) {
+        crate::mcp_install::print_nudge_if_needed();
         Args::command().print_help()?;
         println!();
         return Ok(());

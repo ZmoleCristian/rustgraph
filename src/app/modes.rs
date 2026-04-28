@@ -502,6 +502,8 @@ impl ExecutionMode {
                     Self::Inventory { selection }
                 }
                 ModeCommand::Mcp(_) => unreachable!("Mcp variant intercepted in main.rs before app::run"),
+                ModeCommand::Completions(_) => unreachable!("Completions variant intercepted in main.rs before app::run"),
+                ModeCommand::GenerateMan => unreachable!("GenerateMan variant intercepted in main.rs before app::run"),
                 ModeCommand::Find(find) => {
                     let any = find.func || find.struct_only || find.enum_only;
                     let selection = if !any {

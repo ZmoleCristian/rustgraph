@@ -23,7 +23,12 @@ fn parse_args_or_help() -> Args {
             match e.kind() {
                 ErrorKind::DisplayHelp
                 | ErrorKind::DisplayVersion
-                | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => e.exit(),
+                | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
+                    if matches!(e.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand) {
+                        rustgraph::mcp_install::print_nudge_if_needed();
+                    }
+                    e.exit()
+                }
                 _ => {}
             }
 
@@ -44,6 +49,9 @@ fn parse_args_or_help() -> Args {
                 cmd.render_help()
             };
             eprintln!();
+            if sub_name.is_none() {
+                rustgraph::mcp_install::print_nudge_if_needed();
+            }
             eprintln!("{}", help);
             std::process::exit(e.exit_code());
         }
@@ -66,7 +74,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(rustgraph::cli::ModeCommand::Mcp(mcp_cmd)) = &args.command {
         use rustgraph::cli::McpAction;
         match &mcp_cmd.action {
-            None => {
+            None | Some(McpAction::List) => {
+                let regs = rustgraph::mcp_install::list_all();
+                println!("rustgraph MCP registration state:");
+                rustgraph::mcp_install::print_report(&regs, false);
+                std::process::exit(0);
+            }
+            Some(McpAction::Serve) => {
                 colored::control::set_override(false);
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -94,13 +108,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let any_failed = regs.iter().any(|r| matches!(r.status, rustgraph::mcp_install::RegStatus::Failed(_)));
                 std::process::exit(if any_failed { 1 } else { 0 });
             }
-            Some(McpAction::Status) => {
-                let regs = rustgraph::mcp_install::status_all();
-                println!("rustgraph MCP registration status:");
-                rustgraph::mcp_install::print_report(&regs, false);
-                std::process::exit(0);
-            }
         }
+    }
+
+    if let Some(rustgraph::cli::ModeCommand::Completions(c)) = &args.command {
+        let mut app = Args::command();
+        let name = app.get_name().to_string();
+        clap_complete::generate(c.shell, &mut app, name, &mut std::io::stdout());
+        std::process::exit(0);
+    }
+
+    if let Some(rustgraph::cli::ModeCommand::GenerateMan) = &args.command {
+        let app = Args::command();
+        let man = clap_mangen::Man::new(app);
+        let mut buf: Vec<u8> = Vec::new();
+        man.render(&mut buf)?;
+        use std::io::Write;
+        std::io::stdout().write_all(&buf)?;
+        std::process::exit(0);
     }
 
     match rustgraph::app::run(args) {
