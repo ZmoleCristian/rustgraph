@@ -134,7 +134,7 @@ jobs:
             echo "no manifest changes"
           else
             git commit -m "scoop: bump to ${GITHUB_REF_NAME}"
-            git push origin HEAD:main
+            git push origin HEAD:master
           fi
 
   aur:
