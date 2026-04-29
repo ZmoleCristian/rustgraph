@@ -81,26 +81,30 @@ pub fn list_all() -> Vec<ClientReg> {
     vec![status_claude(), status_codex(), status_gemini()]
 }
 
-fn home() -> PathBuf {
-    dirs::home_dir().unwrap_or_default()
+fn home() -> io::Result<PathBuf> {
+    dirs::home_dir().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "could not resolve home directory ($HOME unset and platform fallback failed)",
+        )
+    })
 }
 
-fn claude_config_path() -> PathBuf {
-
-
-    if let Ok(dir) = std::env::var("CLAUDE_CONFIG_DIR") {
-        PathBuf::from(dir).join(".claude.json")
-    } else {
-        home().join(".claude.json")
+fn claude_config_path() -> io::Result<PathBuf> {
+    if let Ok(dir) = std::env::var("CLAUDE_CONFIG_DIR")
+        && !dir.is_empty()
+    {
+        return Ok(PathBuf::from(dir).join(".claude.json"));
     }
+    Ok(home()?.join(".claude.json"))
 }
 
-fn codex_config_path() -> PathBuf {
-    home().join(".codex/config.toml")
+fn codex_config_path() -> io::Result<PathBuf> {
+    Ok(home()?.join(".codex/config.toml"))
 }
 
-fn gemini_config_path() -> PathBuf {
-    home().join(".gemini/settings.json")
+fn gemini_config_path() -> io::Result<PathBuf> {
+    Ok(home()?.join(".gemini/settings.json"))
 }
 
 fn target_command() -> &'static str {
@@ -122,7 +126,10 @@ fn backup(path: &Path) -> io::Result<PathBuf> {
 }
 
 fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
-    let tmp = path.with_extension("rustgraph-tmp");
+
+    let mut tmp_os = path.as_os_str().to_owned();
+    tmp_os.push(".rustgraph-tmp");
+    let tmp = PathBuf::from(tmp_os);
     fs::write(&tmp, contents)?;
     fs::rename(tmp, path)?;
     Ok(())
@@ -130,7 +137,16 @@ fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
 
 
 fn register_claude() -> ClientReg {
-    let path = claude_config_path();
+    let path = match claude_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "claude",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "claude", config_path: path, status: RegStatus::NotFound };
     }
@@ -143,7 +159,16 @@ fn register_claude() -> ClientReg {
 }
 
 fn unregister_claude() -> ClientReg {
-    let path = claude_config_path();
+    let path = match claude_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "claude",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "claude", config_path: path, status: RegStatus::NotFound };
     }
@@ -156,7 +181,16 @@ fn unregister_claude() -> ClientReg {
 }
 
 fn status_claude() -> ClientReg {
-    let path = claude_config_path();
+    let path = match claude_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "claude",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "claude", config_path: path, status: RegStatus::NotFound };
     }
@@ -234,7 +268,16 @@ fn check_claude(path: &Path) -> io::Result<bool> {
 
 
 fn register_codex() -> ClientReg {
-    let path = codex_config_path();
+    let path = match codex_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "codex",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "codex", config_path: path, status: RegStatus::NotFound };
     }
@@ -247,7 +290,16 @@ fn register_codex() -> ClientReg {
 }
 
 fn unregister_codex() -> ClientReg {
-    let path = codex_config_path();
+    let path = match codex_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "codex",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "codex", config_path: path, status: RegStatus::NotFound };
     }
@@ -260,7 +312,16 @@ fn unregister_codex() -> ClientReg {
 }
 
 fn status_codex() -> ClientReg {
-    let path = codex_config_path();
+    let path = match codex_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "codex",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "codex", config_path: path, status: RegStatus::NotFound };
     }
@@ -346,7 +407,16 @@ fn check_codex(path: &Path) -> io::Result<bool> {
 
 
 fn register_gemini() -> ClientReg {
-    let path = gemini_config_path();
+    let path = match gemini_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "gemini",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "gemini", config_path: path, status: RegStatus::NotFound };
     }
@@ -359,7 +429,16 @@ fn register_gemini() -> ClientReg {
 }
 
 fn unregister_gemini() -> ClientReg {
-    let path = gemini_config_path();
+    let path = match gemini_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "gemini",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "gemini", config_path: path, status: RegStatus::NotFound };
     }
@@ -372,7 +451,16 @@ fn unregister_gemini() -> ClientReg {
 }
 
 fn status_gemini() -> ClientReg {
-    let path = gemini_config_path();
+    let path = match gemini_config_path() {
+        Ok(p) => p,
+        Err(e) => {
+            return ClientReg {
+                name: "gemini",
+                config_path: PathBuf::new(),
+                status: RegStatus::Failed(e.to_string()),
+            };
+        }
+    };
     if !path.exists() {
         return ClientReg { name: "gemini", config_path: path, status: RegStatus::NotFound };
     }

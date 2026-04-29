@@ -37,7 +37,7 @@ pub(crate) fn collect_textual_function_refs(
             let lines = content.lines().map(|l| l.to_string()).collect::<Vec<_>>();
             file_lines_cache.insert(file.clone(), lines);
         }
-        let Some(lines) = file_lines_cache.get(&file).cloned() else {
+        let Some(lines) = file_lines_cache.get(&file).map(Vec::as_slice) else {
             continue;
         };
 
@@ -282,15 +282,29 @@ pub(crate) fn collect_textual_function_argument_refs(
             let lines = content.lines().map(|l| l.to_string()).collect::<Vec<_>>();
             file_lines_cache.insert(file.clone(), lines);
         }
-        let Some(lines) = file_lines_cache.get(&file).cloned() else {
+
+
+        macro_rules_ranges_cache
+            .entry(file.clone())
+            .or_insert_with(|| collect_macro_rules_ranges(&file));
+        let macro_rules_ranges = macro_rules_ranges_cache
+            .get(&file)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[]);
+
+
+        struct WorkItem {
+            line_no: usize,
+            call_col: usize,
+            wrapper: &'static str,
+            arg_index: usize,
+        }
+        let mut work: Vec<WorkItem> = Vec::new();
+        let Some(lines) = file_lines_cache.get(&file).map(Vec::as_slice) else {
             continue;
         };
-
         for (idx, raw) in lines.iter().enumerate() {
             let line_no = idx + 1;
-            let macro_rules_ranges = macro_rules_ranges_cache
-                .entry(file.clone())
-                .or_insert_with(|| collect_macro_rules_ranges(&file));
             if line_in_ranges(line_no, macro_rules_ranges) {
                 continue;
             }
@@ -305,38 +319,42 @@ pub(crate) fn collect_textual_function_argument_refs(
                     };
                     let call_col = search_from + found_at;
                     search_from = call_col + marker.len();
-
-                    let Some(arg_expr) = extract_call_arg_segment_from_file(
-                        &file,
-                        line_no,
-                        call_col,
-                        wrapper,
-                        arg_index,
-                        file_lines_cache,
-                    ) else {
-                        continue;
-                    };
-                    let Some((_, base)) = normalize_handler_expr(&arg_expr) else {
-                        continue;
-                    };
-                    if candidate_name_counts.get(&base).copied().unwrap_or(0) != 1 {
-                        continue;
-                    }
-
-                    let is_test_ref = if is_test_path(&file) {
-                        true
-                    } else {
-                        let ranges = test_ranges_cache
-                            .entry(file.clone())
-                            .or_insert_with(|| collect_cfg_test_ranges(&file));
-                        line_in_ranges(line_no, ranges)
-                    };
-                    if is_test_ref {
-                        *test_only.entry(base).or_default() += 1;
-                    } else {
-                        *non_test.entry(base).or_default() += 1;
-                    }
+                    work.push(WorkItem { line_no, call_col, wrapper, arg_index });
                 }
+            }
+        }
+
+
+        for item in work {
+            let Some(arg_expr) = extract_call_arg_segment_from_file(
+                &file,
+                item.line_no,
+                item.call_col,
+                item.wrapper,
+                item.arg_index,
+                file_lines_cache,
+            ) else {
+                continue;
+            };
+            let Some((_, base)) = normalize_handler_expr(&arg_expr) else {
+                continue;
+            };
+            if candidate_name_counts.get(&base).copied().unwrap_or(0) != 1 {
+                continue;
+            }
+
+            let is_test_ref = if is_test_path(&file) {
+                true
+            } else {
+                let ranges = test_ranges_cache
+                    .entry(file.clone())
+                    .or_insert_with(|| collect_cfg_test_ranges(&file));
+                line_in_ranges(item.line_no, ranges)
+            };
+            if is_test_ref {
+                *test_only.entry(base).or_default() += 1;
+            } else {
+                *non_test.entry(base).or_default() += 1;
             }
         }
     }

@@ -40,33 +40,38 @@ impl MatchKind {
 }
 
 /// Compute the Levenshtein edit distance between two strings.
+///
+/// Implemented with a rolling-row dynamic-programming table: only the previous
+/// and current rows are kept in memory, giving O(n) space instead of O(m*n).
 pub fn edit_distance(s1: &str, s2: &str) -> usize {
     let s1_chars: Vec<char> = s1.chars().collect();
     let s2_chars: Vec<char> = s2.chars().collect();
     let m = s1_chars.len();
     let n = s2_chars.len();
 
-    let mut dp = vec![vec![0; n + 1]; m + 1];
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
 
-    for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
-        row[0] = i;
-    }
-    for (j, cell) in dp[0].iter_mut().enumerate().take(n + 1) {
-        *cell = j;
-    }
+    let mut prev: Vec<usize> = (0..=n).collect();
+    let mut curr: Vec<usize> = vec![0; n + 1];
 
     for i in 1..=m {
+        curr[0] = i;
         for j in 1..=n {
-            if s1_chars[i - 1] == s2_chars[j - 1] {
-                dp[i][j] = dp[i - 1][j - 1];
+            curr[j] = if s1_chars[i - 1] == s2_chars[j - 1] {
+                prev[j - 1]
             } else {
-                dp[i][j] =
-                    1 + std::cmp::min(std::cmp::min(dp[i - 1][j], dp[i][j - 1]), dp[i - 1][j - 1]);
-            }
+                1 + std::cmp::min(std::cmp::min(prev[j], curr[j - 1]), prev[j - 1])
+            };
         }
+        std::mem::swap(&mut prev, &mut curr);
     }
 
-    dp[m][n]
+    prev[n]
 }
 
 /// Return `true` if `query` is a substring of `target` or if their edit-distance similarity
@@ -547,6 +552,60 @@ mod tests {
     #[test]
     fn edit_distance_supports_unicode_chars() {
         assert_eq!(edit_distance("café", "cafe"), 1);
+    }
+
+
+    /// Reference 2D Levenshtein implementation, used only by the
+    /// rolling-row parity test below.
+    fn edit_distance_2d(s1: &str, s2: &str) -> usize {
+        let s1_chars: Vec<char> = s1.chars().collect();
+        let s2_chars: Vec<char> = s2.chars().collect();
+        let m = s1_chars.len();
+        let n = s2_chars.len();
+        let mut dp = vec![vec![0usize; n + 1]; m + 1];
+        for (i, row) in dp.iter_mut().enumerate().take(m + 1) {
+            row[0] = i;
+        }
+        for (j, cell) in dp[0].iter_mut().enumerate().take(n + 1) {
+            *cell = j;
+        }
+        for i in 1..=m {
+            for j in 1..=n {
+                if s1_chars[i - 1] == s2_chars[j - 1] {
+                    dp[i][j] = dp[i - 1][j - 1];
+                } else {
+                    dp[i][j] = 1 + std::cmp::min(
+                        std::cmp::min(dp[i - 1][j], dp[i][j - 1]),
+                        dp[i - 1][j - 1],
+                    );
+                }
+            }
+        }
+        dp[m][n]
+    }
+
+    #[test]
+    fn edit_distance_rolling_row_matches_2d_reference() {
+        let pairs = [
+            ("", ""),
+            ("", "abc"),
+            ("abc", ""),
+            ("kitten", "sitting"),
+            ("flaw", "lawn"),
+            ("intention", "execution"),
+            ("café", "cafe"),
+            ("rustgraph", "rustacean"),
+            ("a", "b"),
+            ("abcdefg", "abcdefg"),
+            ("xyzzy", "fubar"),
+        ];
+        for (a, b) in pairs {
+            assert_eq!(
+                edit_distance(a, b),
+                edit_distance_2d(a, b),
+                "mismatch for ({a:?}, {b:?})",
+            );
+        }
     }
 
     #[test]
