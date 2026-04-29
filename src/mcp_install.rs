@@ -126,7 +126,10 @@ fn backup(path: &Path) -> io::Result<PathBuf> {
 }
 
 fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
-    let tmp = path.with_extension("rustgraph-tmp");
+
+    let mut tmp_os = path.as_os_str().to_owned();
+    tmp_os.push(".rustgraph-tmp");
+    let tmp = PathBuf::from(tmp_os);
     fs::write(&tmp, contents)?;
     fs::rename(tmp, path)?;
     Ok(())
