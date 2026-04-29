@@ -239,8 +239,6 @@ pub fn run(
 
     if args.json {
 
-        let mut payload = String::from("[\n");
-        let mut first = true;
         let mut counts_list: BTreeMap<String, FileCounts> = BTreeMap::new();
         for f in &project.functions {
             counts_list
@@ -264,28 +262,34 @@ pub fn run(
             let rel = super::super::relativize_for_display(&raw.to_string_lossy(), &args.path, &args.also);
             counts_list.entry(rel).or_default();
         }
-        for (rel, c) in counts_list {
-            if let Some(pf) = &prefix_filter
-                && !rel.starts_with(pf.as_str())
-            {
-                continue;
-            }
 
-            if let Some(ranges) = changed
-                && !file_was_changed(&rel, ranges)
-            {
-                continue;
-            }
-            if !first {
-                payload.push_str(",\n");
-            }
-            first = false;
-            payload.push_str(&format!(
-                "  {{\"path\": \"{}\", \"functions\": {}, \"structs\": {}, \"enums\": {}}}",
-                rel, c.functions, c.structs, c.enums
-            ));
-        }
-        payload.push_str("\n]\n");
+
+        let entries: Vec<serde_json::Value> = counts_list
+            .into_iter()
+            .filter(|(rel, _)| {
+                if let Some(pf) = &prefix_filter
+                    && !rel.starts_with(pf.as_str())
+                {
+                    return false;
+                }
+                if let Some(ranges) = changed
+                    && !file_was_changed(rel, ranges)
+                {
+                    return false;
+                }
+                true
+            })
+            .map(|(rel, c)| {
+                serde_json::json!({
+                    "path": rel,
+                    "functions": c.functions,
+                    "structs": c.structs,
+                    "enums": c.enums,
+                })
+            })
+            .collect();
+
+        let payload = format!("{}\n", serde_json::to_string_pretty(&entries)?);
         super::switchboard::write_string_output(args.output.as_deref(), &payload)?;
     } else {
         super::switchboard::write_string_output(args.output.as_deref(), out.trim_end())?;
@@ -339,5 +343,29 @@ mod tests {
         root.render("", true, &mut out);
         assert!(out.contains("lib.rs"));
         assert!(!out.contains("fn"));
+    }
+
+    #[test]
+    fn tree_json_round_trips_paths_with_quote_and_backslash() {
+
+        let weird = r#"src/odd "file"\with-backslash.rs"#;
+        let entry = serde_json::json!({
+            "path": weird,
+            "functions": 3usize,
+            "structs": 1usize,
+            "enums": 0usize,
+        });
+        let payload = serde_json::to_string_pretty(&vec![entry])
+            .expect("serialize entry array");
+
+
+        let parsed: serde_json::Value =
+            serde_json::from_str(&payload).expect("payload must be valid JSON");
+        let arr = parsed.as_array().expect("top level array");
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["path"].as_str(), Some(weird));
+        assert_eq!(arr[0]["functions"].as_u64(), Some(3));
+        assert_eq!(arr[0]["structs"].as_u64(), Some(1));
+        assert_eq!(arr[0]["enums"].as_u64(), Some(0));
     }
 }
