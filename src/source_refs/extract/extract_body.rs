@@ -19,7 +19,7 @@ pub(crate) fn extract_call_args_body(
     let mut closed = false;
 
     for (idx, line_text_raw) in lines.iter().enumerate().take(parse_end).skip(marker_line) {
-        let line_text = line_text_raw.split("//").next().unwrap_or("");
+        let line_text = super::strip_comment::strip_line_comment(line_text_raw);
         let segment = if idx == marker_line {
             let start = super::find_marker::clamp_to_char_boundary(line_text, marker_col);
             if start >= line_text.len() {
