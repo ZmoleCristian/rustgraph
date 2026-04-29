@@ -98,10 +98,16 @@ pub fn resolve_callee_candidates<'a>(
         return (Vec::new(), ResolutionMode::Strict);
     };
     let qualifier = qualifier_for_callee(callee_name);
+    // Pre-format the two qualifier needles once outside the per-candidate
+    // loop; without this, every `matches` entry re-allocates two strings.
+    let needles = qualifier.as_deref().map(QualifierNeedles::new);
     let type_filtered: Vec<&FunctionInfo> = matches
         .iter()
         .copied()
-        .filter(|m| candidate_matches_qualifier(m, qualifier.as_deref()))
+        .filter(|m| match needles.as_ref() {
+            Some(n) => candidate_matches_needles(m, n),
+            None => true,
+        })
         .collect();
     if type_filtered.is_empty() {
 
@@ -183,35 +189,62 @@ pub fn qualifier_for_callee(callee_name: &str) -> Option<String> {
 }
 
 
-/// Return `true` if `candidate`'s kind matches the given type qualifier.
-///
-/// Accepts `None` (any function passes) or a Pascal-case type name.  Generics
-/// in the kind string (e.g. `method(Wrapper<T>)`) are stripped before comparison.
-pub fn candidate_matches_qualifier(candidate: &FunctionInfo, qualifier: Option<&str>) -> bool {
-    let Some(q) = qualifier else { return true };
-    let needles = [
-        format!("method({})", q),
-        format!("trait_fn({})", q),
-    ];
+/// Pre-formatted needles for matching a single qualifier against many
+/// candidate functions. Build once outside the per-candidate loop, then
+/// pass to [`candidate_matches_needles`] for each candidate.
+pub struct QualifierNeedles<'a> {
+    qualifier: &'a str,
+    method_exact: String,
+    trait_fn_exact: String,
+}
+
+impl<'a> QualifierNeedles<'a> {
+    pub fn new(qualifier: &'a str) -> Self {
+        Self {
+            qualifier,
+            method_exact: format!("method({qualifier})"),
+            trait_fn_exact: format!("trait_fn({qualifier})"),
+        }
+    }
+}
+
+/// Variant of [`candidate_matches_qualifier`] that takes pre-formatted
+/// needles. Used by hot loops that resolve many candidates against the same
+/// qualifier; saves two `format!` allocations per candidate.
+pub fn candidate_matches_needles(
+    candidate: &FunctionInfo,
+    needles: &QualifierNeedles<'_>,
+) -> bool {
     let kind = candidate.kind.as_str();
-    if needles.iter().any(|n| kind == n) {
+    if kind == needles.method_exact || kind == needles.trait_fn_exact {
         return true;
     }
-
-
     if let Some(stripped) = kind.strip_prefix("method(").and_then(|s| s.strip_suffix(')')) {
         let bare_type = stripped.split('<').next().unwrap_or(stripped).trim();
-        if bare_type == q {
+        if bare_type == needles.qualifier {
             return true;
         }
     }
     if let Some(stripped) = kind.strip_prefix("trait_fn(").and_then(|s| s.strip_suffix(')')) {
         let bare_type = stripped.split('<').next().unwrap_or(stripped).trim();
-        if bare_type == q {
+        if bare_type == needles.qualifier {
             return true;
         }
     }
     false
+}
+
+/// Return `true` if `candidate`'s kind matches the given type qualifier.
+///
+/// Accepts `None` (any function passes) or a Pascal-case type name.  Generics
+/// in the kind string (e.g. `method(Wrapper<T>)`) are stripped before comparison.
+///
+/// For per-candidate-in-a-loop callers, prefer building [`QualifierNeedles`]
+/// once and using [`candidate_matches_needles`] to avoid repeated `format!`.
+pub fn candidate_matches_qualifier(candidate: &FunctionInfo, qualifier: Option<&str>) -> bool {
+    let Some(q) = qualifier else { return true };
+    let needles = QualifierNeedles::new(q);
+    candidate_matches_needles(candidate, &needles)
 }
 
 
@@ -491,6 +524,61 @@ mod tests {
     fn candidate_rejects_generic_when_bare_type_name_differs() {
         let f = fn_with_kind("get", "method(Other<T>)");
         assert!(!candidate_matches_qualifier(&f, Some("Wrapper")));
+    }
+
+    #[test]
+    fn candidate_matches_needles_matches_method_exact() {
+        let needles = QualifierNeedles::new("Daemon");
+        let f = fn_with_kind("new", "method(Daemon)");
+        assert!(candidate_matches_needles(&f, &needles));
+    }
+
+    #[test]
+    fn candidate_matches_needles_matches_trait_fn_exact() {
+        let needles = QualifierNeedles::new("MyTrait");
+        let f = fn_with_kind("from", "trait_fn(MyTrait)");
+        assert!(candidate_matches_needles(&f, &needles));
+    }
+
+    #[test]
+    fn candidate_matches_needles_strips_generics() {
+        let needles = QualifierNeedles::new("Wrapper");
+        let f = fn_with_kind("get", "method(Wrapper<'a, T>)");
+        assert!(candidate_matches_needles(&f, &needles));
+    }
+
+    #[test]
+    fn candidate_matches_needles_rejects_other_type() {
+        let needles = QualifierNeedles::new("Daemon");
+        let f = fn_with_kind("new", "method(Session)");
+        assert!(!candidate_matches_needles(&f, &needles));
+    }
+
+    #[test]
+    fn candidate_matches_qualifier_still_matches_needles_form() {
+        // Equivalence check: the public API and the inner needles helper must
+        // agree for every candidate kind we care about.
+        let cases = [
+            ("function", "Daemon", false),
+            ("method(Daemon)", "Daemon", true),
+            ("method(Session)", "Daemon", false),
+            ("trait_fn(MyTrait)", "MyTrait", true),
+            ("method(Wrapper<'a, T>)", "Wrapper", true),
+        ];
+        for (kind, q, expected) in cases {
+            let f = fn_with_kind("x", kind);
+            let needles = QualifierNeedles::new(q);
+            assert_eq!(
+                candidate_matches_qualifier(&f, Some(q)),
+                expected,
+                "case: kind={kind}, q={q}"
+            );
+            assert_eq!(
+                candidate_matches_needles(&f, &needles),
+                expected,
+                "case: kind={kind}, q={q}"
+            );
+        }
     }
 
 

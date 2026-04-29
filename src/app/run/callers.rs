@@ -12,7 +12,7 @@ use crate::FunctionInfo;
 use crate::cli::Args;
 use crate::function_id;
 use crate::index::qualifier::{
-    candidate_matches_qualifier, module_path_qualifier, qualifier_for_callee,
+    candidate_matches_needles, module_path_qualifier, qualifier_for_callee, QualifierNeedles,
     ResolutionStats,
 };
 
@@ -105,9 +105,12 @@ pub fn run(
         QualifierFilter::Type(q) => {
             let before = report.matches.len();
             let pre_filter_matches = report.matches.clone();
+            // Pre-format the qualifier needles once before retain, otherwise
+            // `format!` allocates two strings per match in the loop.
+            let needles = QualifierNeedles::new(q.as_str());
             report
                 .matches
-                .retain(|m| candidate_matches_qualifier(&m.info, Some(q.as_str())));
+                .retain(|m| candidate_matches_needles(&m.info, &needles));
             if report.matches.is_empty() && before > 0 {
                 if strict_only {
 
