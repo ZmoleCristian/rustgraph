@@ -7,14 +7,14 @@ class Rustgraph < Formula
   on_macos do
     on_arm do
       url "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.7.8/rustgraph-aarch64-apple-darwin.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "14bd41c339d2a408046e3ec4a228fa38263415fe72f5b3438cca68893f5188e4"
     end
   end
 
   on_linux do
     on_intel do
       url "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.7.8/rustgraph-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "bc4a910f2c8c761e0095d095253520e942b64769db40dd3d82af25f14f63fffe"
     end
   end
 

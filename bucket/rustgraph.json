@@ -6,7 +6,7 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.7.8/rustgraph-x86_64-pc-windows-msvc.zip",
-      "hash": "a17085de9e8ae4a0011fd4bfeba35e18f639283f39c0d46867536dd93264418c"
+      "hash": "9fa906dfe73fdefc4bc95e128cd7b709279a0a21201aa3e553c00b8b80c852c7"
     }
   },
   "bin": "rustgraph.exe",
