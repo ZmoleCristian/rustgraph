@@ -1,4 +1,13 @@
-//! Collects function names that are publicly re-exported from `lib.rs` or `mod.rs` files.
+//! Collects function names that are publicly re-exported via `pub use`
+//! anywhere in the crate.
+//!
+//! Every `.rs` file is a Rust module and `pub use` in any module file places
+//! a name into that module's public namespace, so dead-code analysis must
+//! consider all of them — not just `lib.rs` and `mod.rs`.  In Rust 2018+
+//! the parent module file for a `foo/` directory is `foo.rs`, not
+//! `foo/mod.rs`, and `pub use foo::Bar;` in that parent file was
+//! previously silently dropped, producing false-positive dead-code reports
+//! for re-exported public items.
 
 use std::collections::HashSet;
 use std::fs;
@@ -24,21 +33,16 @@ fn collect_use_names(tree: &syn::UseTree, out: &mut HashSet<String>) {
     }
 }
 
-/// Collect all names exported via `pub use` statements in `lib.rs` and `mod.rs` files.
+/// Collect all names exported via `pub use` anywhere in the crate.
 ///
-/// Only files whose name is exactly `lib.rs` or `mod.rs` are scanned.  For each
-/// such file, the function parses the AST and records every identifier introduced
-/// into the public namespace by a `pub use` item, including rename targets.
-/// Glob re-exports (`pub use foo::*`) are skipped.
+/// Every `.rs` file in `rust_files` is parsed and every `pub use` item is
+/// recorded.  This covers both the classic `foo/mod.rs` parent-module form
+/// and the Rust 2018+ `foo.rs` parent form.  Glob re-exports (`pub use
+/// foo::*`) are skipped because the names they expose cannot be enumerated
+/// without resolving the source module.
 pub(crate) fn collect_public_reexport_names(rust_files: &[PathBuf]) -> HashSet<String> {
     let mut names = HashSet::new();
     for file_path in rust_files {
-        let Some(fname) = file_path.file_name().and_then(|s| s.to_str()) else {
-            continue;
-        };
-        if fname != "mod.rs" && fname != "lib.rs" {
-            continue;
-        }
         let Ok(content) = fs::read_to_string(file_path) else {
             continue;
         };
@@ -131,10 +135,40 @@ mod tests {
     }
 
     #[test]
-    fn collect_public_reexport_names_skips_random_files() {
+    fn collect_public_reexport_names_picks_up_pub_use_in_2018_parent_module_file() {
+        // Rust 2018+ layout: `foo/`'s parent module file is `foo.rs`, not
+        // `foo/mod.rs`. The previous filename filter only scanned `mod.rs`/
+        // `lib.rs` so `pub use` here was silently dropped and the
+        // re-exported name was reported as dead code.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let parent = write(
+            dir.path(),
+            "src/foo.rs",
+            "pub mod bar;\npub use crate::foo::bar::Quux;\n",
+        );
+        let names = collect_public_reexport_names(&[parent]);
+        assert!(
+            names.contains("Quux"),
+            "expected `Quux` from a 2018+ parent-module file (foo.rs), got {names:?}"
+        );
+    }
+
+    #[test]
+    fn collect_public_reexport_names_handles_arbitrary_module_files() {
+        // Previously these were skipped; now every .rs file is scanned so
+        // `pub use` declared in regular module files is honoured.
         let dir = tempfile::tempdir().expect("tempdir");
         let other = write(dir.path(), "src/other.rs", "pub use crate::Foo;\n");
         let names = collect_public_reexport_names(&[other]);
+        assert!(names.contains("Foo"));
+    }
+
+    #[test]
+    fn collect_public_reexport_names_still_skips_glob_reexports() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let lib = write(dir.path(), "src/lib.rs", "pub use crate::foo::*;\n");
+        let names = collect_public_reexport_names(&[lib]);
+        // Glob re-exports cannot be enumerated statically.
         assert!(names.is_empty());
     }
 }
