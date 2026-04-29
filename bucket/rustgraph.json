@@ -1,11 +1,11 @@
 {
-  "version": "0.7.8",
+  "version": "0.7.9",
   "description": "Rust code navigation built for AiDX — AST-aware, MCP-native, token-efficient.",
   "homepage": "https://github.com/ZmoleCristian/rustgraph",
   "license": "0BSD",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.7.8/rustgraph-x86_64-pc-windows-msvc.zip",
+      "url": "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.7.9/rustgraph-x86_64-pc-windows-msvc.zip",
       "hash": "9fa906dfe73fdefc4bc95e128cd7b709279a0a21201aa3e553c00b8b80c852c7"
     }
   },
