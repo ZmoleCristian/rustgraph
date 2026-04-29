@@ -58,7 +58,15 @@ pub fn analyze_project(project_path: &Path, include_ignored: bool) -> ProjectAna
                 all_functions.append(&mut functions);
                 all_structs.append(&mut structs);
                 all_enums.append(&mut enums);
-                all_call_maps.extend(call_map);
+                // `HashMap::extend` would silently overwrite collisions on
+                // file_path:line:name keys — concatenate the callee vecs
+                // instead so cross-crate `--also` merges retain every edge.
+                for (caller_id, mut callees) in call_map {
+                    all_call_maps
+                        .entry(caller_id)
+                        .or_default()
+                        .append(&mut callees);
+                }
                 all_call_sites.append(&mut call_sites);
                 all_reexports.append(&mut reexports);
             }
