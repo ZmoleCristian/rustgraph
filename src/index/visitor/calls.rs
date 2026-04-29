@@ -60,7 +60,8 @@ pub(crate) fn extract_call_target_from_call(call: &ExprCall) -> Option<CallTarge
             })
         }
         _ => {
-            let full = format!("complex_call::{}", quote::quote! { #call.func });
+            let func_expr = &call.func;
+            let full = format!("complex_call::{}", quote::quote! { #func_expr });
             Some(CallTarget {
                 full,
                 base: "complex_call".to_string(),
@@ -130,5 +131,19 @@ mod tests {
         let t = extract_call_target_from_call(&call).expect("target");
         assert_eq!(t.base, "complex_call");
         assert!(t.full.starts_with("complex_call::"));
+        // The function expression itself must be rendered into `full` —
+        // not the literal token `.func`, which is what `quote::quote! { #call.func }`
+        // used to produce when `call` was an `ExprCall` (interpolation does not
+        // support `#var.field` syntax).
+        assert!(
+            !t.full.contains(".func"),
+            "full should not contain literal `.func` token, got {:?}",
+            t.full
+        );
+        assert!(
+            t.full.contains("some") && t.full.contains("field"),
+            "full should contain rendered function expression `some.field`, got {:?}",
+            t.full
+        );
     }
 }
