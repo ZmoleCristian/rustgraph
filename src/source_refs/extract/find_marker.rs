@@ -90,7 +90,7 @@ pub(crate) fn find_marker_in_lines(
 
     let mut marker_location: Option<(usize, usize)> = None;
     for (idx, line_text_raw) in lines.iter().enumerate().take(search_end).skip(start_line) {
-        let line_text = line_text_raw.split("//").next().unwrap_or("");
+        let line_text = super::strip_comment::strip_line_comment(line_text_raw);
         let search_from = if idx == start_line {
             clamp_to_char_boundary(line_text, column)
         } else {

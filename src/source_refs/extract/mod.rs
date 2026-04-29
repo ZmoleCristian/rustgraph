@@ -8,6 +8,7 @@ mod cache;
 mod entry;
 mod extract_body;
 mod find_marker;
+mod strip_comment;
 
 pub(crate) use entry::extract_nth_call_arg_segment_from_file;
 pub(crate) use find_marker::clamp_to_char_boundary;
