@@ -40,4 +40,7 @@ pub use types::DeadFunction;
 pub(super) use file::{find_function_name_position, read_file_lines_cached};
 pub(super) use helpers::{is_generated_path, is_test_helper_name, is_test_path};
 pub(super) use path::{path_to_file_uri, uri_to_file_path};
-pub(super) use ranges::{collect_cfg_test_ranges, collect_macro_rules_ranges, line_in_ranges};
+pub(super) use ranges::{
+    collect_cfg_test_ranges, collect_cfg_test_ranges_from_ast, collect_macro_rules_ranges,
+    collect_macro_rules_ranges_from_ast, line_in_ranges,
+};

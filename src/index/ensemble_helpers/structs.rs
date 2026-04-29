@@ -78,13 +78,35 @@ fn visit_items_for_function(
 /// `known_structs` names that are referenced inside that function's AST node.
 ///
 /// Returns an error if the file cannot be read or the source fails to parse.
+/// Prefer [`collect_used_structs_with_project`] when a [`crate::project::ProjectData`]
+/// is available — it reuses the cached `syn::File` and avoids a second parse.
 pub fn collect_used_structs(
     func: &FunctionInfo,
     known_structs: &HashSet<String>,
 ) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(crate::index::resolve_read_path(&func.file_path))?;
     let syntax_tree = syn::parse_file(&content)?;
+    Ok(collect_used_structs_in_ast(&syntax_tree, func, known_structs))
+}
 
+/// Cache-aware variant of [`collect_used_structs`]: looks the parsed
+/// [`syn::File`] up on `project` and falls back to disk if it isn't cached.
+pub fn collect_used_structs_with_project(
+    project: &crate::project::ProjectData,
+    func: &FunctionInfo,
+    known_structs: &HashSet<String>,
+) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
+    if let Some(syntax) = project.parsed_file_by_str(&func.file_path) {
+        return Ok(collect_used_structs_in_ast(syntax, func, known_structs));
+    }
+    collect_used_structs(func, known_structs)
+}
+
+fn collect_used_structs_in_ast(
+    syntax_tree: &syn::File,
+    func: &FunctionInfo,
+    known_structs: &HashSet<String>,
+) -> HashSet<String> {
     let mut visitor = UsedStructsVisitor {
         known_structs,
         used: HashSet::new(),
@@ -93,7 +115,7 @@ pub fn collect_used_structs(
     let mut found = false;
     visit_items_for_function(&syntax_tree.items, func, &mut visitor, &mut found);
 
-    Ok(visitor.used)
+    visitor.used
 }
 
 #[cfg(test)]

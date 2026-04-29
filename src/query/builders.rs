@@ -122,6 +122,7 @@ pub fn build_dead_code(
         &project.call_sites,
         &project.rust_files,
         workspace_root,
+        Some(project),
     );
     if let Ok(ref report) = result {
         info!(

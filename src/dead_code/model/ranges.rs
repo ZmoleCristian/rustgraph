@@ -64,6 +64,9 @@ impl<'ast> Visit<'ast> for CfgTestRangeVisitor {
 /// Return the line ranges `(start, end)` of all `#[cfg(test)]`-gated items in `file_path`.
 ///
 /// Parses the file with `syn`; returns an empty `Vec` if the file cannot be read or parsed.
+/// Prefer [`collect_cfg_test_ranges_from_ast`] when a parsed `syn::File` is
+/// already available (e.g. via [`crate::project::ProjectData::parsed_file`])
+/// to avoid a second parse of the same source file.
 pub(crate) fn collect_cfg_test_ranges(file_path: &str) -> Vec<(usize, usize)> {
     let Ok(content) = fs::read_to_string(file_path) else {
         return Vec::new();
@@ -71,8 +74,14 @@ pub(crate) fn collect_cfg_test_ranges(file_path: &str) -> Vec<(usize, usize)> {
     let Ok(syntax) = syn::parse_file(&content) else {
         return Vec::new();
     };
+    collect_cfg_test_ranges_from_ast(&syntax)
+}
+
+/// AST-driven core of [`collect_cfg_test_ranges`] — operates on an
+/// already-parsed [`syn::File`] from the project cache.
+pub(crate) fn collect_cfg_test_ranges_from_ast(syntax: &syn::File) -> Vec<(usize, usize)> {
     let mut v = CfgTestRangeVisitor::default();
-    v.visit_file(&syntax);
+    v.visit_file(syntax);
     v.ranges
 }
 
@@ -100,6 +109,8 @@ impl<'ast> Visit<'ast> for MacroRulesRangeVisitor {
 /// Return the line ranges `(start, end)` of all `macro_rules!` definitions in `file_path`.
 ///
 /// Parses the file with `syn`; returns an empty `Vec` if the file cannot be read or parsed.
+/// Prefer [`collect_macro_rules_ranges_from_ast`] when a parsed `syn::File` is
+/// already available.
 pub(crate) fn collect_macro_rules_ranges(file_path: &str) -> Vec<(usize, usize)> {
     let Ok(content) = fs::read_to_string(file_path) else {
         return Vec::new();
@@ -107,8 +118,14 @@ pub(crate) fn collect_macro_rules_ranges(file_path: &str) -> Vec<(usize, usize)>
     let Ok(syntax) = syn::parse_file(&content) else {
         return Vec::new();
     };
+    collect_macro_rules_ranges_from_ast(&syntax)
+}
+
+/// AST-driven core of [`collect_macro_rules_ranges`] — operates on an
+/// already-parsed [`syn::File`] from the project cache.
+pub(crate) fn collect_macro_rules_ranges_from_ast(syntax: &syn::File) -> Vec<(usize, usize)> {
     let mut v = MacroRulesRangeVisitor::default();
-    v.visit_file(&syntax);
+    v.visit_file(syntax);
     v.ranges
 }
 

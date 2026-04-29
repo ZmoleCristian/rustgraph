@@ -48,13 +48,8 @@ pub fn run(
         {
             continue;
         }
-        let content = match fs::read_to_string(file) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-        let syntax = match syn::parse_file(&content) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Some(syntax) = project.parsed_file(file) else {
+            continue;
         };
         let mut v = ImplVisitor {
             file_path: file_str.clone(),
@@ -62,7 +57,7 @@ pub fn run(
             target_last: &target_last,
             hits: &mut hits,
         };
-        v.visit_file(&syntax);
+        v.visit_file(syntax);
     }
 
     hits.sort_by(|a, b| {

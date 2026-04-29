@@ -9,6 +9,7 @@
 //! previously silently dropped, producing false-positive dead-code reports
 //! for re-exported public items.
 
+use crate::project::ProjectData;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -33,6 +34,16 @@ fn collect_use_names(tree: &syn::UseTree, out: &mut HashSet<String>) {
     }
 }
 
+fn collect_pub_use_into(syntax: &syn::File, names: &mut HashSet<String>) {
+    for item in &syntax.items {
+        if let syn::Item::Use(item_use) = item
+            && matches!(item_use.vis, syn::Visibility::Public(_))
+        {
+            collect_use_names(&item_use.tree, names);
+        }
+    }
+}
+
 /// Collect all names exported via `pub use` anywhere in the crate.
 ///
 /// Every `.rs` file in `rust_files` is parsed and every `pub use` item is
@@ -49,12 +60,23 @@ pub(crate) fn collect_public_reexport_names(rust_files: &[PathBuf]) -> HashSet<S
         let Ok(syntax) = syn::parse_file(&content) else {
             continue;
         };
-        for item in syntax.items {
-            if let syn::Item::Use(item_use) = item
-                && matches!(item_use.vis, syn::Visibility::Public(_))
-            {
-                collect_use_names(&item_use.tree, &mut names);
-            }
+        collect_pub_use_into(&syntax, &mut names);
+    }
+    names
+}
+
+/// Cache-aware variant of [`collect_public_reexport_names`] that reuses the
+/// parsed `syn::File` ASTs already stored on `project` instead of re-parsing
+/// each source file from disk.
+pub(crate) fn collect_public_reexport_names_from_project(project: &ProjectData) -> HashSet<String> {
+    let mut names = HashSet::new();
+    for file_path in &project.rust_files {
+        if let Some(syntax) = project.parsed_file(file_path) {
+            collect_pub_use_into(syntax, &mut names);
+        } else if let Ok(content) = fs::read_to_string(file_path)
+            && let Ok(syntax) = syn::parse_file(&content)
+        {
+            collect_pub_use_into(&syntax, &mut names);
         }
     }
     names

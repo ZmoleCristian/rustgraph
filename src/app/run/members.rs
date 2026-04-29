@@ -59,9 +59,8 @@ pub fn run(
                 Ok(c) => c,
                 Err(_) => continue,
             };
-            let syntax = match syn::parse_file(&content) {
-                Ok(s) => s,
-                Err(_) => continue,
+            let Some(syntax) = project.parsed_file(file) else {
+                continue;
             };
             let content_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
             let mut v = MemberVisitor {
@@ -70,7 +69,7 @@ pub fn run(
                 hits_by_field: &mut hits_by_field,
                 content_lines: &content_lines,
             };
-            v.visit_file(&syntax);
+            v.visit_file(syntax);
         }
 
 

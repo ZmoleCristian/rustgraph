@@ -138,8 +138,21 @@ pub fn is_likely_external_qualified_call(
 /// A function is considered an entrypoint if it carries a recognised entrypoint
 /// attribute or if it is defined inside a module annotated with `#[program]` /
 /// `#[anchor_lang::program]`.  Returns an empty set when the file cannot be read
-/// or parsed.
+/// or parsed.  Prefer [`collect_runtime_entrypoint_lines_from_ast`] when a
+/// parsed `syn::File` is already cached on a [`crate::project::ProjectData`].
 pub fn collect_runtime_entrypoint_lines(file_path: &str) -> HashSet<usize> {
+    let Ok(content) = fs::read_to_string(file_path) else {
+        return HashSet::new();
+    };
+    let Ok(syntax) = syn::parse_file(&content) else {
+        return HashSet::new();
+    };
+    collect_runtime_entrypoint_lines_from_ast(&syntax)
+}
+
+/// AST-driven core of [`collect_runtime_entrypoint_lines`] — operates on an
+/// already-parsed [`syn::File`] from the project cache.
+pub fn collect_runtime_entrypoint_lines_from_ast(syntax: &syn::File) -> HashSet<usize> {
     fn visit_items(items: &[syn::Item], in_program_module: bool, out: &mut HashSet<usize>) {
         for item in items {
             match item {
@@ -163,13 +176,6 @@ pub fn collect_runtime_entrypoint_lines(file_path: &str) -> HashSet<usize> {
             }
         }
     }
-
-    let Ok(content) = fs::read_to_string(file_path) else {
-        return HashSet::new();
-    };
-    let Ok(syntax) = syn::parse_file(&content) else {
-        return HashSet::new();
-    };
 
     let mut out = HashSet::new();
     visit_items(&syntax.items, false, &mut out);

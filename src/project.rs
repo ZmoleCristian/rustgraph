@@ -1,6 +1,6 @@
 use crate::{
     CallSite, EnumInfo, FunctionInfo, ProjectAnalysis, StructInfo, find_rust_files,
-    parse_rust_file, search_items_with_options,
+    parse_rust_file_with_ast, search_items_with_options,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -39,6 +39,19 @@ pub struct ProjectData {
     pub reexports: Vec<(String, String, String)>,
     /// Human-readable parse error messages for files that could not be parsed.
     pub parse_errors: Vec<String>,
+
+    /// Cache of parsed `syn::File` ASTs keyed by the file path string used
+    /// elsewhere in the index (the `to_string_lossy()` form of each
+    /// `rust_files` entry, matching `FunctionInfo::file_path` / `CallSite::file_path`).
+    ///
+    /// Populated eagerly by [`ProjectData::load`] so downstream consumers
+    /// (refs, impls, def, members, usages, dead-code, ensemble) can reuse a
+    /// single parse instead of calling `syn::parse_file` 5–12 more times per
+    /// source file.  Skipped during serialization because `syn::File` is not
+    /// `Serialize`/`Deserialize`; deserialized `ProjectData` instances simply
+    /// have an empty cache and consumers must fall back to re-parsing.
+    #[serde(skip)]
+    parsed_files: HashMap<String, syn::File>,
 }
 
 impl ProjectData {
@@ -53,30 +66,35 @@ impl ProjectData {
         let mut functions = Vec::new();
         let mut structs = Vec::new();
         let mut enums = Vec::new();
-        let mut call_map = HashMap::new();
+        let mut call_map: HashMap<String, Vec<String>> = HashMap::new();
         let mut call_sites = Vec::new();
         let mut aliases: Vec<(String, String)> = Vec::new();
         let mut reexports: Vec<(String, String, String)> = Vec::new();
         let mut parse_errors = Vec::new();
+        let mut parsed_files: HashMap<String, syn::File> = HashMap::new();
 
         for file_path in &rust_files {
-            match parse_rust_file(file_path) {
+            match parse_rust_file_with_ast(file_path) {
                 Ok((
-                    mut file_functions,
-                    mut file_structs,
-                    mut file_enums,
-                    file_call_map,
-                    mut file_call_sites,
-                    mut file_aliases,
-                    mut file_reexports,
+                    (
+                        mut file_functions,
+                        mut file_structs,
+                        mut file_enums,
+                        file_call_map,
+                        mut file_call_sites,
+                        mut file_aliases,
+                        mut file_reexports,
+                    ),
+                    syntax_tree,
                 )) => {
                     functions.append(&mut file_functions);
                     structs.append(&mut file_structs);
                     enums.append(&mut file_enums);
-                    call_map.extend(file_call_map);
+                    merge_call_map(&mut call_map, file_call_map);
                     call_sites.append(&mut file_call_sites);
                     aliases.append(&mut file_aliases);
                     reexports.append(&mut file_reexports);
+                    parsed_files.insert(file_path.to_string_lossy().to_string(), syntax_tree);
                 }
                 Err(error) => {
                     warn!(
@@ -157,6 +175,7 @@ impl ProjectData {
             aliases,
             reexports,
             parse_errors,
+            parsed_files,
         };
         info!(
             target: "project.load",
@@ -231,6 +250,69 @@ impl ProjectData {
         );
     }
 
+    /// Look up the cached `syn::File` AST for a Rust source file.
+    ///
+    /// The cache is populated eagerly during [`ProjectData::load`] for every
+    /// file in `rust_files` that parsed successfully.  Returns `None` for
+    /// files that failed to parse, files outside the loaded project, or
+    /// when the cache was not populated (e.g. on a default-constructed
+    /// `ProjectData` that was deserialized from JSON).
+    pub fn parsed_file(&self, path: &Path) -> Option<&syn::File> {
+        self.parsed_file_by_str(&path.to_string_lossy())
+    }
+
+    /// Same as [`ProjectData::parsed_file`] but accepts a string key directly,
+    /// useful when the caller already has a `file_path` string from a
+    /// `FunctionInfo` or `CallSite` and would rather not allocate a `PathBuf`.
+    pub fn parsed_file_by_str(&self, path: &str) -> Option<&syn::File> {
+        self.parsed_files.get(path)
+    }
+
+    /// Move the parsed-file cache out of `self`.
+    ///
+    /// Used by the cross-crate `--also` merge logic in
+    /// [`crate::app::run`] to splice another `ProjectData`'s cache into the
+    /// primary project without re-parsing.
+    pub fn take_parsed_files(&mut self) -> HashMap<String, syn::File> {
+        std::mem::take(&mut self.parsed_files)
+    }
+
+    /// Splice an external `parsed_files` map into `self`'s cache.
+    ///
+    /// On key collision the existing entry wins because it represents the
+    /// primary crate that was loaded first, and downstream consumers index
+    /// other state (functions, structs, call_sites) against those primary
+    /// paths.
+    pub fn absorb_parsed_files(&mut self, extra: HashMap<String, syn::File>) {
+        for (k, v) in extra {
+            self.parsed_files.entry(k).or_insert(v);
+        }
+    }
+
+    /// Snapshot of every key currently in the parsed-file cache.
+    ///
+    /// Used by [`crate::app::run`] to register relativized aliases on top of
+    /// the original absolute-path keys after `--also` merges.
+    pub fn parsed_files_keys(&self) -> Vec<String> {
+        self.parsed_files.keys().cloned().collect()
+    }
+
+    /// Insert a second key `alias` in the parsed-file cache that points at the
+    /// same AST currently stored under `existing`.
+    ///
+    /// Used after path relativization so consumers can look the cached AST up
+    /// using either the original PathBuf-derived form (matches `rust_files`)
+    /// or the relativized string form (matches `FunctionInfo::file_path` /
+    /// `CallSite::file_path`).
+    pub fn alias_parsed_file(&mut self, existing: &str, alias: &str) {
+        if existing == alias || self.parsed_files.contains_key(alias) {
+            return;
+        }
+        if let Some(syntax) = self.parsed_files.get(existing).cloned() {
+            self.parsed_files.insert(alias.to_string(), syntax);
+        }
+    }
+
     /// Convert to a [`crate::ProjectAnalysis`] by cloning the symbol tables.
     ///
     /// `ProjectAnalysis` is the type consumed by the lower-level query and
@@ -247,6 +329,24 @@ impl ProjectData {
             parse_errors: self.parse_errors.clone(),
             reexports: self.reexports.clone(),
         }
+    }
+}
+
+/// Merge a per-file `call_map` into the project-wide `call_map`, concatenating
+/// the callee lists for any caller-id key that already exists.
+///
+/// Caller IDs are file-scoped (`file:line:name`) so collisions are rare
+/// inside a single crate, but when two crates are merged via `--also` and
+/// path normalization brings them into the same key space, two unrelated
+/// callers can share the same `file:line:name` triple and previously
+/// `HashMap::extend` would silently drop the earlier callees.  Concatenating
+/// preserves every edge — call-graph queries dedupe downstream.
+pub(crate) fn merge_call_map(
+    target: &mut HashMap<String, Vec<String>>,
+    incoming: HashMap<String, Vec<String>>,
+) {
+    for (caller_id, mut callees) in incoming {
+        target.entry(caller_id).or_default().append(&mut callees);
     }
 }
 
@@ -325,5 +425,56 @@ mod tests {
         assert!(project.rust_files.is_empty());
         let json = serde_json::to_string(&project).expect("serialize");
         let _: ProjectData = serde_json::from_str(&json).expect("deserialize");
+    }
+
+    #[test]
+    fn project_data_parsed_file_returns_cached_ast_for_loaded_files() {
+        use quote::ToTokens;
+        let dir = tempdir().expect("tempdir");
+        let lib = dir.path().join("lib.rs");
+        fs::write(&lib, "pub fn one() {}\npub struct S;\n").unwrap();
+
+        let project = ProjectData::load(dir.path(), false);
+
+        // Cache should be populated and the parsed AST retrievable by both
+        // PathBuf and string-key forms.
+        let by_path = project.parsed_file(&lib).expect("cached by Path");
+        let by_str = project
+            .parsed_file_by_str(&lib.to_string_lossy())
+            .expect("cached by str");
+
+        // Identity: repeated lookups must return the SAME borrow (same
+        // address) — proves the AST is stored in place rather than re-parsed.
+        let a = project.parsed_file(&lib).expect("first lookup");
+        let b = project.parsed_file(&lib).expect("second lookup");
+        assert!(std::ptr::eq(a, b), "parsed_file must return cached reference");
+        assert!(std::ptr::eq(by_path, by_str));
+
+        // Sanity-check the cached AST round-trips back to the original tokens.
+        let dumped = a.to_token_stream().to_string();
+        assert!(dumped.contains("one"));
+        assert!(dumped.contains("struct S"));
+
+        // Files outside the loaded project return None.
+        assert!(project.parsed_file(std::path::Path::new("/no/such.rs")).is_none());
+    }
+
+    #[test]
+    fn merge_call_map_concatenates_collisions() {
+        let mut target: HashMap<String, Vec<String>> = HashMap::new();
+        target.insert("k".into(), vec!["a".into(), "b".into()]);
+
+        let mut incoming: HashMap<String, Vec<String>> = HashMap::new();
+        incoming.insert("k".into(), vec!["c".into()]);
+        incoming.insert("other".into(), vec!["d".into()]);
+
+        merge_call_map(&mut target, incoming);
+
+        let merged = target.get("k").expect("collision key present");
+        assert_eq!(merged.len(), 3, "callees from both sides must survive");
+        assert!(merged.contains(&"a".to_string()));
+        assert!(merged.contains(&"b".to_string()));
+        assert!(merged.contains(&"c".to_string()));
+        assert_eq!(target.get("other").map(|v| v.as_slice()), Some(&["d".to_string()][..]));
     }
 }

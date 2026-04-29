@@ -14,5 +14,7 @@ mod textual;
 
 pub(super) use handlers::{extract_framework_handler_refs, extract_functional_arg_refs};
 pub(super) use macros::{extract_macro_function_refs, extract_macro_identifier_refs};
-pub(super) use reexports::collect_public_reexport_names;
+pub(super) use reexports::{
+    collect_public_reexport_names, collect_public_reexport_names_from_project,
+};
 pub(super) use textual::{collect_textual_function_argument_refs, collect_textual_function_refs};

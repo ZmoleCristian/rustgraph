@@ -63,9 +63,8 @@ pub fn run(
             Ok(c) => c,
             Err(_) => continue,
         };
-        let syntax = match syn::parse_file(&content) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Some(syntax) = project.parsed_file(file) else {
+            continue;
         };
         let mut v = RefsVisitor {
             file_path: file_str.clone(),
@@ -76,7 +75,7 @@ pub fn run(
             project_enum_names: &project_enum_names,
             project_struct_names: &project_struct_names,
         };
-        v.visit_file(&syntax);
+        v.visit_file(syntax);
     }
 
     if hits.is_empty() {

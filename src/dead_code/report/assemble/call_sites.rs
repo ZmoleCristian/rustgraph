@@ -1,9 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use crate::project::ProjectData;
 use crate::{CallSite, resolve_ambiguous_call_target_for_functions};
 
-use super::super::super::model::{collect_cfg_test_ranges, is_test_path, line_in_ranges};
+use super::super::super::model::{
+    collect_cfg_test_ranges, collect_cfg_test_ranges_from_ast, is_test_path, line_in_ranges,
+};
 use super::super::super::rust_analyzer::collect_rust_analyzer_reference_counts;
 use super::super::super::text_refs::{
     collect_textual_function_argument_refs, collect_textual_function_refs,
@@ -35,6 +38,7 @@ pub fn collect_reference_counts(
     test_ranges_cache: &mut HashMap<String, Vec<(usize, usize)>>,
     macro_rules_ranges_cache: &mut HashMap<String, Vec<(usize, usize)>>,
     file_lines_cache: &mut HashMap<String, Vec<String>>,
+    project: Option<&ProjectData>,
 ) -> Result<CallSiteRefCounts, Box<dyn std::error::Error>> {
     let candidate_names: HashSet<String> = ctx.candidate_name_counts.keys().cloned().collect();
     let framework_refs = extract_framework_handler_refs(call_sites, file_lines_cache);
@@ -101,7 +105,12 @@ pub fn collect_reference_counts(
         } else {
             let ranges = test_ranges_cache
                 .entry(cs.file_path.clone())
-                .or_insert_with(|| collect_cfg_test_ranges(&cs.file_path));
+                .or_insert_with(|| {
+                    match project.and_then(|p| p.parsed_file_by_str(&cs.file_path)) {
+                        Some(syntax) => collect_cfg_test_ranges_from_ast(syntax),
+                        None => collect_cfg_test_ranges(&cs.file_path),
+                    }
+                });
             line_in_ranges(cs.line, ranges)
         };
 

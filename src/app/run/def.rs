@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fs;
 
 use syn::visit::Visit;
 
@@ -314,16 +313,11 @@ fn scan_name_usage(project: &ProjectData, name: &str) -> NameUsage {
 
     let mut total: usize = 0;
     for file in &project.rust_files {
-        let content = match fs::read_to_string(file) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-        let syntax = match syn::parse_file(&content) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Some(syntax) = project.parsed_file(file) else {
+            continue;
         };
         let mut counter = NameCounter { ident: name, count: 0 };
-        counter.visit_file(&syntax);
+        counter.visit_file(syntax);
         total = total.saturating_add(counter.count);
     }
 

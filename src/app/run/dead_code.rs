@@ -25,6 +25,7 @@ pub fn run(
         &project.call_sites,
         &project.rust_files,
         &args.path,
+        Some(project),
     )?;
 
 

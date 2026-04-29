@@ -27,6 +27,21 @@ pub type ParsedRustFile = (
 ///
 /// Files located under a `tests/` directory are treated as `#[cfg(test)]` by default.
 pub fn parse_rust_file(file_path: &Path) -> Result<ParsedRustFile, Box<dyn std::error::Error>> {
+    let (parsed, _ast) = parse_rust_file_with_ast(file_path)?;
+    Ok(parsed)
+}
+
+/// Parse a single `.rs` file and return both the extracted symbols and the
+/// parsed [`syn::File`] AST.
+///
+/// The caller can stash the returned [`syn::File`] in a cache (see
+/// [`crate::project::ProjectData::parsed_file`]) and reuse it instead of
+/// calling `syn::parse_file` again for the same source.
+///
+/// Files located under a `tests/` directory are treated as `#[cfg(test)]` by default.
+pub fn parse_rust_file_with_ast(
+    file_path: &Path,
+) -> Result<(ParsedRustFile, syn::File), Box<dyn std::error::Error>> {
     let content = fs::read_to_string(file_path)?;
     let syntax_tree = syn::parse_file(&content)?;
 
@@ -36,7 +51,7 @@ pub fn parse_rust_file(file_path: &Path) -> Result<ParsedRustFile, Box<dyn std::
     }
     visitor.visit_file(&syntax_tree);
 
-    Ok((
+    let parsed = (
         visitor.functions,
         visitor.structs,
         visitor.enums,
@@ -44,7 +59,8 @@ pub fn parse_rust_file(file_path: &Path) -> Result<ParsedRustFile, Box<dyn std::
         visitor.call_sites,
         visitor.aliases,
         visitor.reexports,
-    ))
+    );
+    Ok((parsed, syntax_tree))
 }
 
 /// Compute the stable ID for a [`FunctionInfo`] in the form `"file:line:name"`.

@@ -1,9 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::FunctionInfo;
+use crate::project::ProjectData;
 
-use super::super::super::model::{collect_cfg_test_ranges, line_in_ranges};
-use super::super::entrypoint::collect_runtime_entrypoint_lines;
+use super::super::super::model::{
+    collect_cfg_test_ranges, collect_cfg_test_ranges_from_ast, line_in_ranges,
+};
+use super::super::entrypoint::{
+    collect_runtime_entrypoint_lines, collect_runtime_entrypoint_lines_from_ast,
+};
 
 pub const COMMON_TRAIT_METHODS: &[&str] = &[
     "from",
@@ -42,6 +47,7 @@ pub fn check_skip_reason(
     framework_live_targets: &HashSet<(String, usize)>,
     test_ranges_cache: &mut HashMap<String, Vec<(usize, usize)>>,
     runtime_entrypoint_cache: &mut HashMap<String, HashSet<usize>>,
+    project: Option<&ProjectData>,
 ) -> SkipReason {
     if framework_live_targets.contains(&(func.file_path.clone(), func.start_line)) {
         return SkipReason::FrameworkHandler;
@@ -53,14 +59,20 @@ pub fn check_skip_reason(
 
     let func_test_ranges = test_ranges_cache
         .entry(func.file_path.clone())
-        .or_insert_with(|| collect_cfg_test_ranges(&func.file_path));
+        .or_insert_with(|| match project.and_then(|p| p.parsed_file_by_str(&func.file_path)) {
+            Some(syntax) => collect_cfg_test_ranges_from_ast(syntax),
+            None => collect_cfg_test_ranges(&func.file_path),
+        });
     if line_in_ranges(func.start_line, func_test_ranges) {
         return SkipReason::CfgTest;
     }
 
     let runtime_lines = runtime_entrypoint_cache
         .entry(func.file_path.clone())
-        .or_insert_with(|| collect_runtime_entrypoint_lines(&func.file_path));
+        .or_insert_with(|| match project.and_then(|p| p.parsed_file_by_str(&func.file_path)) {
+            Some(syntax) => collect_runtime_entrypoint_lines_from_ast(syntax),
+            None => collect_runtime_entrypoint_lines(&func.file_path),
+        });
     if runtime_lines.contains(&func.start_line) {
         return SkipReason::RuntimeEntrypoint;
     }
@@ -145,6 +157,7 @@ mod tests {
             &framework_targets,
             &mut test_cache,
             &mut runtime_cache,
+            None,
         );
         assert!(matches!(reason, SkipReason::FrameworkHandler));
     }
@@ -166,6 +179,7 @@ mod tests {
             &HashSet::new(),
             &mut test_cache,
             &mut runtime_cache,
+            None,
         );
         assert!(matches!(reason, SkipReason::Reexported));
     }
@@ -185,6 +199,7 @@ mod tests {
             &HashSet::new(),
             &mut test_cache,
             &mut runtime_cache,
+            None,
         );
         assert!(matches!(reason, SkipReason::CfgTest));
     }
@@ -204,6 +219,7 @@ mod tests {
             &HashSet::new(),
             &mut test_cache,
             &mut runtime_cache,
+            None,
         );
         assert!(matches!(reason, SkipReason::RuntimeEntrypoint));
     }
@@ -225,6 +241,7 @@ mod tests {
             &HashSet::new(),
             &mut test_cache,
             &mut runtime_cache,
+            None,
         );
         assert!(matches!(reason, SkipReason::CommonTraitMethod));
     }
@@ -244,6 +261,7 @@ mod tests {
             &HashSet::new(),
             &mut test_cache,
             &mut runtime_cache,
+            None,
         );
         assert!(matches!(reason, SkipReason::None));
     }

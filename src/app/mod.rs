@@ -92,6 +92,18 @@ fn relativize_project_paths(
             }
         }
     }
+
+    // The parsed-file cache must stay in sync with the file_path strings on
+    // FunctionInfo / CallSite (which are now relativized) AND with the raw
+    // PathBufs in rust_files (which are not).  Insert relativized aliases
+    // pointing at the same AST so both lookup styles hit a cache entry.
+    let original_keys: Vec<String> = project.parsed_files_keys();
+    for key in original_keys {
+        let stripped = strip(&key);
+        if stripped != key {
+            project.alias_parsed_file(&key, &stripped);
+        }
+    }
 }
 
 fn find_crate_root_from_cwd() -> Option<std::path::PathBuf> {
@@ -174,7 +186,7 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("--also '{}': same as -p root, skipped", extra.display());
             continue;
         }
-        let extra_project = ProjectData::load(extra, args.include_ignored);
+        let mut extra_project = ProjectData::load(extra, args.include_ignored);
         eprintln!(
             "--also '{}': merged {} fn(s), {} struct(s), {} enum(s), {} file(s)",
             extra.display(),
@@ -183,15 +195,20 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
             extra_project.enums.len(),
             extra_project.rust_files.len()
         );
+        let extra_parsed = extra_project.take_parsed_files();
         project.rust_files.extend(extra_project.rust_files);
         project.functions.extend(extra_project.functions);
         project.structs.extend(extra_project.structs);
         project.enums.extend(extra_project.enums);
-        for (k, v) in extra_project.call_map {
-            project.call_map.entry(k).or_default().extend(v);
+        // Concatenate callee vecs on collision so cross-crate `--also`
+        // merges don't drop edges when two crates happen to land on the
+        // same `file:line:name` caller key after relativization.
+        for (k, mut v) in extra_project.call_map {
+            project.call_map.entry(k).or_default().append(&mut v);
         }
         project.call_sites.extend(extra_project.call_sites);
         project.parse_errors.extend(extra_project.parse_errors);
+        project.absorb_parsed_files(extra_parsed);
     }
 
     project.rust_files.sort();

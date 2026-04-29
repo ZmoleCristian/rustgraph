@@ -242,7 +242,6 @@ struct CollectedRef {
 
 fn collect_refs(args: &Args, project: &ProjectData, request: &RefsRequest) -> Vec<CollectedRef> {
     use std::collections::HashMap;
-    use std::fs;
     use syn::visit::Visit;
 
     let by_file: HashMap<String, Vec<&crate::FunctionInfo>> = {
@@ -266,20 +265,15 @@ fn collect_refs(args: &Args, project: &ProjectData, request: &RefsRequest) -> Ve
                 continue;
             }
         }
-        let content = match fs::read_to_string(file) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-        let syntax = match syn::parse_file(&content) {
-            Ok(s) => s,
-            Err(_) => continue,
+        let Some(syntax) = project.parsed_file(file) else {
+            continue;
         };
         let mut v = LiteRefsVisitor {
             file_path: file_str.clone(),
             ident: &request.ident,
             hits: &mut hits,
         };
-        v.visit_file(&syntax);
+        v.visit_file(syntax);
     }
 
     let mut hit_is_test = vec![false; hits.len()];

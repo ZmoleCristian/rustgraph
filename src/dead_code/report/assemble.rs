@@ -11,10 +11,13 @@ pub mod results;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+use crate::project::ProjectData;
 use crate::{CallSite, FunctionInfo};
 
 use super::super::model::{DeadCodeReport, DeadFunction};
-use super::super::text_refs::collect_public_reexport_names;
+use super::super::text_refs::{
+    collect_public_reexport_names, collect_public_reexport_names_from_project,
+};
 
 use self::call_sites::collect_reference_counts;
 use self::candidates::build_candidate_context;
@@ -26,11 +29,15 @@ use self::results::{assemble_report, build_ambiguous_details};
 /// Accepts the project's `functions` and `call_sites` produced by the AST visitor,
 /// the list of Rust source `rust_files` to scan for textual references, and the
 /// `workspace_root` used to scope rust-analyzer if available.
+///
+/// When `project` is supplied, the parsed `syn::File` ASTs cached on it are
+/// reused for re-export discovery instead of re-parsing every source file.
 pub fn build_dead_code_report(
     functions: &[FunctionInfo],
     call_sites: &[CallSite],
     rust_files: &[PathBuf],
     workspace_root: &Path,
+    project: Option<&ProjectData>,
 ) -> Result<DeadCodeReport, Box<dyn std::error::Error>> {
     let mut test_ranges_cache: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
     let mut macro_rules_ranges_cache: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
@@ -43,7 +50,10 @@ pub fn build_dead_code_report(
     }
 
     let ctx = build_candidate_context(functions);
-    let reexported = collect_public_reexport_names(rust_files);
+    let reexported = match project {
+        Some(p) => collect_public_reexport_names_from_project(p),
+        None => collect_public_reexport_names(rust_files),
+    };
     let refs = collect_reference_counts(
         &ctx,
         call_sites,
@@ -52,6 +62,7 @@ pub fn build_dead_code_report(
         &mut test_ranges_cache,
         &mut macro_rules_ranges_cache,
         &mut file_lines_cache,
+        project,
     )?;
 
     let mut dead = Vec::new();
@@ -71,6 +82,7 @@ pub fn build_dead_code_report(
             &refs.framework_live_targets,
             &mut test_ranges_cache,
             &mut runtime_entrypoint_cache,
+            project,
         );
 
         match skip_reason {
