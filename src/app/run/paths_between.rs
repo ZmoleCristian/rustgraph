@@ -151,9 +151,7 @@ pub fn run(
 
     let bfs_clamped = !cap_is_unlimited && paths.len() == request.max_results + 1;
 
-
-    let mut seen: HashSet<Vec<String>> = HashSet::new();
-    paths.retain(|p| seen.insert(p.clone()));
+    paths = dedup_preserve_order(paths);
 
 
     let cap_hit = bfs_clamped || (!cap_is_unlimited && paths.len() > request.max_results);
@@ -501,4 +499,69 @@ fn render_text(report: &PathsReport) -> String {
         }
     }
     out
+}
+
+/// Deduplicate `paths` in-place while preserving insertion order.
+///
+/// Avoids the per-element clone that `paths.retain(|p| seen.insert(p.clone()))`
+/// would otherwise pay: phase 1 walks the input by reference to compute a
+/// keep-mask using borrowed slices as the set key; phase 2 moves only the
+/// kept entries via `mem::take` — duplicates are dropped without any clone.
+fn dedup_preserve_order(mut paths: Vec<Vec<String>>) -> Vec<Vec<String>> {
+    if paths.is_empty() {
+        return paths;
+    }
+    let mut keep: Vec<bool> = Vec::with_capacity(paths.len());
+    {
+        let mut seen: HashSet<&[String]> = HashSet::with_capacity(paths.len());
+        for p in &paths {
+            keep.push(seen.insert(p.as_slice()));
+        }
+    }
+    let mut deduped: Vec<Vec<String>> = Vec::with_capacity(paths.len());
+    for (i, p) in paths.iter_mut().enumerate() {
+        if keep[i] {
+            deduped.push(std::mem::take(p));
+        }
+    }
+    deduped
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dedup_preserve_order;
+
+    fn p<const N: usize>(items: [&str; N]) -> Vec<String> {
+        items.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn dedup_preserves_first_occurrence_order() {
+        let input = vec![
+            p(["a", "b"]),
+            p(["c", "d"]),
+            p(["a", "b"]),
+            p(["e"]),
+            p(["c", "d"]),
+        ];
+        let out = dedup_preserve_order(input);
+        assert_eq!(
+            out,
+            vec![p(["a", "b"]), p(["c", "d"]), p(["e"])],
+            "duplicates after the first must be dropped, order preserved"
+        );
+    }
+
+    #[test]
+    fn dedup_is_a_noop_when_no_duplicates() {
+        let input = vec![p(["a"]), p(["a", "b"]), p(["b"])];
+        let out = dedup_preserve_order(input.clone());
+        assert_eq!(out, input);
+    }
+
+    #[test]
+    fn dedup_handles_empty_input() {
+        let out = dedup_preserve_order(Vec::<Vec<String>>::new());
+        assert!(out.is_empty());
+    }
 }

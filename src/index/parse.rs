@@ -26,6 +26,10 @@ pub type ParsedRustFile = (
 /// Parse a single `.rs` file and return all extracted symbols and call sites.
 ///
 /// Files located under a `tests/` directory are treated as `#[cfg(test)]` by default.
+///
+/// Non-UTF-8 files are surfaced as a tagged error containing the literal string
+/// `"non-UTF-8"`; a `tracing::warn!` is also emitted so the issue is visible
+/// even when callers swallow the error.
 pub fn parse_rust_file(file_path: &Path) -> Result<ParsedRustFile, Box<dyn std::error::Error>> {
     let (parsed, _ast) = parse_rust_file_with_ast(file_path)?;
     Ok(parsed)
@@ -39,10 +43,31 @@ pub fn parse_rust_file(file_path: &Path) -> Result<ParsedRustFile, Box<dyn std::
 /// calling `syn::parse_file` again for the same source.
 ///
 /// Files located under a `tests/` directory are treated as `#[cfg(test)]` by default.
+///
+/// Non-UTF-8 files are surfaced as a tagged error containing the literal
+/// string `"non-UTF-8"`; a `tracing::warn!` is also emitted so the issue is
+/// visible even when callers swallow the error.
 pub fn parse_rust_file_with_ast(
     file_path: &Path,
 ) -> Result<(ParsedRustFile, syn::File), Box<dyn std::error::Error>> {
-    let content = fs::read_to_string(file_path)?;
+    let bytes = fs::read(file_path)?;
+    let content = match std::str::from_utf8(&bytes) {
+        Ok(s) => s.to_owned(),
+        Err(e) => {
+            tracing::warn!(
+                target: "rustgraph.parse",
+                file = %file_path.display(),
+                error = %e,
+                "skipping non-UTF-8 source file"
+            );
+            return Err(format!(
+                "non-UTF-8 source file at byte {}: {}",
+                e.valid_up_to(),
+                e
+            )
+            .into());
+        }
+    };
     let syntax_tree = syn::parse_file(&content)?;
 
     let mut visitor = CodeVisitor::new(file_path.to_string_lossy().to_string());
@@ -66,12 +91,6 @@ pub fn parse_rust_file_with_ast(
 /// Compute the stable ID for a [`FunctionInfo`] in the form `"file:line:name"`.
 pub fn function_id(func: &FunctionInfo) -> String {
     make_function_id(&func.file_path, func.start_line, &func.name)
-}
-
-
-/// Alias for [`function_id`]; prefer [`function_id`] in new code.
-pub fn function_symbol_id(func: &FunctionInfo) -> String {
-    function_id(func)
 }
 
 /// Compute the stable ID for a [`StructInfo`] in the form `"struct:file:line:name"`.
@@ -163,5 +182,19 @@ mod tests {
         let path = dir.path().join("bad.rs");
         std::fs::write(&path, "fn () { invalid syntax").expect("write");
         assert!(parse_rust_file(&path).is_err());
+    }
+
+    #[test]
+    fn parse_rust_file_tags_non_utf8_input() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("bin.rs");
+        // 0xFF is invalid as the leading byte of a UTF-8 sequence.
+        std::fs::write(&path, [0xFFu8, 0xFE, 0x00, 0x41]).expect("write");
+        let err = parse_rust_file(&path).err().expect("expected non-UTF-8 error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("non-UTF-8"),
+            "expected error to be tagged 'non-UTF-8', got: {msg}"
+        );
     }
 }

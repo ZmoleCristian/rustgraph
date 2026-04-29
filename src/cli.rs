@@ -993,7 +993,7 @@ Reduces false-positive edges at the cost of hiding some legit ones; see stderr f
 
     #[arg(
         long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Diff",
-        help = "Filter to symbols whose enclosing fn/struct/enum was changed since --since (default HEAD~1). Requires git."
+        help = "Filter results to changes since --since (default HEAD~1). Granularity varies: find applies span-level filtering to fn/struct/enum; callers/refs/dead-code apply span-level filtering to fns; grep/impls/tree filter at file-level. Requires git."
     )]
     pub changed: bool,
 

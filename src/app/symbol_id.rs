@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::{
-    EnumInfo, FunctionInfo, StructInfo, enum_symbol_id, function_symbol_id, struct_symbol_id,
+    EnumInfo, FunctionInfo, StructInfo, enum_symbol_id, function_id, struct_symbol_id,
 };
 
 /// Wraps a serializable symbol value with its pre-computed stable symbol ID.
@@ -27,7 +27,7 @@ pub struct WithSymbolId<T: Serialize> {
 impl WithSymbolId<FunctionInfo> {
     /// Computes the function's symbol ID and wraps it together with the function info.
     pub fn wrap_fn(inner: FunctionInfo) -> Self {
-        let symbol_id = function_symbol_id(&inner);
+        let symbol_id = function_id(&inner);
         Self { symbol_id, inner }
     }
 }

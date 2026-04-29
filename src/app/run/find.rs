@@ -507,7 +507,7 @@ fn render_fn_lines(hits: &[(FunctionInfo, MatchKind)], show_ids: bool, out: &mut
 
 
         let id_suffix = if show_ids {
-            format!(" [id: {}]", crate::function_symbol_id(f))
+            format!(" [id: {}]", crate::function_id(f))
         } else {
             String::new()
         };
