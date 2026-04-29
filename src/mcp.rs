@@ -13,6 +13,78 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::json;
 
+/// Strongly-typed `kind` filter for `rustgraph_find`.
+///
+/// Used as the JSON-Schema enum so the MCP client gets validation errors
+/// up front rather than the server silently dropping unknown values.
+#[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum FindKind {
+    /// Filter to functions only.
+    Func,
+    /// Filter to structs only.
+    Struct,
+    /// Filter to enums only.
+    Enum,
+}
+
+impl FindKind {
+    fn flag(self) -> &'static str {
+        match self {
+            FindKind::Func => "--func",
+            FindKind::Struct => "--struct",
+            FindKind::Enum => "--enum",
+        }
+    }
+}
+
+/// Strongly-typed `view` selector for `rustgraph_ensemble`.
+#[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum EnsembleView {
+    /// Concise summary (default).
+    Summary,
+    /// Caller / use-site oriented view.
+    Usage,
+    /// Dataflow-oriented view.
+    Flow,
+    /// Everything: summary + usage + flow.
+    Full,
+}
+
+impl EnsembleView {
+    fn as_cli(self) -> &'static str {
+        match self {
+            EnsembleView::Summary => "summary",
+            EnsembleView::Usage => "usage",
+            EnsembleView::Flow => "flow",
+            EnsembleView::Full => "full",
+        }
+    }
+}
+
+/// Strongly-typed `preset` selector for `rustgraph_ensemble`.
+#[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum EnsemblePreset {
+    /// Quick summary, minimal context.
+    Quick,
+    /// Balanced (default).
+    Balanced,
+    /// Deep dive: more context, more lines.
+    Deep,
+}
+
+impl EnsemblePreset {
+    fn as_cli(self) -> &'static str {
+        match self {
+            EnsemblePreset::Quick => "quick",
+            EnsemblePreset::Balanced => "balanced",
+            EnsemblePreset::Deep => "deep",
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct FindArgs {
     /// Symbol name; `a|b` for OR.
@@ -22,7 +94,7 @@ pub struct FindArgs {
     pub path: Option<String>,
     /// Kind filter: `func`, `struct`, or `enum`.
     #[serde(default)]
-    pub kind: Option<String>,
+    pub kind: Option<FindKind>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -52,10 +124,10 @@ pub struct EnsembleArgs {
     pub path: Option<String>,
     /// View: `summary` (default), `usage`, `flow`, `full`.
     #[serde(default)]
-    pub view: Option<String>,
+    pub view: Option<EnsembleView>,
     /// Preset: `quick`, `balanced` (default), `deep`.
     #[serde(default)]
-    pub preset: Option<String>,
+    pub preset: Option<EnsemblePreset>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -133,13 +205,8 @@ impl RustgraphServer {
         }
         argv.push("find".into());
         argv.push(p.0.query.clone());
-        if let Some(kind) = &p.0.kind {
-            match kind.as_str() {
-                "func" => argv.push("--func".into()),
-                "struct" => argv.push("--struct".into()),
-                "enum" => argv.push("--enum".into()),
-                _ => {}
-            }
+        if let Some(kind) = p.0.kind {
+            argv.push(kind.flag().into());
         }
         Ok(run_rustgraph(&self.binary, &argv))
     }
@@ -190,13 +257,13 @@ impl RustgraphServer {
         }
         argv.push("ensemble".into());
         argv.push(p.0.target.clone());
-        if let Some(v) = &p.0.view {
+        if let Some(v) = p.0.view {
             argv.push("--view".into());
-            argv.push(v.clone());
+            argv.push(v.as_cli().into());
         }
-        if let Some(pre) = &p.0.preset {
+        if let Some(pre) = p.0.preset {
             argv.push("--preset".into());
-            argv.push(pre.clone());
+            argv.push(pre.as_cli().into());
         }
         Ok(run_rustgraph(&self.binary, &argv))
     }
@@ -372,6 +439,55 @@ mod tests {
             .and_then(|v| v.as_array())
             .expect("argv array");
         assert_eq!(argv.len(), 2);
+    }
+
+    #[test]
+    fn find_kind_serde_accepts_lowercase_strings() {
+        let v: FindKind = serde_json::from_str("\"func\"").unwrap();
+        assert!(matches!(v, FindKind::Func));
+        let v: FindKind = serde_json::from_str("\"struct\"").unwrap();
+        assert!(matches!(v, FindKind::Struct));
+        let v: FindKind = serde_json::from_str("\"enum\"").unwrap();
+        assert!(matches!(v, FindKind::Enum));
+    }
+
+    #[test]
+    fn find_kind_serde_rejects_unknown_values() {
+        let err = serde_json::from_str::<FindKind>("\"banana\"").err();
+        assert!(
+            err.is_some(),
+            "unknown variants must be rejected at deserialize time"
+        );
+    }
+
+    #[test]
+    fn ensemble_view_serde_accepts_documented_set() {
+        for s in ["summary", "usage", "flow", "full"] {
+            let raw = format!("\"{s}\"");
+            let _v: EnsembleView =
+                serde_json::from_str(&raw).expect("should accept documented view");
+        }
+    }
+
+    #[test]
+    fn ensemble_preset_serde_accepts_documented_set() {
+        for s in ["quick", "balanced", "deep"] {
+            let raw = format!("\"{s}\"");
+            let _v: EnsemblePreset =
+                serde_json::from_str(&raw).expect("should accept documented preset");
+        }
+    }
+
+    #[test]
+    fn ensemble_view_rejects_unknown() {
+        let err = serde_json::from_str::<EnsembleView>("\"deep-dive\"").err();
+        assert!(err.is_some(), "unknown view must fail deserialization");
+    }
+
+    #[test]
+    fn ensemble_preset_rejects_unknown() {
+        let err = serde_json::from_str::<EnsemblePreset>("\"slow\"").err();
+        assert!(err.is_some(), "unknown preset must fail deserialization");
     }
 
     #[test]
