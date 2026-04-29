@@ -208,7 +208,7 @@ fn resolve_slice(
                 .collect();
             hits.sort_by_key(|f| std::cmp::Reverse(f.start_line));
             if let Some(f) = hits.first() {
-                let id = crate::function_symbol_id(f);
+                let id = crate::function_id(f);
                 let symbol = project_symbol_by_id(project, &id);
                 let slice = query::source_slice_for_symbol(project, &id)?;
                 return Ok(SliceOutput { symbol, slice });

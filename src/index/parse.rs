@@ -73,12 +73,6 @@ pub fn function_id(func: &FunctionInfo) -> String {
     make_function_id(&func.file_path, func.start_line, &func.name)
 }
 
-
-/// Alias for [`function_id`]; prefer [`function_id`] in new code.
-pub fn function_symbol_id(func: &FunctionInfo) -> String {
-    function_id(func)
-}
-
 /// Compute the stable ID for a [`StructInfo`] in the form `"struct:file:line:name"`.
 pub fn struct_symbol_id(s: &StructInfo) -> String {
     format!("struct:{}:{}:{}", s.file_path, s.start_line, s.name)
