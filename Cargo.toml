@@ -1,6 +1,6 @@
 [package]
 name = "rustgraph"
-version = "0.7.7"
+version = "0.7.8"
 edition = "2024"
 authors = ["Zmole Cristian"]
 description = "Rust code navigation built for AiDX — AST-aware, MCP-native, token-efficient."

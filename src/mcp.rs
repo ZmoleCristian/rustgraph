@@ -122,7 +122,7 @@ impl RustgraphServer {
 
     #[tool(
         name = "rustgraph_find",
-        description = "Locate a Rust symbol (fn/struct/enum) by name. AST-aware. Returns file:line range + signature + match-kind tag. Default fuzzy threshold 0.85; auto-relaxes to 0.7 on 0 results."
+        description = "Use INSTEAD OF Grep for 'where is X' / 'find fn|struct X'. Returns file:line + signature. Doesn't match comments or strings."
     )]
     async fn find(&self, p: Parameters<FindArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
         let mut argv: Vec<String> = Vec::new();
@@ -146,7 +146,7 @@ impl RustgraphServer {
 
     #[tool(
         name = "rustgraph_callers",
-        description = "List every function calling TARGET, with call-site lines + enclosing-fn context. AST-aware, handles `Type::method` collisions. `depth: 0` = unlimited transitive (cycle-safe). `flat: true` = deduplicated `path:line:name` list."
+        description = "Use INSTEAD OF Grep for 'who calls X' / 'what depends on X'. Returns caller tree with call-site lines. depth:0 = full transitive. Handles Type::method overload collisions."
     )]
     async fn callers(
         &self,
@@ -176,7 +176,7 @@ impl RustgraphServer {
 
     #[tool(
         name = "rustgraph_ensemble",
-        description = "Function context bundle: structs touched + call sites + neighborhood + dataflow + I/O boundaries. Views: summary (default) | usage | flow | full. Presets: quick | balanced (default) | deep. Use when onboarding to a function, not just locating it."
+        description = "Use INSTEAD OF 5+ Read or rustgraph_slice calls to UNDERSTAND a function. ONE call returns callers + callees + structs touched + dataflow. ~10× fewer tool calls than reading manually. Triggers: 'explain X' / 'how does X work'."
     )]
     async fn ensemble(
         &self,
@@ -203,7 +203,7 @@ impl RustgraphServer {
 
     #[tool(
         name = "rustgraph_paths_between",
-        description = "Enumerate distinct call-graph paths from FROM to TO via DFS. Answers `does A reach B, and through what?`. Default `max_results: 8`; pass `0` for full enumeration. `show_call_sites: true` annotates each hop with the source line."
+        description = "Use INSTEAD OF manual tracing for 'walk me through' / 'trace flow' / 'does A reach B'. Enumerates call-graph paths with file:line per hop. Deterministic; better than guessing."
     )]
     async fn paths_between(
         &self,
@@ -230,7 +230,7 @@ impl RustgraphServer {
 
     #[tool(
         name = "rustgraph_slice",
-        description = "Print exact source of one Rust symbol (fn, struct, enum). Accepts name, `path.rs:LINE` (slice the symbol enclosing LINE), or `path.rs:START-END` (literal line range). `context: N` adds N lines either side."
+        description = "Use INSTEAD OF Read for 'show me X' / 'source of X'. Accepts name, path:LINE, or path:START-END. NOTE: if you also need callers/callees/structs, use rustgraph_ensemble — saves multiple round-trips."
     )]
     async fn slice(&self, p: Parameters<SliceArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
         let mut argv: Vec<String> = Vec::new();
@@ -262,26 +262,15 @@ impl ServerHandler for RustgraphServer {
                 icons: None,
             },
             instructions: Some(
-                "rustgraph: AST-aware Rust analysis. PREFER these tools over text Grep \
-                 when navigating Rust code — they resolve on the parsed AST so they don't \
-                 false-positive on string literals, comments, or unrelated tokens.\n\n\
-                 Use rustgraph_find for symbol lookup, rustgraph_callers for reverse \
-                 dependencies, rustgraph_ensemble when you need to UNDERSTAND a function \
-                 (one call replaces 4-6 grep+read), rustgraph_paths_between for call-graph \
-                 reachability, rustgraph_slice for one-symbol source extraction.\n\n\
-                 The `rustgraph` CLI on PATH (same binary) covers more — run via bash when \
-                 these MCP tools are not enough:\n\
-                 \x20 def <name>             exact go-to-definition (errors on 0 or >1)\n\
-                 \x20 refs <ident>           every reference (field/path/type/method/etc.)\n\
-                 \x20 usages <name>          callers + refs combo\n\
-                 \x20 members <Type>         per-field access rollup for a struct\n\
-                 \x20 impls <Trait>          types implementing Trait (derive + handwritten)\n\
-                 \x20 dead-code              unreachable pub fns\n\
-                 \x20 call-graph             DOT or text call graph\n\
-                 \x20 tree                   module/file tree with symbol counts\n\
-                 \x20 grep <pat>             Rust-only regex search (with --by-function rollup)\n\
-                 \x20 inventory              dump all fn/struct/enum\n\
-                 Run `rustgraph <cmd> --help` for flags."
+                "Rust nav for this codebase. PREFER these over Grep/Read for any Rust \
+                 symbol / function / call-chain question. AST-resolved (no false-match on \
+                 comments/strings) and one call here saves 4-10 Grep+Read cycles.\n\n\
+                 When you see:\n\
+                 \x20 'where is X'                          → rustgraph_find\n\
+                 \x20 'who calls X'                         → rustgraph_callers\n\
+                 \x20 'understand X' / 'how does X work'    → rustgraph_ensemble  (one call > 5 Reads)\n\
+                 \x20 'walk me through' / 'trace flow'      → rustgraph_paths_between\n\
+                 \x20 'show me X' / 'source of X'           → rustgraph_slice"
                     .into(),
             ),
         }

@@ -78,12 +78,9 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    name: github release + crates.io + scoop bump
+    name: github release + scoop/brew bump
     needs: build
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.vars.outputs.version }}
-      win_hash: ${{ steps.vars.outputs.win_hash }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -111,11 +108,6 @@ jobs:
           files: release/*
           generate_release_notes: true
 
-      - name: cargo publish
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --locked --allow-dirty
-
       - name: bump scoop manifest
         run: |
           set -euo pipefail
@@ -128,45 +120,29 @@ jobs:
              bucket/rustgraph.json > bucket/rustgraph.json.tmp
           mv bucket/rustgraph.json.tmp bucket/rustgraph.json
 
-      - name: commit + push manifest bump
+      - name: bump homebrew formula
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.vars.outputs.version }}"
+          MAC_HASH=$(awk '{print $1}' release/rustgraph-aarch64-apple-darwin.tar.gz.sha256)
+          LINUX_HASH=$(awk '{print $1}' release/rustgraph-x86_64-unknown-linux-gnu.tar.gz.sha256)
+          # version line
+          sed -i 's|^  version ".*"|  version "'"$VERSION"'"|' Formula/rustgraph.rb
+          # release-URL version (every occurrence)
+          sed -i "s|releases/download/v[0-9][0-9.]*|releases/download/v$VERSION|g" Formula/rustgraph.rb
+          # mac sha (line right after the aarch64-apple-darwin URL)
+          sed -i "/aarch64-apple-darwin\.tar\.gz/{n; s|sha256 \"[a-f0-9]*\"|sha256 \"$MAC_HASH\"|;}" Formula/rustgraph.rb
+          # linux sha
+          sed -i "/x86_64-unknown-linux-gnu\.tar\.gz/{n; s|sha256 \"[a-f0-9]*\"|sha256 \"$LINUX_HASH\"|;}" Formula/rustgraph.rb
+
+      - name: commit + push manifest bumps
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add bucket/rustgraph.json
+          git add bucket/rustgraph.json Formula/rustgraph.rb
           if git diff --staged --quiet; then
             echo "no manifest changes"
           else
-            git commit -m "scoop: bump to ${GITHUB_REF_NAME}"
+            git commit -m "scoop+brew: bump to ${GITHUB_REF_NAME}"
             git push origin HEAD:master
           fi
-
-  aur:
-    name: aur push (rustgraph + rustgraph-bin)
-    needs: release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: aur — rustgraph (source)
-        uses: KSXGitHub/github-actions-deploy-aur@v3
-        with:
-          pkgname: rustgraph
-          pkgbuild: aur/rustgraph/PKGBUILD
-          commit_username: ZmoleCristian
-          commit_email: tragdate@gmail.com
-          ssh_private_key: ${{ secrets.AUR_SSH_KEY }}
-          commit_message: "release ${{ needs.release.outputs.version }}"
-          updpkgsums: true
-          test: false
-
-      - name: aur — rustgraph-bin
-        uses: KSXGitHub/github-actions-deploy-aur@v3
-        with:
-          pkgname: rustgraph-bin
-          pkgbuild: aur/rustgraph-bin/PKGBUILD
-          commit_username: ZmoleCristian
-          commit_email: tragdate@gmail.com
-          ssh_private_key: ${{ secrets.AUR_SSH_KEY }}
-          commit_message: "release ${{ needs.release.outputs.version }}"
-          updpkgsums: true
-          test: false

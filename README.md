@@ -2,13 +2,49 @@
 
 AiDX-native Rust codebase navigation. AST-aware. CLI + library + MCP server.
 
+## Install
+
+**Cargo** (any platform with a Rust toolchain)
+
 ```bash
 cargo install rustgraph
 ```
 
+**Homebrew** (macOS arm64, Linux x86_64)
+
+```bash
+brew tap zmolecristian/rustgraph https://github.com/ZmoleCristian/rustgraph
+brew install rustgraph
+```
+
+**AUR** (Arch — yay / paru / makepkg)
+
+```bash
+yay -S rustgraph        # build from source
+yay -S rustgraph-bin    # prebuilt binary
+# or:
+paru -S rustgraph
+paru -S rustgraph-bin
+```
+
+**Scoop** (Windows)
+
+```powershell
+scoop bucket add rustgraph https://github.com/ZmoleCristian/rustgraph
+scoop install rustgraph
+```
+
+**As a library** (Rust crate)
+
 ```toml
 [dependencies]
 rustgraph = "0.7"
+```
+
+After install, register the MCP server with Claude / Codex / Gemini:
+
+```bash
+rustgraph mcp install
 ```
 
 ## What is AiDX?
