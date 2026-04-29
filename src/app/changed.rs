@@ -18,8 +18,11 @@ pub fn build_changed_ranges(
     git_ref: &str,
 ) -> Result<ChangedRanges, Box<dyn std::error::Error>> {
 
+    // `--end-of-options` prevents user-supplied refs (which may legitimately
+    // start with `-`) from being parsed as flags. A bare `--` is not accepted
+    // by `git rev-parse --verify`, so we must use `--end-of-options` here.
     let rev_parse = Command::new("git")
-        .args(["rev-parse", "--verify", git_ref])
+        .args(["rev-parse", "--verify", "--end-of-options", git_ref])
         .current_dir(project_root)
         .output()
         .map_err(|e| format!("failed to invoke `git` (is it installed?): {}", e))?;
@@ -42,8 +45,16 @@ pub fn build_changed_ranges(
     }
 
 
+    // `--end-of-options` blocks flag interpretation of the rev expression.
+    // We cannot use a bare `--` separator here because `git diff` reserves
+    // `--` for separating revs from paths.
     let names = Command::new("git")
-        .args(["diff", "--name-only", &format!("{}..HEAD", git_ref)])
+        .args([
+            "diff",
+            "--name-only",
+            "--end-of-options",
+            &format!("{}..HEAD", git_ref),
+        ])
         .current_dir(project_root)
         .output()
         .map_err(|e| format!("failed to run `git diff --name-only`: {}", e))?;
@@ -61,10 +72,13 @@ pub fn build_changed_ranges(
 
     let mut map: ChangedRanges = HashMap::new();
     for file in rust_files {
+        // `--end-of-options` protects the rev expression; the trailing `--`
+        // separates revs from path arguments per `git diff` convention.
         let diff = Command::new("git")
             .args([
                 "diff",
                 "--unified=0",
+                "--end-of-options",
                 &format!("{}..HEAD", git_ref),
                 "--",
                 file,
@@ -251,5 +265,32 @@ mod tests {
         map.insert("src/foo.rs".to_string(), vec![(10, 20)]);
         assert!(file_was_changed("src/foo.rs", &map));
         assert!(!file_was_changed("src/bar.rs", &map));
+    }
+
+    /// Crude check that we don't allow a leading-dash ref to be parsed by git
+    /// as a flag. We rely on `--end-of-options` having been wired into every
+    /// git invocation. Without it, `git rev-parse --verify -h` would treat
+    /// `-h` as a help flag and exit 0; with it, git rejects the invalid rev.
+    #[test]
+    fn build_changed_ranges_rejects_leading_dash_ref() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        // Initialize a real git repo so we get past the "not a git repository"
+        // branch and hit rev-parse on the dashy input.
+        let init = std::process::Command::new("git")
+            .args(["init", "--quiet"])
+            .current_dir(dir.path())
+            .status();
+        if !init.map(|s| s.success()).unwrap_or(false) {
+            // Skip on systems without git available.
+            return;
+        }
+        let err = build_changed_ranges(dir.path(), "-h")
+            .err()
+            .expect("expected git rev-parse to reject '-h' as a rev");
+        let msg = err.to_string();
+        assert!(
+            !msg.is_empty(),
+            "expected non-empty error from git rev-parse; got: {msg}"
+        );
     }
 }
