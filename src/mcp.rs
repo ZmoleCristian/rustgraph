@@ -11,6 +11,7 @@ use rmcp::model::{
 use rmcp::{ServerHandler, ServiceExt, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
+use serde_json::json;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct FindArgs {
@@ -277,33 +278,128 @@ impl ServerHandler for RustgraphServer {
     }
 }
 
+/// Run the `rustgraph` CLI as a subprocess and translate its output into a
+/// structured `CallToolResult`.
+///
+/// On success: return stdout as a text content block (no marker, no stderr).
+/// On failure: return a structured error whose `structured_content` carries
+/// stdout, stderr, exit code, and (on Unix) the terminating signal so MCP
+/// clients can introspect the failure programmatically. The text content
+/// block remains human-readable for clients that ignore structured fields.
 fn run_rustgraph(binary: &str, args: &[String]) -> CallToolResult {
     let output = Command::new(binary).args(args).output();
     match output {
         Ok(out) => {
-            let mut combined = String::new();
-            if !out.stdout.is_empty() {
-                combined.push_str(&String::from_utf8_lossy(&out.stdout));
-            }
-            if !out.stderr.is_empty() {
-                if !combined.is_empty() {
-                    combined.push_str("\n--- stderr ---\n");
-                }
-                combined.push_str(&String::from_utf8_lossy(&out.stderr));
-            }
-            if combined.is_empty() {
-                combined.push_str("(no output)");
-            }
+            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
             if out.status.success() {
-                CallToolResult::success(vec![Content::text(combined)])
+                let body = if stdout.is_empty() {
+                    "(no output)".to_string()
+                } else {
+                    stdout
+                };
+                CallToolResult::success(vec![Content::text(body)])
             } else {
-                CallToolResult::error(vec![Content::text(combined)])
+                let exit_code = out.status.code();
+                #[cfg(unix)]
+                let signal = {
+                    use std::os::unix::process::ExitStatusExt;
+                    out.status.signal()
+                };
+                #[cfg(not(unix))]
+                let signal: Option<i32> = None;
+
+                let summary = match (exit_code, signal) {
+                    (Some(code), _) => format!("rustgraph exited with status {code}"),
+                    (None, Some(sig)) => format!("rustgraph terminated by signal {sig}"),
+                    (None, None) => "rustgraph terminated abnormally".to_string(),
+                };
+                let payload = json!({
+                    "kind": "rustgraph_subprocess_failure",
+                    "summary": summary,
+                    "argv": args,
+                    "exit_code": exit_code,
+                    "signal": signal,
+                    "stdout": stdout,
+                    "stderr": stderr,
+                });
+                CallToolResult::structured_error(payload)
             }
         }
-        Err(e) => CallToolResult::error(vec![Content::text(format!(
-            "failed to spawn rustgraph subprocess: {}",
-            e
-        ))]),
+        Err(e) => {
+            let payload = json!({
+                "kind": "rustgraph_spawn_failure",
+                "summary": format!("failed to spawn rustgraph subprocess: {e}"),
+                "binary": binary,
+                "argv": args,
+                "io_error_kind": format!("{:?}", e.kind()),
+            });
+            CallToolResult::structured_error(payload)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn extract_text(content: &[Content]) -> String {
+        content
+            .iter()
+            .filter_map(|c| c.as_text().map(|t| t.text.clone()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn run_rustgraph_spawn_failure_is_structured_error() {
+        // Use a path that cannot exist as an executable.
+        let result = run_rustgraph(
+            "/nonexistent/no-such-binary-rustgraph-test",
+            &["find".to_string(), "x".to_string()],
+        );
+        assert_eq!(result.is_error, Some(true), "must be flagged as error");
+        let payload = result
+            .structured_content
+            .as_ref()
+            .expect("structured payload required");
+        assert_eq!(
+            payload.get("kind").and_then(|v| v.as_str()),
+            Some("rustgraph_spawn_failure")
+        );
+        let argv = payload
+            .get("argv")
+            .and_then(|v| v.as_array())
+            .expect("argv array");
+        assert_eq!(argv.len(), 2);
+    }
+
+    #[test]
+    fn run_rustgraph_subprocess_nonzero_is_structured_error() {
+        // `false` exits 1 with no output on every Unix-like system. On Windows
+        // this test is skipped because we don't ship `false`.
+        if cfg!(not(unix)) {
+            return;
+        }
+        let result = run_rustgraph("false", &[]);
+        assert_eq!(result.is_error, Some(true));
+        let payload = result
+            .structured_content
+            .as_ref()
+            .expect("structured payload required");
+        assert_eq!(
+            payload.get("kind").and_then(|v| v.as_str()),
+            Some("rustgraph_subprocess_failure")
+        );
+        assert!(payload.get("exit_code").is_some());
+        assert!(payload.get("stderr").is_some());
+        assert!(payload.get("stdout").is_some());
+        // Ensure no machine-unfriendly stderr marker leaks back into the human text.
+        let text = extract_text(&result.content);
+        assert!(
+            !text.contains("--- stderr ---"),
+            "old marker should not appear in restructured output: {text}"
+        );
     }
 }
 
