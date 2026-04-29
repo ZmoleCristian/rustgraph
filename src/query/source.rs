@@ -10,25 +10,34 @@ use std::path::Path;
 /// Read `path` and return the content of lines `start_line..=end_line`.
 ///
 /// Both bounds are clamped to valid line numbers. Line numbers are 1-based.
-/// Byte offsets in the returned [`FileSlice`] are relative to the start of
-/// the file.
+/// `byte_start` and `byte_end` are byte offsets into the original file
+/// (CRLF-aware: a `\r\n` terminator counts as two bytes). The returned
+/// `content` joins lines with `\n` regardless of the file's terminator
+/// convention, so for CRLF inputs `content.len()` may be smaller than
+/// `byte_end - byte_start`.
 pub fn file_slice_for_lines(
     path: &Path,
     start_line: usize,
     end_line: usize,
 ) -> Result<FileSlice, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(path)?;
-    let lines = content.lines().collect::<Vec<_>>();
-    let safe_start = start_line.max(1).min(lines.len().max(1));
-    let safe_end = end_line.max(safe_start).min(lines.len().max(safe_start));
+    let line_spans = compute_line_spans(&content);
+    let line_count = line_spans.len();
+    let safe_start = start_line.max(1).min(line_count.max(1));
+    let safe_end = end_line.max(safe_start).min(line_count.max(safe_start));
 
-    let mut byte_start = 0usize;
-    for line in lines.iter().take(safe_start.saturating_sub(1)) {
-        byte_start += line.len() + 1;
-    }
+
+    let (byte_start, byte_end) = if line_count == 0 {
+        (0usize, 0usize)
+    } else {
+        let (start_off, _) = line_spans[safe_start - 1];
+        let (_, end_off) = line_spans[safe_end - 1];
+        (start_off, end_off)
+    };
+
 
     let mut selected = String::new();
-    for (idx, line) in lines.iter().enumerate() {
+    for (idx, &(s, e)) in line_spans.iter().enumerate() {
         let line_no = idx + 1;
         if line_no < safe_start || line_no > safe_end {
             continue;
@@ -36,9 +45,8 @@ pub fn file_slice_for_lines(
         if !selected.is_empty() {
             selected.push('\n');
         }
-        selected.push_str(line);
+        selected.push_str(&content[s..e]);
     }
-    let byte_end = byte_start + selected.len();
 
     Ok(FileSlice {
         file_path: path.to_string_lossy().to_string(),
@@ -48,6 +56,30 @@ pub fn file_slice_for_lines(
         byte_end,
         content: selected,
     })
+}
+
+/// Compute `(content_start, content_end)` byte offsets for every line in
+/// `content`. The end offset excludes the trailing line terminator (`\n`
+/// or `\r\n`). Bare `\r` is **not** treated as a line terminator, matching
+/// the behaviour of `str::lines()`.
+fn compute_line_spans(content: &str) -> Vec<(usize, usize)> {
+    let bytes = content.as_bytes();
+    let mut spans = Vec::new();
+    let mut line_start = 0usize;
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes[i] == b'\n' {
+            let content_end = if i > line_start && bytes[i - 1] == b'\r' { i - 1 } else { i };
+            spans.push((line_start, content_end));
+            line_start = i + 1;
+        }
+        i += 1;
+    }
+    if line_start < bytes.len() {
+
+        spans.push((line_start, bytes.len()));
+    }
+    spans
 }
 
 /// Wrap [`file_slice_for_lines`] in a [`SourceSlice`] with an optional symbol ID annotation.
@@ -174,6 +206,44 @@ mod tests {
         let slice = file_slice_for_lines(&path, 2, 2).expect("slice");
         assert_eq!(slice.byte_start, "abc\n".len());
         assert_eq!(slice.byte_end, slice.byte_start + slice.content.len());
+    }
+
+    #[test]
+    fn file_slice_handles_crlf_byte_offsets_correctly() {
+
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("crlf.rs");
+        write(&path, "alpha\r\nbeta\r\ngamma\r\n");
+
+
+
+
+        let slice = file_slice_for_lines(&path, 2, 2).expect("slice");
+        assert_eq!(slice.start_line, 2);
+        assert_eq!(slice.end_line, 2);
+        assert_eq!(slice.content, "beta");
+        assert_eq!(slice.byte_start, "alpha\r\n".len(), "byte_start must skip CRLF terminator");
+        assert_eq!(slice.byte_end, "alpha\r\n".len() + "beta".len());
+
+
+        let slice2 = file_slice_for_lines(&path, 1, 2).expect("slice");
+        assert_eq!(slice2.start_line, 1);
+        assert_eq!(slice2.end_line, 2);
+        assert_eq!(slice2.content, "alpha\nbeta");
+        assert_eq!(slice2.byte_start, 0);
+        assert_eq!(slice2.byte_end, "alpha\r\nbeta".len());
+    }
+
+    #[test]
+    fn file_slice_handles_mixed_lf_and_crlf() {
+
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("mixed.rs");
+        write(&path, "one\ntwo\r\nthree\n");
+        let slice = file_slice_for_lines(&path, 3, 3).expect("slice");
+        assert_eq!(slice.content, "three");
+        assert_eq!(slice.byte_start, "one\ntwo\r\n".len());
+        assert_eq!(slice.byte_end, slice.byte_start + "three".len());
     }
 
     #[test]
