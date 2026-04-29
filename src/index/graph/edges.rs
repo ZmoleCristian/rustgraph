@@ -7,7 +7,7 @@ use std::collections::HashMap;
 ///
 /// Strips reference sigils, `Option<>`, `Result<>`, and `Vec<>` wrappers to
 /// expose the inner base type while recording each modifier as a boolean flag.
-pub fn extract_type_info(ty: &str) -> TypeInfo {
+pub(crate) fn extract_type_info(ty: &str) -> TypeInfo {
     let original = ty.trim();
     let is_optional = original.starts_with("Option<") || original.starts_with("Result<");
     let is_collection =
@@ -53,7 +53,7 @@ pub fn extract_type_info(ty: &str) -> TypeInfo {
 /// Edge semantics (pass-through, transform, side-effect, etc.) are inferred
 /// from the caller's parameter types and the callee's return type.  An
 /// `is_async_boundary` flag is set when the two functions differ in asyncness.
-pub fn build_type_aware_edges(
+pub(crate) fn build_type_aware_edges(
     functions: &[FunctionInfo],
     call_sites: &[CallSite],
 ) -> Vec<TypedEdge> {

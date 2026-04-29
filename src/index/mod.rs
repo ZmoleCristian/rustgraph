@@ -20,10 +20,7 @@ mod types;
 mod visitor;
 
 pub use ensemble::*;
-pub use graph::{
-    EdgeSemantics, TypeInfo, TypedEdge, build_type_aware_edges, extract_type_info,
-    generate_call_graph,
-};
+pub use graph::{EdgeSemantics, TypeInfo, TypedEdge, generate_call_graph};
 pub use parse::*;
 pub use qualifier::{candidate_matches_qualifier, qualifier_for_callee};
 pub use render::*;
