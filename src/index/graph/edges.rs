@@ -1,3 +1,4 @@
+use super::super::visitor::make_function_id;
 use super::super::{CallSite, FunctionInfo};
 use super::types::{EdgeSemantics, TypeInfo, TypedEdge};
 use std::collections::HashMap;
@@ -60,7 +61,7 @@ pub fn build_type_aware_edges(
 
     let func_by_id: HashMap<String, &FunctionInfo> = functions
         .iter()
-        .map(|f| (format!("{}:{}", f.file_path, f.start_line), f))
+        .map(|f| (make_function_id(&f.file_path, f.start_line, &f.name), f))
         .collect();
 
     let func_by_name: HashMap<String, Vec<&FunctionInfo>> = functions.iter().fold(
@@ -259,7 +260,11 @@ mod tests {
         let funcs = vec![caller.clone(), callee.clone()];
 
         let cs = CallSite {
-            caller_id: Some(format!("{}:{}", caller.file_path, caller.start_line)),
+            caller_id: Some(make_function_id(
+                &caller.file_path,
+                caller.start_line,
+                &caller.name,
+            )),
             caller_name: Some(caller.name.clone()),
             callee: "callee".to_string(),
             callee_base: "callee".to_string(),
@@ -271,5 +276,66 @@ mod tests {
         let edges = build_type_aware_edges(&funcs, &[cs]);
         assert_eq!(edges.len(), 1);
         assert!(edges[0].is_async_boundary);
+    }
+
+    #[test]
+    fn build_type_aware_edges_resolves_production_shaped_caller_id() {
+        // Regression: in production, `caller_id` is built via
+        // `make_function_id` and has the 3-part `file:line:name` shape.
+        // The lookup table must be keyed identically or the function
+        // silently returns an empty edge list for every real input.
+        let caller = make_func("caller", vec!["x: u32".to_string()], None, false);
+        let callee = make_func("callee", vec![], None, false);
+        let funcs = vec![caller.clone(), callee.clone()];
+
+        let caller_id =
+            make_function_id(&caller.file_path, caller.start_line, &caller.name);
+        // Sanity: production format is 3 parts (file:line:name), not 2.
+        assert_eq!(caller_id.split(':').count(), 3);
+
+        let cs = CallSite {
+            caller_id: Some(caller_id),
+            caller_name: Some(caller.name.clone()),
+            callee: "callee".to_string(),
+            callee_base: "callee".to_string(),
+            call_kind: "function".to_string(),
+            file_path: caller.file_path.clone(),
+            line: 1,
+            column: 0,
+        };
+        let edges = build_type_aware_edges(&funcs, &[cs]);
+        assert_eq!(
+            edges.len(),
+            1,
+            "edge must be produced for a production-shaped caller_id"
+        );
+        assert_eq!(edges[0].caller, "caller");
+        assert_eq!(edges[0].callee, "callee");
+    }
+
+    #[test]
+    fn build_type_aware_edges_rejects_legacy_two_part_caller_id() {
+        // The old (broken) 2-part `file:line` shape must NOT match: the
+        // lookup is keyed on the 3-part production id. This pins the fix
+        // so a regression to the 2-part key would fail loudly.
+        let caller = make_func("caller", vec![], None, false);
+        let callee = make_func("callee", vec![], None, false);
+        let funcs = vec![caller.clone(), callee.clone()];
+
+        let cs = CallSite {
+            caller_id: Some(format!("{}:{}", caller.file_path, caller.start_line)),
+            caller_name: Some(caller.name.clone()),
+            callee: "callee".to_string(),
+            callee_base: "callee".to_string(),
+            call_kind: "function".to_string(),
+            file_path: caller.file_path.clone(),
+            line: 1,
+            column: 0,
+        };
+        let edges = build_type_aware_edges(&funcs, &[cs]);
+        assert!(
+            edges.is_empty(),
+            "2-part legacy caller_id must not resolve against 3-part keys"
+        );
     }
 }
