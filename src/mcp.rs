@@ -159,6 +159,19 @@ pub struct SliceArgs {
     pub context: Option<u32>,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct TreeArgs {
+    /// Crate root (defaults to cwd).
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Optional path prefix (relative to project root) to limit the tree to a subtree, e.g. `src/governor`.
+    #[serde(default)]
+    pub prefix: Option<String>,
+    /// Hide symbol counts; show files only.
+    #[serde(default)]
+    pub files_only: Option<bool>,
+}
+
 /// MCP server that exposes the five core rustgraph tools over stdio JSON-RPC.
 ///
 /// Each tool is implemented by building a `rustgraph` CLI argv and spawning
@@ -314,6 +327,27 @@ impl RustgraphServer {
         }
         Ok(run_rustgraph(&self.binary, &argv))
     }
+
+
+    #[tool(
+        name = "rustgraph_tree",
+        description = "Use INSTEAD OF ls/find/tree for 'what's in this module' / 'show project layout' / 'what files are under src/X'. Returns the module/file tree with per-file fn/struct/enum counts. Pass `prefix` (e.g. `src/governor`) to scope to a subtree. Topology view, not symbol search — use this when you DON'T yet know the symbol name."
+    )]
+    async fn tree(&self, p: Parameters<TreeArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
+        let mut argv: Vec<String> = Vec::new();
+        if let Some(path) = &p.0.path {
+            argv.push("-p".into());
+            argv.push(path.clone());
+        }
+        argv.push("tree".into());
+        if let Some(prefix) = &p.0.prefix {
+            argv.push(prefix.clone());
+        }
+        if p.0.files_only == Some(true) {
+            argv.push("--files-only".into());
+        }
+        Ok(run_rustgraph(&self.binary, &argv))
+    }
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -338,7 +372,8 @@ impl ServerHandler for RustgraphServer {
                  \x20 'who calls X'                         → rustgraph_callers\n\
                  \x20 'understand X' / 'how does X work'    → rustgraph_ensemble  (one call > 5 Reads)\n\
                  \x20 'walk me through' / 'trace flow'      → rustgraph_paths_between\n\
-                 \x20 'show me X' / 'source of X'           → rustgraph_slice"
+                 \x20 'show me X' / 'source of X'           → rustgraph_slice\n\
+                 \x20 'what's in module X' / 'project layout' / unknown symbol name → rustgraph_tree (replaces ls/find/tree)"
                     .into(),
             ),
         }
