@@ -80,6 +80,24 @@ pub fn render_callers_text(report: &CallersReport) -> String {
                 }
             }
         }
+        if !entry.unresolved_call_site_locations.is_empty() {
+            let _ = writeln!(out, "  Unresolved call sites:");
+            for site in &entry.unresolved_call_site_locations {
+                let caller_hint = match (&site.caller_name, site.caller_kind) {
+                    (Some(name), _) => format!(" [in {} — {}]", name, site.caller_kind),
+                    (None, kind) => format!(" [{}]", kind),
+                };
+                let _ = writeln!(
+                    out,
+                    "    {}:{}:{} - {}{}",
+                    site.file_path,
+                    site.line,
+                    site.column,
+                    site.line_text.trim(),
+                    caller_hint
+                );
+            }
+        }
         out.push('\n');
     }
     out
@@ -89,4 +107,96 @@ pub fn render_callers_text(report: &CallersReport) -> String {
 /// Prints the [`CallersReport`] in plain-text format to stdout.
 pub fn print_callers_text(report: &CallersReport) {
     print!("{}", render_callers_text(report));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FunctionInfo;
+    use crate::app::callers::{CallersMatch, UnresolvedCallSite};
+
+    fn fn_info(name: &str, file_path: &str, start_line: usize) -> FunctionInfo {
+        FunctionInfo {
+            name: name.to_string(),
+            signature: format!("fn {}()", name),
+            file_path: file_path.to_string(),
+            start_line,
+            end_line: start_line + 1,
+            is_async: false,
+            is_unsafe: false,
+            is_pub: false,
+            is_const: false,
+            is_test: false,
+            generics: Vec::new(),
+            parameters: Vec::new(),
+            return_type: None,
+            kind: "function".to_string(),
+            cfg_attrs: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn render_lists_unresolved_call_sites_with_locations() {
+        let report = CallersReport {
+            query: "target".to_string(),
+            matches: vec![CallersMatch {
+                info: fn_info("target", "src/lib.rs", 10),
+                call_sites_total: 2,
+                unresolved_call_sites: 2,
+                unresolved_call_site_locations: vec![
+                    UnresolvedCallSite {
+                        file_path: "src/a.rs".to_string(),
+                        line: 30,
+                        column: 4,
+                        line_text: "    target();".to_string(),
+                        caller_name: Some("alpha".to_string()),
+                        caller_kind: "unmapped",
+                    },
+                    UnresolvedCallSite {
+                        file_path: "src/b.rs".to_string(),
+                        line: 7,
+                        column: 0,
+                        line_text: "static GREETER: fn() = target;".to_string(),
+                        caller_name: None,
+                        caller_kind: "module-level",
+                    },
+                ],
+                callers: Vec::new(),
+            }],
+        };
+
+        let out = render_callers_text(&report);
+        assert!(
+            out.contains("Unresolved call sites:"),
+            "missing header in output:\n{}",
+            out
+        );
+        assert!(
+            out.contains("src/a.rs:30:4 - target(); [in alpha — unmapped]"),
+            "missing unmapped site (line text is trimmed):\n{}",
+            out
+        );
+        assert!(
+            out.contains("src/b.rs:7:0 - static GREETER: fn() = target; [module-level]"),
+            "missing module-level site:\n{}",
+            out
+        );
+    }
+
+    #[test]
+    fn render_omits_unresolved_block_when_empty() {
+        let report = CallersReport {
+            query: "target".to_string(),
+            matches: vec![CallersMatch {
+                info: fn_info("target", "src/lib.rs", 10),
+                call_sites_total: 0,
+                unresolved_call_sites: 0,
+                unresolved_call_site_locations: Vec::new(),
+                callers: Vec::new(),
+            }],
+        };
+
+        let out = render_callers_text(&report);
+        assert!(!out.contains("Unresolved call sites:"));
+    }
 }

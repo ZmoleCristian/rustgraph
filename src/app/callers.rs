@@ -10,4 +10,4 @@ mod types;
 
 pub use context::ContextLine;
 pub use report::{build_callers_report, build_callers_report_with_options};
-pub use types::{CallerFunction, CallerSite, CallersMatch, CallersReport};
+pub use types::{CallerFunction, CallerSite, CallersMatch, CallersReport, UnresolvedCallSite};

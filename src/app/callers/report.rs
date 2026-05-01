@@ -6,7 +6,7 @@ use crate::{FunctionEnsembleOptions, build_function_ensemble, function_id};
 use std::collections::{BTreeMap, HashMap};
 
 use super::context::context_lines_for_call;
-use super::types::{CallerFunction, CallerSite, CallersMatch, CallersReport};
+use super::types::{CallerFunction, CallerSite, CallersMatch, CallersReport, UnresolvedCallSite};
 
 #[derive(Default)]
 struct CallerBucket {
@@ -81,12 +81,37 @@ pub fn build_callers_report_with_options(
 
     for ensemble_match in ensemble.matches {
         let mut grouped = BTreeMap::<String, CallerBucket>::new();
-        let mut unresolved_call_sites = 0usize;
+        let mut unresolved_call_site_locations: Vec<UnresolvedCallSite> = Vec::new();
 
         for call_site in ensemble_match.call_sites {
-            let Some(caller_id) = call_site.caller_id else {
-                unresolved_call_sites += 1;
-                continue;
+            let caller_id = match call_site.caller_id.clone() {
+                Some(id) if function_by_id.contains_key(&id) => id,
+                Some(id) => {
+                    // The visitor recorded an enclosing function for this call,
+                    // but that id is not present in the project's function index.
+                    // Surface the location anyway so the user can navigate.
+                    let _unmapped_id = id;
+                    unresolved_call_site_locations.push(UnresolvedCallSite {
+                        file_path: call_site.file_path.clone(),
+                        line: call_site.line,
+                        column: call_site.column,
+                        line_text: call_site.line_text.clone(),
+                        caller_name: call_site.caller_name.clone(),
+                        caller_kind: "unmapped",
+                    });
+                    continue;
+                }
+                None => {
+                    unresolved_call_site_locations.push(UnresolvedCallSite {
+                        file_path: call_site.file_path.clone(),
+                        line: call_site.line,
+                        column: call_site.column,
+                        line_text: call_site.line_text.clone(),
+                        caller_name: call_site.caller_name.clone(),
+                        caller_kind: "module-level",
+                    });
+                    continue;
+                }
             };
 
             grouped
@@ -96,7 +121,7 @@ pub fn build_callers_report_with_options(
                 .push(CallerSite {
                     line: call_site.line,
                     column: call_site.column,
-                    line_text: call_site.line_text,
+                    line_text: call_site.line_text.clone(),
                     context_lines: context_lines_for_call(
                         &call_site.file_path,
                         call_site.line,
@@ -113,7 +138,10 @@ pub fn build_callers_report_with_options(
 
         for (caller_id, mut bucket) in grouped {
             let Some(caller) = function_by_id.get(&caller_id) else {
-                unresolved_call_sites += bucket.sites.len();
+                // Should not happen any more thanks to the upfront
+                // `function_by_id.contains_key` check above, but defend
+                // against future refactors that bypass it.
+                let _stale_caller_id = caller_id;
                 continue;
             };
 
@@ -141,10 +169,24 @@ pub fn build_callers_report_with_options(
                 .then(left.info.name.cmp(&right.info.name))
         });
 
+        unresolved_call_site_locations.sort_by(|left, right| {
+            left.file_path
+                .cmp(&right.file_path)
+                .then(left.line.cmp(&right.line))
+                .then(left.column.cmp(&right.column))
+        });
+        unresolved_call_site_locations
+            .dedup_by(|left, right| {
+                left.file_path == right.file_path
+                    && left.line == right.line
+                    && left.column == right.column
+            });
+
         matches.push(CallersMatch {
             info: ensemble_match.info,
             call_sites_total: ensemble_match.call_sites_total,
-            unresolved_call_sites,
+            unresolved_call_sites: unresolved_call_site_locations.len(),
+            unresolved_call_site_locations,
             callers,
         });
     }
