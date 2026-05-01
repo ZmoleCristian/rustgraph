@@ -65,7 +65,6 @@ pub(crate) fn relativize_for_display(
     crate::normalize_path_separators(path.trim_start_matches("./"))
 }
 
-
 /// Split a function id (`{path}:{line}:{name}`) back into its three parts.
 ///
 /// `split_once(':')` is the wrong tool for this on Windows because absolute

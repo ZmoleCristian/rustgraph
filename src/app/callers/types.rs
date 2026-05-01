@@ -68,12 +68,8 @@ pub struct CallersMatch {
     pub info: FunctionInfo,
     /// Total call-site count across all resolved callers.
     pub call_sites_total: usize,
-    /// Number of call sites that could not be attributed to a known function.
-    pub unresolved_call_sites: usize,
     /// Locations of every unresolved call site, preserved so the user can
     /// still navigate even when the resolver could not bind a caller function.
-    /// The length of this list always equals `unresolved_call_sites`.
-    #[serde(default)]
     pub unresolved_call_site_locations: Vec<UnresolvedCallSite>,
     /// Per-caller breakdown, sorted by file path then start line.
     pub callers: Vec<CallerFunction>,

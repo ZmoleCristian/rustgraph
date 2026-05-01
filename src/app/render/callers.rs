@@ -26,13 +26,14 @@ pub fn render_callers_text(report: &CallersReport) -> String {
             entry.info.signature,
             target_cfg
         );
+        let unresolved_count = entry.unresolved_call_site_locations.len();
         let _ = writeln!(
             out,
             "Callers: {} function(s), {} total call site(s){}",
             entry.callers.len(),
             entry.call_sites_total,
-            if entry.unresolved_call_sites > 0 {
-                format!(", {} unresolved", entry.unresolved_call_sites)
+            if unresolved_count > 0 {
+                format!(", {unresolved_count} unresolved")
             } else {
                 String::new()
             }
@@ -118,7 +119,7 @@ mod tests {
     fn fn_info(name: &str, file_path: &str, start_line: usize) -> FunctionInfo {
         FunctionInfo {
             name: name.to_string(),
-            signature: format!("fn {}()", name),
+            signature: format!("fn {name}()"),
             file_path: file_path.to_string(),
             start_line,
             end_line: start_line + 1,
@@ -142,7 +143,6 @@ mod tests {
             matches: vec![CallersMatch {
                 info: fn_info("target", "src/lib.rs", 10),
                 call_sites_total: 2,
-                unresolved_call_sites: 2,
                 unresolved_call_site_locations: vec![
                     UnresolvedCallSite {
                         file_path: "src/a.rs".to_string(),
@@ -190,7 +190,6 @@ mod tests {
             matches: vec![CallersMatch {
                 info: fn_info("target", "src/lib.rs", 10),
                 call_sites_total: 0,
-                unresolved_call_sites: 0,
                 unresolved_call_site_locations: Vec::new(),
                 callers: Vec::new(),
             }],

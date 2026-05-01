@@ -39,8 +39,8 @@ pub fn build_callers_report(
 /// every call site by its caller function ID, optionally attaching `before_context` /
 /// `after_context` source lines read from `primary_root` or `also_roots`.
 ///
-/// Call sites whose caller ID cannot be resolved against `project.functions` are counted
-/// in `unresolved_call_sites`.
+/// Call sites whose caller ID cannot be resolved against `project.functions` land in
+/// `unresolved_call_site_locations`, tagged `module-level` or `unmapped`.
 pub fn build_callers_report_with_options(
     project: &ProjectData,
     query: &str,
@@ -84,31 +84,21 @@ pub fn build_callers_report_with_options(
         let mut unresolved_call_site_locations: Vec<UnresolvedCallSite> = Vec::new();
 
         for call_site in ensemble_match.call_sites {
-            let caller_id = match call_site.caller_id.clone() {
-                Some(id) if function_by_id.contains_key(&id) => id,
-                Some(id) => {
-                    // The visitor recorded an enclosing function for this call,
-                    // but that id is not present in the project's function index.
-                    // Surface the location anyway so the user can navigate.
-                    let _unmapped_id = id;
+            let caller_id = match call_site.caller_id.as_deref() {
+                Some(id) if function_by_id.contains_key(id) => id.to_string(),
+                Some(_) | None => {
+                    let kind = if call_site.caller_id.is_some() {
+                        "unmapped"
+                    } else {
+                        "module-level"
+                    };
                     unresolved_call_site_locations.push(UnresolvedCallSite {
-                        file_path: call_site.file_path.clone(),
+                        file_path: call_site.file_path,
                         line: call_site.line,
                         column: call_site.column,
-                        line_text: call_site.line_text.clone(),
-                        caller_name: call_site.caller_name.clone(),
-                        caller_kind: "unmapped",
-                    });
-                    continue;
-                }
-                None => {
-                    unresolved_call_site_locations.push(UnresolvedCallSite {
-                        file_path: call_site.file_path.clone(),
-                        line: call_site.line,
-                        column: call_site.column,
-                        line_text: call_site.line_text.clone(),
-                        caller_name: call_site.caller_name.clone(),
-                        caller_kind: "module-level",
+                        line_text: call_site.line_text,
+                        caller_name: call_site.caller_name,
+                        caller_kind: kind,
                     });
                     continue;
                 }
@@ -121,7 +111,7 @@ pub fn build_callers_report_with_options(
                 .push(CallerSite {
                     line: call_site.line,
                     column: call_site.column,
-                    line_text: call_site.line_text.clone(),
+                    line_text: call_site.line_text,
                     context_lines: context_lines_for_call(
                         &call_site.file_path,
                         call_site.line,
@@ -137,13 +127,9 @@ pub fn build_callers_report_with_options(
         let mut callers = Vec::new();
 
         for (caller_id, mut bucket) in grouped {
-            let Some(caller) = function_by_id.get(&caller_id) else {
-                // Should not happen any more thanks to the upfront
-                // `function_by_id.contains_key` check above, but defend
-                // against future refactors that bypass it.
-                let _stale_caller_id = caller_id;
-                continue;
-            };
+            let caller = function_by_id
+                .get(&caller_id)
+                .expect("caller_id presence checked above");
 
             bucket.sites.sort_by(|left, right| {
                 left.line
@@ -185,7 +171,6 @@ pub fn build_callers_report_with_options(
         matches.push(CallersMatch {
             info: ensemble_match.info,
             call_sites_total: ensemble_match.call_sites_total,
-            unresolved_call_sites: unresolved_call_site_locations.len(),
             unresolved_call_site_locations,
             callers,
         });

@@ -113,10 +113,12 @@ fn callers_json_does_not_drop_resolved_sites_on_absolute_root() {
         "call_sites_total should be 1, got: {}",
         stdout
     );
-    assert_eq!(
-        match_entry["unresolved_call_sites"].as_u64(),
-        Some(0),
-        "unresolved_call_sites should be 0 (regression: was 1 on Windows), got: {}",
+    let unresolved = match_entry["unresolved_call_site_locations"]
+        .as_array()
+        .expect("unresolved_call_site_locations array");
+    assert!(
+        unresolved.is_empty(),
+        "unresolved should be empty (regression: was 1 site on Windows), got: {}",
         stdout
     );
     let callers = match_entry["callers"].as_array().expect("callers array");
