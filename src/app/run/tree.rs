@@ -60,11 +60,9 @@ impl TreeNode {
 fn relative_path(file_path: &str, project_root: &Path) -> String {
     let path = Path::new(file_path);
     if let Ok(stripped) = path.strip_prefix(project_root) {
-        stripped.to_string_lossy().to_string()
+        crate::normalize_path_separators(&stripped.to_string_lossy())
     } else {
-
-        let stripped = file_path.trim_start_matches("./");
-        stripped.to_string()
+        crate::normalize_path_separators(file_path.trim_start_matches("./"))
     }
 }
 

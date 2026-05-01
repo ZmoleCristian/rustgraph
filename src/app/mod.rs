@@ -20,6 +20,10 @@ use project::ProjectData;
 
 /// Strips the primary root or any `--also` root prefix from `path`, returning a display-friendly
 /// relative string. Falls back to stripping `./` if no root matches.
+///
+/// The returned path always uses forward slashes regardless of host OS, so
+/// downstream consumers (terminal renderers, IDE links, symbol-id strings)
+/// see the same shape on Windows and POSIX.
 pub(crate) fn relativize_for_display(
     path: &str,
     root: &std::path::Path,
@@ -29,13 +33,13 @@ pub(crate) fn relativize_for_display(
     let canon = std::fs::canonicalize(pb).unwrap_or_else(|_| pb.to_path_buf());
     let abs_root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
     if let Ok(stripped) = canon.strip_prefix(&abs_root) {
-        return stripped.to_string_lossy().to_string();
+        return crate::normalize_path_separators(&stripped.to_string_lossy());
     }
     if let Ok(stripped) = pb.strip_prefix(&abs_root) {
-        return stripped.to_string_lossy().to_string();
+        return crate::normalize_path_separators(&stripped.to_string_lossy());
     }
     if let Ok(stripped) = pb.strip_prefix(root) {
-        return stripped.to_string_lossy().to_string();
+        return crate::normalize_path_separators(&stripped.to_string_lossy());
     }
     for r in also_roots {
         let canon_also = std::fs::canonicalize(r).unwrap_or_else(|_| r.clone());
@@ -44,15 +48,36 @@ pub(crate) fn relativize_for_display(
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| "also".to_string());
         if let Ok(stripped) = canon.strip_prefix(&canon_also) {
-            return format!("{}/{}", label, stripped.to_string_lossy());
+            return format!(
+                "{}/{}",
+                label,
+                crate::normalize_path_separators(&stripped.to_string_lossy())
+            );
         }
         if let Ok(stripped) = pb.strip_prefix(&canon_also) {
-            return format!("{}/{}", label, stripped.to_string_lossy());
+            return format!(
+                "{}/{}",
+                label,
+                crate::normalize_path_separators(&stripped.to_string_lossy())
+            );
         }
     }
-    path.trim_start_matches("./").to_string()
+    crate::normalize_path_separators(path.trim_start_matches("./"))
 }
 
+
+/// Split a function id (`{path}:{line}:{name}`) back into its three parts.
+///
+/// `split_once(':')` is the wrong tool for this on Windows because absolute
+/// paths begin with a drive-letter colon (`C:/Users/...`) and the first `:`
+/// would land *inside* the path. Walking from the right is unambiguous because
+/// the suffix is always `:{line}:{name}` regardless of platform — the line
+/// number is a small integer and the name has no colons.
+fn split_function_id(id: &str) -> Option<(&str, &str, &str)> {
+    let (rest, name) = id.rsplit_once(':')?;
+    let (path, line) = rest.rsplit_once(':')?;
+    Some((path, line, name))
+}
 
 fn relativize_project_paths(
     project: &mut crate::app::project::ProjectData,
@@ -75,11 +100,11 @@ fn relativize_project_paths(
 
     let mut new_call_map = std::collections::HashMap::new();
     for (key, val) in std::mem::take(&mut project.call_map) {
-
-        let new_key = if let Some((path_part, rest)) = key.split_once(':') {
-            format!("{}:{}", strip(path_part), rest)
-        } else {
-            key
+        let new_key = match split_function_id(&key) {
+            Some((path_part, line, name)) => {
+                format!("{}:{}:{}", strip(path_part), line, name)
+            }
+            None => key,
         };
         new_call_map.insert(new_key, val);
     }
@@ -87,8 +112,8 @@ fn relativize_project_paths(
 
     for cs in project.call_sites.iter_mut() {
         if let Some(id) = cs.caller_id.as_mut() {
-            if let Some((path_part, rest)) = id.split_once(':') {
-                *id = format!("{}:{}", strip(path_part), rest);
+            if let Some((path_part, line, name)) = split_function_id(id) {
+                *id = format!("{}:{}:{}", strip(path_part), line, name);
             }
         }
     }
@@ -256,4 +281,51 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
     };
 
     run::execute(&args, &project, mode, changed_ranges.as_ref())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_function_id_unix_path() {
+        let parts = split_function_id("src/foo.rs:42:bar").expect("split should succeed");
+        assert_eq!(parts, ("src/foo.rs", "42", "bar"));
+    }
+
+    #[test]
+    fn split_function_id_windows_relative_with_backslashes() {
+        let parts = split_function_id(r"src\foo.rs:42:bar").expect("split should succeed");
+        assert_eq!(parts, (r"src\foo.rs", "42", "bar"));
+    }
+
+    #[test]
+    fn split_function_id_windows_absolute_with_drive_letter() {
+        // The bug fix: a previous implementation used `split_once(':')` and
+        // would mis-split on the drive-letter colon, producing
+        // ("C", "/Users/.../foo.rs:42:bar") and silently breaking every call
+        // graph lookup on Windows. `rsplit_once` is OS-agnostic.
+        let parts = split_function_id(r"C:\Users\me\proj\src\foo.rs:42:bar")
+            .expect("split should succeed");
+        assert_eq!(parts, (r"C:\Users\me\proj\src\foo.rs", "42", "bar"));
+    }
+
+    #[test]
+    fn split_function_id_windows_absolute_forward_slashes() {
+        let parts = split_function_id("C:/Users/me/proj/src/foo.rs:42:bar")
+            .expect("split should succeed");
+        assert_eq!(parts, ("C:/Users/me/proj/src/foo.rs", "42", "bar"));
+    }
+
+    #[test]
+    fn split_function_id_returns_none_on_short_input() {
+        assert!(split_function_id("just_a_name").is_none());
+        assert!(split_function_id("name:42").is_none());
+    }
+
+    #[test]
+    fn split_function_id_handles_unicode_path() {
+        let parts = split_function_id("src/Æ_module.rs:7:über").expect("split should succeed");
+        assert_eq!(parts, ("src/Æ_module.rs", "7", "über"));
+    }
 }

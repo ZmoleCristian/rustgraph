@@ -67,11 +67,16 @@ impl EnsembleView {
 #[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum EnsemblePreset {
-    /// Quick summary, minimal context.
+    /// Tight caps: at most 80 call sites, depth 1, 25 related, 8 lifecycle paths.
+    /// Use when you only need the structs and a small downstream sample. Trades
+    /// completeness for token cost.
     Quick,
-    /// Balanced (default).
+    /// Recommended default: 200 call sites, depth 2, 60 related, 20 lifecycle paths.
+    /// Returns the full callers + callees + structs + dataflow bundle the tool
+    /// description advertises.
     Balanced,
-    /// Deep dive: more context, more lines.
+    /// Generous caps: unlimited call sites, depth 3, 120 related, 40 lifecycle paths.
+    /// Use only when you need wide transitive coverage (e.g. lifecycle audits).
     Deep,
 }
 
@@ -257,7 +262,7 @@ impl RustgraphServer {
 
     #[tool(
         name = "rustgraph_ensemble",
-        description = "Use INSTEAD OF 5+ Read or rustgraph_slice calls to UNDERSTAND a function. ONE call returns callers + callees + structs touched + dataflow. ~10× fewer tool calls than reading manually. Triggers: 'explain X' / 'how does X work'."
+        description = "Use INSTEAD OF 5+ Read or rustgraph_slice calls to UNDERSTAND a function. With the default `balanced` preset ONE call returns callers + callees + structs touched + dataflow (~10× fewer tool calls than reading manually). The `quick` preset trades coverage for tokens — pass it only when you already know you just want the structs and a tiny callee sample. Triggers: 'explain X' / 'how does X work'."
     )]
     async fn ensemble(
         &self,

@@ -1,6 +1,6 @@
 use crate::{
     CallSite, EnumInfo, FunctionInfo, ProjectAnalysis, StructInfo, find_rust_files,
-    parse_rust_file_with_ast, search_items_with_options,
+    normalize_path_separators, parse_rust_file_with_ast, search_items_with_options,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -94,7 +94,10 @@ impl ProjectData {
                     call_sites.append(&mut file_call_sites);
                     aliases.append(&mut file_aliases);
                     reexports.append(&mut file_reexports);
-                    parsed_files.insert(file_path.to_string_lossy().to_string(), syntax_tree);
+                    parsed_files.insert(
+                        normalize_path_separators(&file_path.to_string_lossy()),
+                        syntax_tree,
+                    );
                 }
                 Err(error) => {
                     warn!(
@@ -264,8 +267,21 @@ impl ProjectData {
     /// Same as [`ProjectData::parsed_file`] but accepts a string key directly,
     /// useful when the caller already has a `file_path` string from a
     /// `FunctionInfo` or `CallSite` and would rather not allocate a `PathBuf`.
+    ///
+    /// Lookups are tolerant of path-separator differences: a Windows-native
+    /// `PathBuf` whose `to_string_lossy()` emits backslashes still resolves
+    /// against cache keys that were normalized to forward slashes at insert
+    /// time. POSIX paths are unaffected because they never contain `\`.
     pub fn parsed_file_by_str(&self, path: &str) -> Option<&syn::File> {
-        self.parsed_files.get(path)
+        if let Some(direct) = self.parsed_files.get(path) {
+            return Some(direct);
+        }
+        if path.contains('\\') {
+            return self
+                .parsed_files
+                .get(crate::normalize_path_separators(path).as_str());
+        }
+        None
     }
 
     /// Move the parsed-file cache out of `self`.
