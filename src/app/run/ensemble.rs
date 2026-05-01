@@ -322,16 +322,24 @@ fn summary_view_footer(sections: &[String]) -> Option<String> {
         return None;
     }
 
-
-    let mut block = String::from("[summary view — sections hidden:\n");
+    // One-line tip. Multi-line variants got noisy when the same agent ran
+    // ensemble several times in a session — the verbose block was useful
+    // once, then it just pushed the actual signature off-screen on every
+    // subsequent call. The substrings tests rely on (`summary view`,
+    // `sections hidden`) are preserved so the existing footer assertions
+    // keep working.
+    let mut tips: Vec<&str> = Vec::new();
     if !has("code") {
-        block.push_str("  --view full      adds: code body + lifecycle + boundaries\n");
+        tips.push("--view full");
     }
     if !(has("neighborhood") && has("lifecycle") && has("dataflow") && has("boundaries")) {
-        block.push_str("  --view flow      adds: lifecycle + boundaries (drops structs + call-sites)\n");
+        tips.push("--view flow");
     }
-    block.push_str("  --section <name> cherry-pick: code | structs | call-sites | neighborhood | lifecycle | dataflow | boundaries]\n");
-    Some(block)
+    tips.push("--section <name>");
+    Some(format!(
+        "[summary view — sections hidden; for more pass {}]\n",
+        tips.join(", ")
+    ))
 }
 
 
