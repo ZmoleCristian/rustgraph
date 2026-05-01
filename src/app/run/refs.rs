@@ -48,7 +48,7 @@ pub fn run(
     let mut hits: Vec<RefHit> = Vec::new();
 
     for file in &project.rust_files {
-        let abs = file.to_string_lossy().to_string();
+        let abs = crate::normalize_path_separators(&file.to_string_lossy());
         let file_str = if args.absolute_paths {
             abs.clone()
         } else {
@@ -634,9 +634,9 @@ fn innermost_enclosing<'a>(fns: &'a [&FunctionInfo], line: usize) -> Option<&'a 
 fn relative(file_path: &str, project_root: &Path) -> String {
     let path = Path::new(file_path);
     if let Ok(stripped) = path.strip_prefix(project_root) {
-        stripped.to_string_lossy().to_string()
+        crate::normalize_path_separators(&stripped.to_string_lossy())
     } else {
-        file_path.trim_start_matches("./").to_string()
+        crate::normalize_path_separators(file_path.trim_start_matches("./"))
     }
 }
 

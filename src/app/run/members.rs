@@ -42,7 +42,7 @@ pub fn run(
         }
 
         for file in &project.rust_files {
-            let abs = file.to_string_lossy().to_string();
+            let abs = crate::normalize_path_separators(&file.to_string_lossy());
             let file_str = if args.absolute_paths {
                 abs.clone()
             } else {

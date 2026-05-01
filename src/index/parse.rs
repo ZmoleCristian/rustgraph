@@ -70,7 +70,9 @@ pub fn parse_rust_file_with_ast(
     };
     let syntax_tree = syn::parse_file(&content)?;
 
-    let mut visitor = CodeVisitor::new(file_path.to_string_lossy().to_string());
+    let mut visitor = CodeVisitor::new(normalize_path_separators(
+        &file_path.to_string_lossy(),
+    ));
     if path_is_under_tests_dir(file_path) {
         visitor.cfg_test_depth = 1;
     }
@@ -91,6 +93,23 @@ pub fn parse_rust_file_with_ast(
 /// Compute the stable ID for a [`FunctionInfo`] in the form `"file:line:name"`.
 pub fn function_id(func: &FunctionInfo) -> String {
     make_function_id(&func.file_path, func.start_line, &func.name)
+}
+
+/// Normalize Windows-style path separators (`\`) to forward slashes (`/`).
+///
+/// Forward slashes are valid on every platform we target, including Windows,
+/// and produce stable, copy-pasteable, IDE-clickable `file:line` strings in
+/// every renderer. They also keep the symbol-id format consistent across
+/// platforms so AI agents can re-use stable IDs in scripts and snapshots.
+///
+/// Returns `path` unchanged when there are no `\` characters to replace, so
+/// the function is effectively zero-cost on POSIX where path strings already
+/// use forward slashes.
+pub fn normalize_path_separators(path: &str) -> String {
+    if !path.contains('\\') {
+        return path.to_string();
+    }
+    path.replace('\\', "/")
 }
 
 /// Compute the stable ID for a [`StructInfo`] in the form `"struct:file:line:name"`.
@@ -182,6 +201,64 @@ mod tests {
         let path = dir.path().join("bad.rs");
         std::fs::write(&path, "fn () { invalid syntax").expect("write");
         assert!(parse_rust_file(&path).is_err());
+    }
+
+    #[test]
+    fn normalize_path_separators_replaces_backslashes() {
+        assert_eq!(
+            normalize_path_separators(r"src\foo.rs"),
+            "src/foo.rs"
+        );
+        assert_eq!(
+            normalize_path_separators(r"C:\Users\me\proj\src\foo.rs"),
+            "C:/Users/me/proj/src/foo.rs"
+        );
+    }
+
+    #[test]
+    fn normalize_path_separators_returns_input_when_no_backslashes() {
+        let input = "src/already/forward.rs";
+        // The early-return path should return a fresh `String` equal to
+        // the input — i.e. behave as a no-op for POSIX paths.
+        assert_eq!(normalize_path_separators(input), input);
+    }
+
+    #[test]
+    fn normalize_path_separators_handles_empty_input() {
+        assert_eq!(normalize_path_separators(""), "");
+    }
+
+    #[test]
+    fn normalize_path_separators_handles_mixed_separators() {
+        // A pathological input from `Path::display()` on Windows when the
+        // path was constructed by joining a forward-slash literal with a
+        // backslash-prefixed env var.
+        assert_eq!(
+            normalize_path_separators(r"src/sub\foo.rs"),
+            "src/sub/foo.rs"
+        );
+    }
+
+    #[test]
+    fn parse_rust_file_normalizes_visitor_file_path_on_windows_style_input() {
+        // The visitor stamps `file_path` onto every `FunctionInfo`,
+        // `StructInfo`, and `CallSite`. Those strings are rendered to the
+        // user verbatim and used as the `path` segment of every
+        // `function_id`, so they must use forward slashes on every OS.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let nested = dir.path().join("src").join("inner");
+        std::fs::create_dir_all(&nested).expect("create nested dir");
+        let path = nested.join("a.rs");
+        std::fs::write(&path, "pub fn foo() {}\n").expect("write fixture");
+
+        let (funcs, _structs, _enums, _calls, _sites, _aliases, _reexports) =
+            parse_rust_file(&path).expect("parse ok");
+        assert_eq!(funcs.len(), 1);
+        assert!(
+            !funcs[0].file_path.contains('\\'),
+            "visitor file_path must not contain backslashes; got: {}",
+            funcs[0].file_path
+        );
     }
 
     #[test]
