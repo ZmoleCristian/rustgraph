@@ -80,20 +80,6 @@ pub enum ModeCommand {
     )]
     CallGraph(CallGraphCommand),
     #[command(
-        about = "Print an exact source slice for a symbol query, symbol id, or file range. Accepts `path.rs:LINE` or `path.rs:START-END` as the positional QUERY (e.g. `slice src/foo.rs:120-180`), or use --file/--start-line/--end-line.",
-        long_about = "Print an exact source slice for a function, struct, enum, or arbitrary file range.\n\n\
-Query forms (positional QUERY):\n  \
-  • `slice <name>`                         — symbol query (resolves to a single fn/struct/enum)\n  \
-  • `slice path/to/file.rs:LINE`           — slice the symbol enclosing LINE in that file\n  \
-  • `slice path/to/file.rs:START-END`      — exact line-range slice (no symbol resolution needed)\n\n\
-Equivalent explicit forms:\n  \
-  • `slice --file path/to/file.rs --start-line START --end-line END`\n  \
-  • `slice --symbol-id <CANONICAL_ID>` (round-trips with `find -j` / `callers -j` `symbol_id` field)",
-        after_help = GLOBALS_FOOTER_SHORT,
-        after_long_help = GLOBALS_FOOTER_LONG
-    )]
-    Slice(SliceCommand),
-    #[command(
         about = "Print the module/file tree of the project, with symbol counts. Replaces `ls`/`tree` for code navigation. Tip: use `-p ../sibling-crate tree` for another crate.",
         after_help = GLOBALS_FOOTER_SHORT,
         after_long_help = GLOBALS_FOOTER_LONG
@@ -130,7 +116,7 @@ Shell quoting trap (most-common cause of cryptic regex errors):\n  \
     )]
     Impls(ImplsCommand),
     #[command(
-        about = "Short alias for symbol lookup. `find <name>` ≈ `--search <name> --search-threshold 0.85`. Auto-shows fns + structs + enums; muscle-memory replacement for `rg <name>`. Query is name-only or `<a>|<b>` alternatives — for `path.rs:LINE` lookup use `slice path.rs:LINE` or `callers path.rs:LINE`.",
+        about = "Short alias for symbol lookup. `find <name>` ≈ `--search <name> --search-threshold 0.85`. Auto-shows fns + structs + enums; muscle-memory replacement for `rg <name>`. Query is name-only or `<a>|<b>` alternatives — for `path.rs:LINE` lookup use `callers path.rs:LINE`.",
         after_help = GLOBALS_FOOTER_SHORT,
         after_long_help = GLOBALS_FOOTER_LONG,
         arg_required_else_help = true
@@ -415,7 +401,7 @@ pub struct RefsCommand {
 #[derive(clap::Args, Debug, Clone)]
 pub struct FindCommand {
     #[arg(
-        help = "Symbol name only, or `<a>|<b>` alternatives (OR logic). Does NOT accept `path.rs:LINE` — for that, use `slice path.rs:LINE` or `callers path.rs:LINE`."
+        help = "Symbol name only, or `<a>|<b>` alternatives (OR logic). Does NOT accept `path.rs:LINE` — for that, use `callers path.rs:LINE`, or open the path:line with the Read tool."
     )]
     pub query: String,
 
@@ -439,7 +425,7 @@ pub struct FindCommand {
 
     #[arg(
         long = "show-ids",
-        help = "Append `[id: <symbol_id>]` to each text-mode result line. Off by default for readability; turn on when you need to round-trip through `slice --symbol-id` (or just use `-j`)."
+        help = "Append `[id: <symbol_id>]` to each text-mode result line. Off by default for readability; turn on when you need to round-trip through `callers --symbol-id` / `ensemble --symbol-id` (or just use `-j`)."
     )]
     pub show_ids: bool,
 
@@ -557,7 +543,7 @@ impl CallersCommand {
 pub struct EnsembleCommand {
     #[arg(
         required_unless_present = "symbol_id",
-        help = "Function name, path.rs:LINE, or use --symbol-id for canonical lookup (functions only — for structs/enums use `slice <name>`). Optional when --symbol-id is set."
+        help = "Function name, path.rs:LINE, or use --symbol-id for canonical lookup (functions only — for structs/enums use `def <name>`). Optional when --symbol-id is set."
     )]
     pub query: Option<String>,
 
@@ -698,40 +684,6 @@ pub struct CallGraphCommand {
         help = "Render the WHOLE project graph (no scope filter). Required when no --root/--search is set on a project with >50 functions — without this flag the unscoped path errors out. Small projects (≤50 fns) auto-render unscoped without --all."
     )]
     pub all: bool,
-}
-
-/// Arguments for the `slice` subcommand (print exact source of a symbol or
-/// line range).
-#[derive(clap::Args, Debug, Clone)]
-pub struct SliceCommand {
-    #[arg(
-        help = "Symbol query (name) OR `path.rs:LINE` (or `path.rs:LINE:COL` — COL ignored) OR `path.rs:START-END`. Resolves to a single fn/struct/enum, or to a literal line range. Examples: `slice DaemonState`, `slice src/foo.rs:120`, `slice src/foo.rs:120-180`."
-    )]
-    pub query: Option<String>,
-
-    #[arg(
-        long,
-        help = "Exact symbol id from a prior `--json` run. Format: functions are `<path>:<line>:<name>` (NO kind prefix); structs/enums are `struct:<path>:<line>:<name>` / `enum:<path>:<line>:<name>`. Round-trips with `find -j` / `callers -j` / `ensemble -j` (their `symbol_id` field is canonical). For ad-hoc lookup, use the positional QUERY or --file/--start-line/--end-line."
-    )]
-    pub symbol_id: Option<String>,
-
-    #[arg(long, help = "Explicit file path to slice by line range")]
-    pub file: Option<PathBuf>,
-
-    #[arg(long, help = "Starting line for explicit file slicing")]
-    pub start_line: Option<usize>,
-
-    #[arg(long, help = "Ending line for explicit file slicing")]
-    pub end_line: Option<usize>,
-
-
-    #[arg(
-        short = 'C',
-        long = "around",
-        value_name = "N",
-        help = "Line-centered context window (N lines before+after). For `path.rs:LINE` queries: returns LINE-N..LINE+N instead of the enclosing fn. For `path.rs:START-END` queries: expands the range by N each side. Without --around, behavior is unchanged (enclosing fn or explicit range)."
-    )]
-    pub around: Option<usize>,
 }
 
 /// Arguments for the `tree` subcommand (module/file tree with symbol counts).
@@ -1121,29 +1073,6 @@ mod tests {
                 assert_eq!(c.max_results, None);
             }
             _ => panic!("expected callers subcommand"),
-        }
-    }
-
-    #[test]
-    fn args_recognises_slice_subcommand_with_file_range() {
-        let parsed = Args::try_parse_from([
-            "rustgraph",
-            "slice",
-            "--file",
-            "src/lib.rs",
-            "--start-line",
-            "1",
-            "--end-line",
-            "10",
-        ])
-        .expect("parse");
-        match parsed.command.unwrap() {
-            ModeCommand::Slice(s) => {
-                assert_eq!(s.file.as_deref().map(|p| p.to_string_lossy().to_string()), Some("src/lib.rs".to_string()));
-                assert_eq!(s.start_line, Some(1));
-                assert_eq!(s.end_line, Some(10));
-            }
-            _ => panic!("expected slice subcommand"),
         }
     }
 

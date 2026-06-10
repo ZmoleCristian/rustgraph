@@ -73,10 +73,10 @@ pub fn run(
     let resolved_query = if let Some(id) = &request.symbol_id {
         if id.starts_with("struct:") || id.starts_with("enum:") {
             return Err(format!(
-                "ensemble operates on functions only; '{}' is a {}. Use `slice --symbol-id {}` instead.",
+                "ensemble operates on functions only; '{}' is a {}. Use `def` / `members` to inspect a {}, or `refs` for its uses.",
                 id,
                 if id.starts_with("struct:") { "struct" } else { "enum" },
-                id
+                if id.starts_with("struct:") { "struct" } else { "enum" }
             )
             .into());
         }

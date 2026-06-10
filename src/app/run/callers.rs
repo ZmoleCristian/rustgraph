@@ -16,7 +16,7 @@ use crate::index::qualifier::{
     ResolutionStats,
 };
 
-use super::switchboard::write_string_output;
+use super::switchboard::{READ_TOOL_HINT, write_string_output};
 
 
 /// Implements `rustgraph callers <fn>` — reverse-dependency walk that reports every function that calls the target.
@@ -36,10 +36,10 @@ pub fn run(
     let resolved_query = if let Some(id) = &request.symbol_id {
         if id.starts_with("struct:") || id.starts_with("enum:") {
             return Err(format!(
-                "callers operates on functions only; '{}' is a {}. Use `slice --symbol-id {}` instead.",
+                "callers operates on functions only; '{}' is a {}. Use `refs` or `impls` for a {}'s uses instead.",
                 id,
                 if id.starts_with("struct:") { "struct" } else { "enum" },
-                id
+                if id.starts_with("struct:") { "struct" } else { "enum" }
             )
             .into());
         }
@@ -421,6 +421,7 @@ pub fn run(
                     max_results, total_callers_across_matches
                 ));
             }
+            rendered.push_str(&format!("\n{}\n", READ_TOOL_HINT));
             write_string_output(args.output.as_deref(), rendered.trim_end_matches('\n'))?;
         }
 
@@ -451,8 +452,9 @@ pub fn run(
         let payload = serde_json::to_string_pretty(&value)?;
         write_string_output(args.output.as_deref(), &payload)?;
     } else {
-        let rendered = render_transitive_text(&transitive);
-        write_string_output(args.output.as_deref(), &rendered)?;
+        let mut rendered = render_transitive_text(&transitive);
+        rendered.push_str(&format!("\n{}\n", READ_TOOL_HINT));
+        write_string_output(args.output.as_deref(), rendered.trim_end_matches('\n'))?;
     }
 
 

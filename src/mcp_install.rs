@@ -3,7 +3,6 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Result of one MCP registration or unregistration attempt for a detected AI
 /// client.
@@ -51,8 +50,9 @@ impl RegStatus {
 /// Register the rustgraph MCP entry in every detected AI client config.
 ///
 /// Returns one [`ClientReg`] per client. Idempotent: already-registered
-/// entries are left unchanged. Writes are atomic (tmp-file rename) with an
-/// auto-timestamped backup.
+/// entries are left unchanged. Writes are atomic (tmp-file rename); the merge
+/// is non-destructive (only the `rustgraph` entry is touched), so no backup
+/// copies are made.
 pub fn install_all() -> Vec<ClientReg> {
     vec![
         register_claude(),
@@ -113,16 +113,6 @@ fn target_command() -> &'static str {
 
 fn target_args() -> Vec<String> {
     vec!["mcp".into(), "serve".into()]
-}
-
-fn backup(path: &Path) -> io::Result<PathBuf> {
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let backup_path = path.with_extension(format!("rustgraph-bak.{}", ts));
-    fs::copy(path, &backup_path)?;
-    Ok(backup_path)
 }
 
 fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
@@ -230,8 +220,6 @@ fn merge_claude(path: &Path) -> io::Result<bool> {
         return Ok(false);
     }
     mcps_obj.insert("rustgraph".to_string(), target);
-
-    let _ = backup(path);
     let new_contents = serde_json::to_string_pretty(&json)?;
     write_atomic(path, &new_contents)?;
     Ok(true)
@@ -247,9 +235,7 @@ fn remove_claude(path: &Path) -> io::Result<bool> {
         .and_then(|m| m.as_object_mut())
         .map(|mcps| mcps.remove("rustgraph").is_some())
         .unwrap_or(false);
-    if removed {
-        let _ = backup(path);
-        let new_contents = serde_json::to_string_pretty(&json)?;
+    if removed {        let new_contents = serde_json::to_string_pretty(&json)?;
         write_atomic(path, &new_contents)?;
     }
     Ok(removed)
@@ -374,8 +360,6 @@ fn merge_codex(path: &Path) -> io::Result<bool> {
     }
     entry["args"] = toml_edit::Item::Value(toml_edit::Value::Array(args_arr));
     mcp_table["rustgraph"] = toml_edit::Item::Table(entry);
-
-    let _ = backup(path);
     write_atomic(path, &doc.to_string())?;
     Ok(true)
 }
@@ -390,9 +374,7 @@ fn remove_codex(path: &Path) -> io::Result<bool> {
         .and_then(|t| t.as_table_mut())
         .map(|t| t.remove("rustgraph").is_some())
         .unwrap_or(false);
-    if removed {
-        let _ = backup(path);
-        write_atomic(path, &doc.to_string())?;
+    if removed {        write_atomic(path, &doc.to_string())?;
     }
     Ok(removed)
 }
@@ -500,8 +482,6 @@ fn merge_gemini(path: &Path) -> io::Result<bool> {
         return Ok(false);
     }
     mcps_obj.insert("rustgraph".to_string(), target);
-
-    let _ = backup(path);
     let new_contents = serde_json::to_string_pretty(&json)?;
     write_atomic(path, &new_contents)?;
     Ok(true)
@@ -517,9 +497,7 @@ fn remove_gemini(path: &Path) -> io::Result<bool> {
         .and_then(|m| m.as_object_mut())
         .map(|mcps| mcps.remove("rustgraph").is_some())
         .unwrap_or(false);
-    if removed {
-        let _ = backup(path);
-        let new_contents = serde_json::to_string_pretty(&json)?;
+    if removed {        let new_contents = serde_json::to_string_pretty(&json)?;
         write_atomic(path, &new_contents)?;
     }
     Ok(removed)

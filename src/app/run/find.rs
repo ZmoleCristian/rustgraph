@@ -10,7 +10,7 @@ use crate::{
     search_items_exact_with_kinds, search_items_with_kinds_and_fallback,
 };
 
-use super::switchboard::write_string_output;
+use super::switchboard::{READ_TOOL_HINT, write_string_output};
 
 
 fn collect_suggestions(
@@ -242,6 +242,7 @@ pub fn run(
                 render_fn_lines(&disp_fns, request.show_ids, &mut relaxed_out);
                 render_struct_lines(&disp_structs, request.show_ids, &mut relaxed_out);
                 render_enum_lines(&disp_enums, request.show_ids, &mut relaxed_out);
+                relaxed_out.push_str(&format!("\n{}\n", READ_TOOL_HINT));
                 write_string_output(args.output.as_deref(), relaxed_out.trim_end_matches('\n'))?;
             }
             return Ok(());
@@ -458,6 +459,9 @@ pub fn run(
                 "(showing {} of {}; use --max-results to expand)\n",
                 max_results, total_hits
             ));
+        }
+        if total_hits > 0 {
+            out.push_str(&format!("\n{}\n", READ_TOOL_HINT));
         }
         write_string_output(args.output.as_deref(), out.trim_end_matches('\n'))?;
     }

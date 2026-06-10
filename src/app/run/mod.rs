@@ -11,7 +11,6 @@ pub(super) mod inventory;
 pub(super) mod members;
 pub(super) mod paths_between;
 pub(super) mod refs;
-pub(super) mod slice;
 mod switchboard;
 pub(super) mod tree;
 pub(super) mod usages;

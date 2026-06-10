@@ -54,33 +54,6 @@ fn regression_help_subcommand_long_form_omits_global_descriptions() {
 
 
 #[test]
-fn regression_slice_help_advertises_path_line_form() {
-    let help = help_for("slice");
-
-
-    assert!(
-        help.contains("path:LINE")
-            || help.contains("path.rs:LINE")
-            || help.contains("path/to/file.rs:LINE"),
-        "slice --help should mention the `path:LINE` syntax; got:\n{}",
-        help
-    );
-
-
-    assert!(
-        help.contains("START-END")
-            || help.contains("path:LINE-LINE")
-            || help.contains("path.rs:120-180")
-            || help.contains("path.rs:START-END")
-            || help.contains("file.rs:START-END")
-            || help.contains("path/to/file.rs:START-END"),
-        "slice --help should mention the `path:START-END` range form; got:\n{}",
-        help
-    );
-}
-
-
-#[test]
 fn regression_grep_help_documents_quoting() {
     let help = help_for("grep");
 
@@ -154,10 +127,10 @@ fn regression_find_help_explains_query_syntax() {
         "find --help should explicitly mention `path:LINE` (so users know it isn't supported here); got:\n{}",
         help
     );
-    let redirects_elsewhere = help.contains("slice path") || help.contains("callers path") || help.contains("use `slice");
+    let redirects_elsewhere = help.contains("callers path") || help.contains("Read tool");
     assert!(
         redirects_elsewhere,
-        "find --help should redirect users wanting path:LINE to `slice` or `callers`; got:\n{}",
+        "find --help should redirect users wanting path:LINE to `callers` or the Read tool; got:\n{}",
         help
     );
 }

@@ -15,7 +15,6 @@ use super::inventory;
 use super::members;
 use super::paths_between;
 use super::refs;
-use super::slice;
 use super::tree;
 use super::usages;
 use crate::cli::Args;
@@ -33,7 +32,6 @@ pub fn execute(
     match mode {
         ExecutionMode::Ensemble(request) => ensemble::run(args, project, request),
         ExecutionMode::Callers(request) => callers::run(args, project, request, changed),
-        ExecutionMode::Slice(request) => slice::run(args, project, request),
         ExecutionMode::CallGraph { detail, config } => call_graph::run(args, project, detail, config),
         ExecutionMode::DeadCode { in_path, verbose, max_results } => dead_code::run(args, project, in_path, verbose, max_results, changed),
         ExecutionMode::Inventory { selection } => inventory::run(args, project.clone(), selection),
@@ -48,6 +46,13 @@ pub fn execute(
         ExecutionMode::Members(request) => members::run(args, project, request),
     }
 }
+
+/// Steering footer appended to locator-tool text output (find, callers).
+///
+/// These tools answer "where is X" / "who calls X" with `file:line` locations,
+/// not source. The hint nudges the model to open those locations with the Read
+/// tool rather than reaching for a code-dumping substitute.
+pub(super) const READ_TOOL_HINT: &str = "↳ Use the Read tool to read functions of interest.";
 
 /// Write `payload` to `output_path` when provided, or print to stdout when `None`.
 ///

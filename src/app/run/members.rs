@@ -29,8 +29,8 @@ pub fn run(
         let field_names = extract_field_names(&struct_info.fields);
         if field_names.is_empty() {
             return Err(format!(
-                "'{}' is a unit struct (no fields). Try `refs {}` for type uses, or `slice {}` to view the definition.",
-                request.type_name, request.type_name, request.type_name
+                "'{}' is a unit struct (no fields). Try `refs {}` for type uses, or read {}:{} with the Read tool to view the definition.",
+                request.type_name, request.type_name, struct_info.file_path, struct_info.start_line
             )
             .into());
         }

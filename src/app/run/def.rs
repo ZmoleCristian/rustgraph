@@ -185,7 +185,7 @@ pub fn run(
             )
         } else {
             format!(
-                "ambiguous: '{}' matches {} symbols. Use --func/--struct/--enum to narrow, or `slice` with one of:\n",
+                "ambiguous: '{}' matches {} symbols. Use --func/--struct/--enum to narrow, or open one of these with the Read tool:\n",
                 request.name,
                 hits.len()
             )
@@ -239,7 +239,7 @@ pub fn run(
     if !args.json && (kind == "struct" || kind == "enum") {
         let kind_article = if kind == "struct" { "a" } else { "an" };
         let msg = format!(
-            "'{}' is {} {} ({}:{}). Use `slice {}:{}` to see definition, `impls {}` for trait implementations, `refs {}` for all uses.",
+            "'{}' is {} {} ({}:{}). Read `{}:{}` with the Read tool to see the definition, `impls {}` for trait implementations, `refs {}` for all uses.",
             request.name, kind_article, kind, file, line, file, line, request.name, request.name
         );
         return Err(msg.into());

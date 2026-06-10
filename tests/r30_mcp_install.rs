@@ -142,27 +142,27 @@ fn uninstall_removes_only_rustgraph_entry() {
 }
 
 #[test]
-fn install_creates_backup_file() {
+fn install_leaves_no_backup_or_temp_trash() {
     let home = tempdir().unwrap();
     let claude_path = home.path().join(".claude.json");
     fs::create_dir_all(claude_path.parent().unwrap()).unwrap();
-    fs::write(&claude_path, r#"{}"#).unwrap();
+    fs::write(&claude_path, r#"{"k":"v"}"#).unwrap();
 
+    // Run twice — a changing write then an idempotent no-op — to be sure
+    // neither path drops trash next to the config.
+    let _ = run_with_home(home.path(), &["mcp", "install"]);
     let _ = run_with_home(home.path(), &["mcp", "install"]);
 
-    let backups: Vec<_> = fs::read_dir(claude_path.parent().unwrap())
+    let stray: Vec<String> = fs::read_dir(claude_path.parent().unwrap())
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .contains("rustgraph-bak.")
-        })
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.contains("rustgraph-bak") || name.ends_with(".rustgraph-tmp"))
         .collect();
     assert!(
-        !backups.is_empty(),
-        "expected at least one backup file in {:?}",
-        claude_path.parent().unwrap()
+        stray.is_empty(),
+        "install must not create backup/temp trash; found: {:?}",
+        stray
     );
 }
 

@@ -87,61 +87,6 @@ fn regression_call_graph_no_phantom_method_call_edges() {
 
 
 #[test]
-fn regression_slice_path_line_resolves_struct_enclosing_line() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub struct DaemonState {\n\
-             pub id: u32,\n\
-         }\n\
-         pub fn unrelated() {}\n",
-    );
-    let base = fixture.path().to_string_lossy().to_string();
-
-    let out = run_rustgraph(&["--path", &base, "slice", "src/lib.rs:2"]);
-    assert!(
-        out.status.success(),
-        "slice should resolve struct path:LINE. stderr:\n{}\nstdout:\n{}",
-        String::from_utf8_lossy(&out.stderr),
-        String::from_utf8_lossy(&out.stdout)
-    );
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("DaemonState"),
-        "slice output should contain the struct definition; got:\n{stdout}"
-    );
-}
-
-
-#[test]
-fn regression_slice_path_line_resolves_enum_enclosing_line() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub enum Mode {\n\
-             Read,\n\
-             Write,\n\
-         }\n\
-         pub fn unrelated() {}\n",
-    );
-    let base = fixture.path().to_string_lossy().to_string();
-
-    let out = run_rustgraph(&["--path", &base, "slice", "src/lib.rs:2"]);
-    assert!(
-        out.status.success(),
-        "slice should resolve enum path:LINE. stderr:\n{}\nstdout:\n{}",
-        String::from_utf8_lossy(&out.stderr),
-        String::from_utf8_lossy(&out.stdout)
-    );
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("Mode"),
-        "slice output should contain the enum definition; got:\n{stdout}"
-    );
-}
-
-
-#[test]
 fn regression_callers_path_line_on_struct_redirects_to_refs() {
     let fixture = tempdir().expect("tempdir");
     write_file(

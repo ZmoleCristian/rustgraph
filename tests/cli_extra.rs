@@ -262,97 +262,6 @@ fn output_flag_writes_file_instead_of_stdout() {
 }
 
 #[test]
-fn slice_subcommand_returns_struct_source() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        r#"
-pub struct Foo {
-    pub a: u32,
-}
-"#,
-    );
-    let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "slice", "Foo", "--json"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    assert_eq!(json["symbol"]["name"].as_str(), Some("Foo"));
-    let content = json["slice"]["content"].as_str().unwrap_or_default();
-    assert!(content.contains("pub a: u32"));
-}
-
-#[test]
-fn slice_subcommand_returns_enum_source() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        r#"
-pub enum Color {
-    Red,
-    Green,
-    Blue,
-}
-"#,
-    );
-    let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "slice", "Color", "--json"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    assert_eq!(json["symbol"]["name"].as_str(), Some("Color"));
-    let content = json["slice"]["content"].as_str().unwrap_or_default();
-    assert!(content.contains("Red"));
-    assert!(content.contains("Blue"));
-}
-
-#[test]
-fn slice_subcommand_clamps_overshoot_end_line() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(&fixture.path().join("src/lib.rs"), "pub fn one() {}\npub fn two() {}\n");
-    let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "slice",
-        "--file",
-        "src/lib.rs",
-        "--start-line",
-        "1",
-        "--end-line",
-        "9999",
-        "--json",
-    ]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    let end = json["slice"]["end_line"].as_u64().unwrap_or(0);
-    assert!(end <= 2, "expected end_line clamped at file length, got {end}");
-}
-
-#[test]
-fn slice_subcommand_requires_either_query_or_file() {
-    let bin = env!("CARGO_BIN_EXE_rustgraph");
-    let out = Command::new(bin)
-        .args(["slice"])
-        .output()
-        .expect("run slice");
-    assert!(
-        !out.status.success(),
-        "slice without args should exit non-zero"
-    );
-}
-
-#[test]
 fn callers_no_color_in_text_output_by_default() {
     let fixture = tempdir().expect("tempdir");
     write_file(
@@ -523,31 +432,6 @@ pub fn run() { let _a = make_a(); let _b = make_b(); }
 }
 
 #[test]
-fn slice_subcommand_resolves_by_symbol_id() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(&fixture.path().join("src/lib.rs"), "pub fn target() {}\n");
-    let base = fixture.path().to_string_lossy().to_string();
-
-
-    let inv = run_rustgraph(&["--path", &base, "--analyze", "functions", "--json"]);
-    assert!(inv.status.success());
-    let inv_json: Value = serde_json::from_slice(&inv.stdout).expect("inv json");
-    let func = &inv_json["functions"][0];
-    let file_path = func["file_path"].as_str().unwrap();
-    let start_line = func["start_line"].as_u64().unwrap();
-    let symbol_id = format!("{file_path}:{start_line}:target");
-
-    let out = run_rustgraph(&["--path", &base, "slice", "--symbol-id", &symbol_id, "--json"]);
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    assert_eq!(json["symbol"]["name"].as_str(), Some("target"));
-}
-
-#[test]
 fn search_threshold_zero_matches_everything() {
     let fixture = tempdir().expect("tempdir");
     let base = write_simple_lib(&fixture);
@@ -670,7 +554,7 @@ fn top_level_help_lists_subcommands() {
     assert!(stdout.contains("ensemble"));
     assert!(stdout.contains("dead-code"));
     assert!(stdout.contains("call-graph"));
-    assert!(stdout.contains("slice"));
+    assert!(stdout.contains("tree"));
 }
 
 
@@ -734,24 +618,6 @@ pub fn alpha() {
         .cloned()
         .unwrap_or_default();
     assert!(context.len() >= 2);
-}
-
-
-#[test]
-fn slice_subcommand_returns_text_when_no_json_flag() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        r#"
-pub fn hello() -> &'static str { "hi" }
-"#,
-    );
-    let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "slice", "hello"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("hello"));
-    assert!(stdout.contains("\"hi\""));
 }
 
 
@@ -868,36 +734,6 @@ pub fn caller() { target(); }
     assert_eq!(json["max_call_sites"].as_u64(), Some(0));
     assert_eq!(json["max_results"].as_u64(), Some(10));
     assert_eq!(json["call_depth"].as_u64(), Some(3));
-}
-
-
-#[test]
-fn slice_with_explicit_file_outside_project_works() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub fn placeholder() {}\n",
-    );
-    let outside = fixture.path().join("outside.txt");
-    fs::write(&outside, "alpha\nbeta\ngamma\ndelta\n").expect("write outside file");
-
-    let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "slice",
-        "--file",
-        outside.to_str().unwrap(),
-        "--start-line",
-        "2",
-        "--end-line",
-        "3",
-        "--json",
-    ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    let content = json["slice"]["content"].as_str().unwrap_or_default();
-    assert_eq!(content, "beta\ngamma");
 }
 
 
@@ -1134,31 +970,6 @@ fn regression_grep_by_function_attributes_to_enclosing_fn_not_orphan() {
         "no matches should be orphaned; got: {}",
         stdout
     );
-}
-
-
-#[test]
-fn regression_slice_query_does_not_signature_match_by_default() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub struct DaemonState;\npub fn handle(d: &DaemonState) {}\npub fn process(state: DaemonState) -> DaemonState { state }\n",
-    );
-    let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "slice", "DaemonState", "--json"]);
-    assert!(
-        out.status.success(),
-        "slice should resolve the struct, not error on ambiguity. stderr: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    assert_eq!(
-        json["symbol"]["name"].as_str(),
-        Some("DaemonState"),
-        "expected the struct named DaemonState; got: {}",
-        String::from_utf8_lossy(&out.stdout)
-    );
-    assert_eq!(json["symbol"]["kind"].as_str(), Some("struct"));
 }
 
 
@@ -1924,22 +1735,6 @@ fn regression_usages_combines_callers_and_refs() {
 
 
 #[test]
-fn regression_slice_accepts_path_line_range_syntax() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "// line1\n// line2\n// line3\n// line4\n// line5\n",
-    );
-    let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "slice", "src/lib.rs:2-4", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    assert_eq!(json["slice"]["start_line"].as_u64(), Some(2));
-    assert_eq!(json["slice"]["end_line"].as_u64(), Some(4));
-}
-
-
-#[test]
 fn regression_find_no_match_emits_did_you_mean() {
     let fixture = tempdir().expect("tempdir");
     write_file(
@@ -2217,30 +2012,6 @@ fn regression_paths_between_show_call_sites_annotates_hops() {
         "entry node should have call_site_line set when --show-call-sites; got: {entry_node}"
     );
 }
-
-#[test]
-fn slice_query_partial_name_resolves_with_low_threshold() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub fn render_complex_widget() { let _ = 1; }\n",
-    );
-
-    let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "slice",
-        "render_complex",
-        "--search-threshold",
-        "0.4",
-        "--json",
-    ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-    let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    assert_eq!(json["symbol"]["name"].as_str(), Some("render_complex_widget"));
-}
-
 
 #[test]
 fn regression_find_does_not_double_fn_name() {
@@ -2570,26 +2341,6 @@ pub fn caller() { handle_a(); handle_b(); handle_c(); handle_d(); handle_e(); ha
     let pass = run_rustgraph(&["--path", &base, "callers", "handle", "--ambiguity-cap", "9"]);
     assert!(pass.status.success(), "cap=9 should let 9 matches pass: {}",
         String::from_utf8_lossy(&pass.stderr));
-}
-
-
-#[test]
-fn regression_slice_resolves_relative_paths_against_p_root() {
-    let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub fn target() {\n    let _ = 1;\n}\n",
-    );
-    let base = fixture.path().to_string_lossy().to_string();
-
-    let out = Command::new(env!("CARGO_BIN_EXE_rustgraph"))
-        .current_dir("/tmp")
-        .args(["--no-auto-path", "--path", &base, "slice", "target"])
-        .output()
-        .expect("run");
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("pub fn target"), "slice did not return target body: {stdout}");
 }
 
 

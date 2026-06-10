@@ -170,6 +170,10 @@ pub struct SearchResults {
 }
 
 /// A contiguous byte/line range extracted from a source file.
+///
+/// Library primitive (used by downstream consumers for synthetic-read /
+/// source-injection); intentionally NOT exposed as a CLI subcommand or MCP
+/// tool, so it can't be used as a Read-tool substitute by agents.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileSlice {
     /// Relative path to the source file from the crate root.

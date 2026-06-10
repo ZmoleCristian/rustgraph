@@ -250,7 +250,7 @@ fn fix2_def_unknown_name_no_refs_keeps_legacy_no_match_message() {
 
 
 #[test]
-fn fix3_def_struct_redirect_includes_slice_impls_refs() {
+fn fix3_def_struct_redirect_includes_read_impls_refs() {
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -269,8 +269,8 @@ fn fix3_def_struct_redirect_includes_slice_impls_refs() {
         "redirect must classify as struct; got:\n{stderr}"
     );
     assert!(
-        stderr.contains("slice "),
-        "redirect must mention `slice <path:line>`; got:\n{stderr}"
+        stderr.contains("Read ") && stderr.contains("Read tool"),
+        "redirect must steer to the Read tool on the path:line; got:\n{stderr}"
     );
     assert!(
         stderr.contains("impls MyStruct"),

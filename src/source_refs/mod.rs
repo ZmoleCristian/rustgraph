@@ -1,4 +1,5 @@
-//! Source-slice extraction subsystem used by the `slice` subcommand.
+//! Call-argument extraction subsystem used by ensemble dataflow analysis and
+//! dead-code text-reference parsing.
 //!
 //! Given a file path and line/column hint, locates the argument list of a
 //! specific call expression and returns an individual argument by index.

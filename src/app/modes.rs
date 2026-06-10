@@ -127,23 +127,6 @@ pub struct CallersRequest {
     pub flat: bool,
 }
 
-/// Parameters for the `slice` subcommand, which extracts a contiguous source excerpt.
-#[derive(Clone, Debug)]
-pub struct SliceRequest {
-    /// Fuzzy-search query to locate the symbol; mutually exclusive with `symbol_id`.
-    pub query: Option<String>,
-    /// Stable symbol ID that pinpoints the slice target.
-    pub symbol_id: Option<String>,
-    /// Explicit file path when slicing by line range rather than symbol name.
-    pub file: Option<std::path::PathBuf>,
-    /// First line of the range to slice (1-based, inclusive).
-    pub start_line: Option<usize>,
-    /// Last line of the range to slice (1-based, inclusive).
-    pub end_line: Option<usize>,
-    /// Expand the slice by this many lines above and below the symbol boundary.
-    pub around: Option<usize>,
-}
-
 /// Parameters for the `tree` subcommand, which renders the module/file hierarchy.
 #[derive(Clone, Debug)]
 pub struct TreeRequest {
@@ -295,7 +278,6 @@ pub struct MembersRequest {
 pub enum ExecutionMode {
     Ensemble(EnsembleRequest),
     Callers(CallersRequest),
-    Slice(SliceRequest),
     CallGraph {
         detail: CallGraphDetail,
         config: CallGraphConfig,
@@ -403,14 +385,6 @@ impl ExecutionMode {
                     verbose: dc.verbose,
                     max_results: dc.max_results,
                 },
-                ModeCommand::Slice(slice) => Self::Slice(SliceRequest {
-                    query: slice.query,
-                    symbol_id: slice.symbol_id,
-                    file: slice.file,
-                    start_line: slice.start_line,
-                    end_line: slice.end_line,
-                    around: slice.around,
-                }),
                 ModeCommand::CallGraph(call_graph) => Self::CallGraph {
                     detail: call_graph.detail,
                     config: CallGraphConfig {
@@ -717,14 +691,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn execution_mode_slice_via_subcommand() {
-        let args = parse(&["rustgraph", "slice", "--symbol-id", "myid"]);
-        match ExecutionMode::from_args(&args) {
-            ExecutionMode::Slice(req) => {
-                assert_eq!(req.symbol_id, Some("myid".to_string()));
-            }
-            _ => panic!("expected slice mode"),
-        }
-    }
 }

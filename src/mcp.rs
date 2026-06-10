@@ -17,14 +17,15 @@ use serde_json::json;
 ///
 /// Used as the JSON-Schema enum so the MCP client gets validation errors
 /// up front rather than the server silently dropping unknown values.
+// NOTE: variants intentionally carry NO doc comments. schemars renders
+// per-variant docs as `oneOf: [{const, description}, ...]`, which strict tool-
+// schema validators (e.g. the Anthropic API) reject. Doc-free unit variants
+// serialize to a flat `enum: [...]`. Describe the values on the *field* instead.
 #[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum FindKind {
-    /// Filter to functions only.
     Func,
-    /// Filter to structs only.
     Struct,
-    /// Filter to enums only.
     Enum,
 }
 
@@ -39,16 +40,15 @@ impl FindKind {
 }
 
 /// Strongly-typed `view` selector for `rustgraph_ensemble`.
+///
+/// Variants are doc-free on purpose — see the note on [`FindKind`]; value
+/// meanings live on the `view` field of [`EnsembleArgs`].
 #[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum EnsembleView {
-    /// Concise summary (default).
     Summary,
-    /// Caller / use-site oriented view.
     Usage,
-    /// Dataflow-oriented view.
     Flow,
-    /// Everything: summary + usage + flow.
     Full,
 }
 
@@ -64,19 +64,14 @@ impl EnsembleView {
 }
 
 /// Strongly-typed `preset` selector for `rustgraph_ensemble`.
+///
+/// Variants are doc-free on purpose — see the note on [`FindKind`]; the cap
+/// details live on the `preset` field of [`EnsembleArgs`].
 #[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum EnsemblePreset {
-    /// Tight caps: at most 80 call sites, depth 1, 25 related, 8 lifecycle paths.
-    /// Use when you only need the structs and a small downstream sample. Trades
-    /// completeness for token cost.
     Quick,
-    /// Recommended default: 200 call sites, depth 2, 60 related, 20 lifecycle paths.
-    /// Returns the full callers + callees + structs + dataflow bundle the tool
-    /// description advertises.
     Balanced,
-    /// Generous caps: unlimited call sites, depth 3, 120 related, 40 lifecycle paths.
-    /// Use only when you need wide transitive coverage (e.g. lifecycle audits).
     Deep,
 }
 
@@ -127,10 +122,12 @@ pub struct EnsembleArgs {
     /// Crate root (defaults to cwd).
     #[serde(default)]
     pub path: Option<String>,
-    /// View: `summary` (default), `usage`, `flow`, `full`.
+    /// View: `summary` (default, concise), `usage` (caller/use-site), `flow` (dataflow), `full` (all three).
     #[serde(default)]
     pub view: Option<EnsembleView>,
-    /// Preset: `quick`, `balanced` (default), `deep`.
+    /// Preset caps: `quick` (tight — 80 call sites, depth 1, structs + small sample, cheapest),
+    /// `balanced` (default — 200 sites, depth 2, full callers+callees+structs+dataflow bundle),
+    /// `deep` (generous — unlimited sites, depth 3, wide transitive coverage for lifecycle audits).
     #[serde(default)]
     pub preset: Option<EnsemblePreset>,
 }
@@ -150,18 +147,6 @@ pub struct PathsBetweenArgs {
     /// Annotate each hop with the call-site line.
     #[serde(default)]
     pub show_call_sites: Option<bool>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-pub struct SliceArgs {
-    /// Name, `path.rs:LINE`, or `path.rs:START-END`.
-    pub query: String,
-    /// Crate root (defaults to cwd).
-    #[serde(default)]
-    pub path: Option<String>,
-    /// Lines of context above/below the slice.
-    #[serde(default)]
-    pub context: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -262,7 +247,7 @@ impl RustgraphServer {
 
     #[tool(
         name = "rustgraph_ensemble",
-        description = "Use INSTEAD OF 5+ Read or rustgraph_slice calls to UNDERSTAND a function. With the default `balanced` preset ONE call returns callers + callees + structs touched + dataflow (~10× fewer tool calls than reading manually). The `quick` preset trades coverage for tokens — pass it only when you already know you just want the structs and a tiny callee sample. Triggers: 'explain X' / 'how does X work'."
+        description = "Use INSTEAD OF 5+ Read calls to UNDERSTAND a function. With the default `balanced` preset ONE call returns callers + callees + structs touched + dataflow (~10× fewer tool calls than reading manually). The `quick` preset trades coverage for tokens — pass it only when you already know you just want the structs and a tiny callee sample. Triggers: 'explain X' / 'how does X work'."
     )]
     async fn ensemble(
         &self,
@@ -315,26 +300,6 @@ impl RustgraphServer {
 
 
     #[tool(
-        name = "rustgraph_slice",
-        description = "Use INSTEAD OF Read for 'show me X' / 'source of X'. Accepts name, path:LINE, or path:START-END. NOTE: if you also need callers/callees/structs, use rustgraph_ensemble — saves multiple round-trips."
-    )]
-    async fn slice(&self, p: Parameters<SliceArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
-        let mut argv: Vec<String> = Vec::new();
-        if let Some(path) = &p.0.path {
-            argv.push("-p".into());
-            argv.push(path.clone());
-        }
-        argv.push("slice".into());
-        argv.push(p.0.query.clone());
-        if let Some(c) = p.0.context {
-            argv.push("-C".into());
-            argv.push(c.to_string());
-        }
-        Ok(run_rustgraph(&self.binary, &argv))
-    }
-
-
-    #[tool(
         name = "rustgraph_tree",
         description = "Use INSTEAD OF ls/find/tree for 'what's in this module' / 'show project layout' / 'what files are under src/X'. Returns the module/file tree with per-file fn/struct/enum counts. Pass `prefix` (e.g. `src/governor`) to scope to a subtree. Topology view, not symbol search — use this when you DON'T yet know the symbol name."
     )]
@@ -377,7 +342,7 @@ impl ServerHandler for RustgraphServer {
                  \x20 'who calls X'                         → rustgraph_callers\n\
                  \x20 'understand X' / 'how does X work'    → rustgraph_ensemble  (one call > 5 Reads)\n\
                  \x20 'walk me through' / 'trace flow'      → rustgraph_paths_between\n\
-                 \x20 'show me X' / 'source of X'           → rustgraph_slice\n\
+                 \x20 'show me X' / 'read source of X'      → use the Read tool (rustgraph_find gives you the path:line to Read)\n\
                  \x20 'what's in module X' / 'project layout' / unknown symbol name → rustgraph_tree (replaces ls/find/tree)"
                     .into(),
             ),
@@ -456,6 +421,33 @@ mod tests {
             .filter_map(|c| c.as_text().map(|t| t.text.clone()))
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    fn arg_schema_json<T: JsonSchema>() -> String {
+        let schema = schemars::SchemaGenerator::default().into_root_schema_for::<T>();
+        serde_json::to_string(&schema).expect("serialize schema")
+    }
+
+    /// Regression guard: the Anthropic tool-schema validator rejects `oneOf`
+    /// ("'oneOf' is not permitted"). schemars emits `oneOf` for enum variants
+    /// that carry doc comments, so every tool-arg enum must keep its variants
+    /// doc-free (describe values on the field). This test fails the moment a
+    /// `oneOf` reappears in any tool's input schema.
+    #[test]
+    fn no_tool_arg_schema_uses_oneof() {
+        let schemas = [
+            ("FindArgs", arg_schema_json::<FindArgs>()),
+            ("CallersArgs", arg_schema_json::<CallersArgs>()),
+            ("EnsembleArgs", arg_schema_json::<EnsembleArgs>()),
+            ("PathsBetweenArgs", arg_schema_json::<PathsBetweenArgs>()),
+            ("TreeArgs", arg_schema_json::<TreeArgs>()),
+        ];
+        for (name, json) in schemas {
+            assert!(
+                !json.contains("oneOf"),
+                "{name} input schema must not contain `oneOf` (strict validators reject it): {json}"
+            );
+        }
     }
 
     #[test]

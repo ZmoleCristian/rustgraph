@@ -1,8 +1,8 @@
 //! AST-aware Rust codebase navigation library and CLI.
 //!
 //! `rustgraph` parses Rust source files with `syn` and exposes structured
-//! symbol information — functions, structs, enums, call-graphs, and source
-//! slices — through both a CLI and an MCP server for AI assistants.
+//! symbol information — functions, structs, enums, and call-graphs — through
+//! both a CLI and an MCP server for AI assistants.
 //!
 //! # Main entry points for library consumers
 //!

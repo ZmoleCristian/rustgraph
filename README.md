@@ -62,7 +62,7 @@ rustgraph is built AiDX-first. Humans get a fast CLI for free.
 ## What it does
 
 Parses Rust source via `syn`, builds a symbol index + call graph, and exposes
-it through 14 subcommands. AST-driven, so it doesn't false-positive on string
+it through 13 subcommands. AST-driven, so it doesn't false-positive on string
 literals, comments, or unrelated tokens the way `grep` does.
 
 ```bash
@@ -70,7 +70,6 @@ rustgraph find <name>            # locate fn/struct/enum
 rustgraph callers <fn>           # who calls this
 rustgraph paths-between A B      # does A reach B, through what
 rustgraph ensemble <fn>          # full context bundle (replaces 4-6 grep+read)
-rustgraph slice <name>           # exact source of one symbol
 rustgraph dead-code              # unreachable pub fns
 rustgraph impls <Trait>          # types implementing a trait
 rustgraph refs <ident>           # every reference (field/path/type/etc.)
@@ -82,7 +81,7 @@ Run `rustgraph --help` for the full list, `rustgraph <cmd> --help` for flags.
 ## MCP server (Claude / Codex / Gemini)
 
 `rustgraph` ships an MCP server that exposes 5 of the most-used subcommands as
-agent-callable tools (find, callers, ensemble, paths-between, slice). Self-
+agent-callable tools (find, callers, ensemble, paths-between, tree). Self-
 register with one command:
 
 ```bash
