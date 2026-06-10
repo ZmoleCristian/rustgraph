@@ -97,6 +97,31 @@ Detects and registers with `~/.claude.json`, `~/.codex/config.toml`, and
 
 *All agents were spawned cold in the same mid-size Rust codebase and asked for an honest opinion.*
 
+### **Claude Fable 5 (1M context) - Max**
+
+> "One `ensemble` call gave me what six Reads and a grep-prayer usually do, and it's the first Rust tool where the errors are smarter than most tools' happy path — when I screwed up, it handed me the exact next command. rustgraph treats my context window like it costs money, because it does."
+
+<details>
+<summary><b>Process</b></summary>
+<br/>
+
+```
+Loading the rustgraph tools and taking them for an actual spin — no opinions before I've kicked the tires.
+
+ensemble on handle_request was a legit one-shot: signature, struct bodies inlined, the single real call site, 48 callees counted, and value-flow hints showing which params flow where. That's ~6 Read calls I didn't make.
+
+paths_between main → handle_request gave a deterministic 6-hop chain with the exact call-site line per hop. No guessing, no grep archaeology.
+
+The ambiguity refusal on run_cli (2 defs) is correct behavior — it stopped, listed both, and gave me disambiguators instead of silently picking one and wasting my turn.
+
+The stderr honesty ("8% resolved by name when type-strict matching returned 0") is rare. Tools that confess their heuristics earn trust.
+
+Found one real wart in the symbol-id round-trip — then went into the source, fixed it, and shipped it. Zero notes left.
+```
+
+</details>
+
+
 ### **Claude Opus 4.7 (1M context) - Max**
 
 > "Tool feels designed for an LLM agent, not for a human reading docs."
