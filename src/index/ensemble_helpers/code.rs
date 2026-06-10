@@ -45,9 +45,13 @@ pub fn extract_code_snippet(
 }
 
 /// Parse a `path:line` or `path#Lline` query string into its path and line
-/// number components.  Returns `None` when the query does not match either
-/// format or the line portion is not a valid integer.
+/// number components.  Also accepts the symbol-id triple `path:line:name`
+/// (with optional `fn:` prefix), dropping the trailing name.  Returns `None`
+/// when the query does not match any format or the line portion is not a
+/// valid integer.
 pub fn parse_file_line_query(query: &str) -> Option<(String, usize)> {
+    let query = query.strip_prefix("fn:").unwrap_or(query);
+
     if let Some((path, line_str)) = query.rsplit_once("#L")
         && let Ok(line) = line_str.trim().parse::<usize>()
     {
@@ -66,7 +70,28 @@ pub fn parse_file_line_query(query: &str) -> Option<(String, usize)> {
         }
     }
 
+    if let Some((path, line, _name)) = parse_symbol_id_query(query) {
+        return Some((path, line));
+    }
+
     None
+}
+
+/// Parse a function symbol-id query `path:line:name` (with optional `fn:`
+/// prefix), as emitted by ambiguity errors and `--json` output, into its
+/// path, line, and name components.
+pub fn parse_symbol_id_query(query: &str) -> Option<(String, usize, String)> {
+    let query = query.strip_prefix("fn:").unwrap_or(query);
+
+    let (rest, name) = query.rsplit_once(':')?;
+    let name = name.trim();
+    let (path, line_str) = rest.rsplit_once(':')?;
+    let line = line_str.trim().parse::<usize>().ok()?;
+    let path = path.trim();
+    if path.is_empty() || name.is_empty() {
+        return None;
+    }
+    Some((path.to_string(), line, name.to_string()))
 }
 
 #[cfg(test)]
@@ -148,5 +173,37 @@ mod tests {
     #[test]
     fn parse_file_line_query_returns_none_for_empty_path() {
         assert_eq!(parse_file_line_query(":12"), None);
+    }
+
+    #[test]
+    fn parse_file_line_query_accepts_symbol_id_triple() {
+        assert_eq!(
+            parse_file_line_query("src/session/cli.rs:90:run_cli"),
+            Some(("src/session/cli.rs".to_string(), 90))
+        );
+    }
+
+    #[test]
+    fn parse_symbol_id_query_parses_triple() {
+        assert_eq!(
+            parse_symbol_id_query("src/session/cli.rs:90:run_cli"),
+            Some(("src/session/cli.rs".to_string(), 90, "run_cli".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_symbol_id_query_strips_fn_prefix() {
+        assert_eq!(
+            parse_symbol_id_query("fn:src/a.rs:12:foo"),
+            Some(("src/a.rs".to_string(), 12, "foo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_symbol_id_query_rejects_plain_name_and_module_paths() {
+        assert_eq!(parse_symbol_id_query("run_cli"), None);
+        assert_eq!(parse_symbol_id_query("std::fs"), None);
+        assert_eq!(parse_symbol_id_query("Type::method"), None);
+        assert_eq!(parse_symbol_id_query("src/a.rs:12"), None);
     }
 }

@@ -1,4 +1,4 @@
-use super::super::ensemble_helpers::parse_file_line_query;
+use super::super::ensemble_helpers::{parse_file_line_query, parse_symbol_id_query};
 use super::super::parse::ProjectAnalysis;
 use super::super::{FunctionInfo, fuzzy_similarity};
 
@@ -25,6 +25,23 @@ pub fn find_candidates_with_options<'a>(
     match_signature: bool,
 ) -> Vec<(&'a FunctionInfo, f64)> {
     let mut candidates: Vec<(&FunctionInfo, f64)> = Vec::new();
+
+    // Symbol-id triple (`path:LINE:name`, as emitted by ambiguity errors) is
+    // authoritative: when it names an existing function exactly, return only
+    // that function and skip span-containment / fuzzy fallbacks.
+    if let Some((path_query, line_query, name_query)) = parse_symbol_id_query(query) {
+        for func in &analysis.functions {
+            if func.name == name_query
+                && func.start_line == line_query
+                && func.file_path.ends_with(&path_query)
+            {
+                candidates.push((func, 1.0));
+            }
+        }
+        if !candidates.is_empty() {
+            return candidates;
+        }
+    }
 
     if let Some((path_query, line_query)) = parse_file_line_query(query) {
         for func in &analysis.functions {
@@ -167,6 +184,40 @@ mod tests {
         ]);
         let cands = find_candidates(&analysis, "compute", 0.5, 2);
         assert_eq!(cands.len(), 2);
+    }
+
+    #[test]
+    fn find_candidates_symbol_id_is_authoritative_against_homonyms() {
+        let analysis = analysis_from(vec![
+            fn_("run_cli", "src/daemon/cli.rs", 11, 41),
+            fn_("run_cli", "src/session/cli.rs", 90, 139),
+        ]);
+        let cands = find_candidates(&analysis, "src/session/cli.rs:90:run_cli", 0.7, 0);
+        assert_eq!(cands.len(), 1);
+        assert_eq!(cands[0].0.file_path, "src/session/cli.rs");
+        assert_eq!(cands[0].1, 1.0);
+    }
+
+    #[test]
+    fn find_candidates_symbol_id_excludes_enclosing_span() {
+        // span-containment would match `outer` too; the name+start_line pin must not
+        let analysis = analysis_from(vec![
+            fn_("outer", "src/a.rs", 1, 100),
+            fn_("inner", "src/a.rs", 10, 12),
+        ]);
+        let cands = find_candidates(&analysis, "src/a.rs:10:inner", 0.7, 0);
+        assert_eq!(cands.len(), 1);
+        assert_eq!(cands[0].0.name, "inner");
+    }
+
+    #[test]
+    fn find_candidates_stale_symbol_id_falls_back_to_span_containment() {
+        let analysis = analysis_from(vec![fn_("inner", "src/a.rs", 10, 12)]);
+        // line 11 is inside the span but is not the start line; name lookup misses,
+        // span-containment via parse_file_line_query recovers it
+        let cands = find_candidates(&analysis, "src/a.rs:11:inner", 0.7, 0);
+        assert_eq!(cands.len(), 1);
+        assert_eq!(cands[0].0.name, "inner");
     }
 
     #[test]

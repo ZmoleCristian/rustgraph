@@ -174,12 +174,12 @@ pub fn run(
 
         let n = ensemble.matches.len();
         let mut msg = format!(
-            "ambiguous: {} matches for '{}'. Disambiguate with --symbol-id or --target-in:",
+            "ambiguous: {} matches for '{}'. Disambiguate by re-running with one of these symbol ids as the target:",
             n, request.query
         );
         for m in &ensemble.matches {
             let sym_id = format!("{}:{}:{}", m.info.file_path, m.info.start_line, m.info.name);
-            msg.push_str(&format!("\n  {}  --symbol-id '{}'", sym_id, sym_id));
+            msg.push_str(&format!("\n  {}", sym_id));
             if n <= 5 {
                 let preview = super::callers::read_body_preview_pub(&args.path, &m.info.file_path, m.info.start_line, 3);
                 for line in &preview {

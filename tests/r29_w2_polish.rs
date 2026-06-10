@@ -254,7 +254,7 @@ fn callers_ambiguity_shows_preview_for_2_matches() {
 
     assert!(stderr.contains("| "), "expected body preview lines (| prefix); got: {stderr}");
 
-    assert!(stderr.contains("--symbol-id"), "expected --symbol-id hints; got: {stderr}");
+    assert!(stderr.contains("symbol ids as the target"), "expected symbol-id target hints; got: {stderr}");
 
     assert!(stderr.contains("ambiguous: 2"), "expected 'ambiguous: 2' header; got: {stderr}");
 }
@@ -280,7 +280,7 @@ fn callers_ambiguity_no_preview_when_many_matches() {
 
     assert!(!stderr.contains("| "), "expected no preview when >5 matches; got: {stderr}");
 
-    assert!(stderr.contains("--symbol-id"), "expected candidate list; got: {stderr}");
+    assert!(stderr.contains("symbol ids as the target"), "expected candidate list; got: {stderr}");
 }
 
 
@@ -302,5 +302,5 @@ fn ensemble_ambiguity_shows_preview_for_2_matches() {
     assert!(!out.status.success(), "expected non-zero (ambiguous)");
     let stderr = stderr_of(&out);
     assert!(stderr.contains("| "), "expected body preview (| prefix) for ensemble; got: {stderr}");
-    assert!(stderr.contains("--symbol-id"), "expected --symbol-id hints; got: {stderr}");
+    assert!(stderr.contains("symbol ids as the target"), "expected symbol-id target hints; got: {stderr}");
 }

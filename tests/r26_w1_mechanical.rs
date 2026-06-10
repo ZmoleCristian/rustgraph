@@ -150,22 +150,41 @@ fn fix2_ambiguity_candidate_lines_are_copy_pasteable() {
     let stderr = stderr_of(&out);
 
     assert!(
-        stderr.contains("--symbol-id "),
-        "R26-W1 Fix 2: ambiguity error must include '--symbol-id ' prefix in candidates; got stderr:\n{stderr}"
+        stderr.contains("symbol ids as the target"),
+        "R26-W1 Fix 2: ambiguity error must tell the caller to re-run with a symbol id as target; got stderr:\n{stderr}"
     );
 
+    let candidate_ids: Vec<String> = stderr
+        .lines()
+        .skip_while(|line| !line.contains("ambiguous:"))
+        .skip(1)
+        .map(|line| line.trim().to_string())
+        .filter(|line| {
+            !line.is_empty()
+                && !line.starts_with('(')
+                && !line.starts_with('|')
+                && line.chars().filter(|&c| c == ':').count() >= 2
+        })
+        .collect();
+    assert!(
+        !candidate_ids.is_empty(),
+        "R26-W1 Fix 2: expected bare path:line:name candidate lines; got:\n{stderr}"
+    );
 
-    for line in stderr.lines() {
-        if line.trim_start().starts_with("--symbol-id ") {
-
-            let id_part = line.trim_start().trim_start_matches("--symbol-id ").trim();
-            let colon_count = id_part.chars().filter(|&c| c == ':').count();
-            assert!(
-                colon_count >= 2,
-                "R26-W1 Fix 2: --symbol-id value '{}' should have >=2 colons (path:line:name); got:\n{stderr}",
-                id_part
-            );
-        }
+    for id in &candidate_ids {
+        let id = id.split_whitespace().next().unwrap_or(id);
+        let rerun = run_rustgraph(&["-p", &base, "callers", id, "--ambiguity-cap", "1"]);
+        let rerun_stderr = stderr_of(&rerun);
+        assert!(
+            rerun.status.success(),
+            "R26-W1 Fix 2: suggested symbol id '{}' must round-trip as the positional target; got stderr:\n{rerun_stderr}",
+            id
+        );
+        assert!(
+            !rerun_stderr.contains("ambiguous:"),
+            "R26-W1 Fix 2: symbol id '{}' must resolve unambiguously; got stderr:\n{rerun_stderr}",
+            id
+        );
     }
 }
 

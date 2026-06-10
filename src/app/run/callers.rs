@@ -257,12 +257,12 @@ pub fn run(
 
         let n = report.matches.len();
         let mut msg = format!(
-            "ambiguous: {} matches for '{}' (depth={}). Transitive multi-match requires explicit --all. Disambiguate with --symbol-id or --target-in:",
+            "ambiguous: {} matches for '{}' (depth={}). Transitive multi-match requires explicit --all. Disambiguate by re-running with one of these symbol ids as the target:",
             n, request.query, request.depth
         );
         for m in &report.matches {
             let sym_id = format!("{}:{}:{}", m.info.file_path, m.info.start_line, m.info.name);
-            msg.push_str(&format!("\n  {}  --symbol-id '{}'", sym_id, sym_id));
+            msg.push_str(&format!("\n  {}", sym_id));
         }
         msg.push_str(&format!(
             "\n(or pass `--all` to process all {} transitively — N×subtree work)",
@@ -274,12 +274,12 @@ pub fn run(
 
         let n = report.matches.len();
         let mut msg = format!(
-            "ambiguous: {} matches for '{}'. Disambiguate with --symbol-id or --target-in:",
+            "ambiguous: {} matches for '{}'. Disambiguate by re-running with one of these symbol ids as the target:",
             n, request.query
         );
         for m in &report.matches {
             let sym_id = format!("{}:{}:{}", m.info.file_path, m.info.start_line, m.info.name);
-            msg.push_str(&format!("\n  {}  --symbol-id '{}'", sym_id, sym_id));
+            msg.push_str(&format!("\n  {}", sym_id));
             if n <= 5 {
 
                 let preview = read_body_preview(&args.path, &m.info.file_path, m.info.start_line, 3);
