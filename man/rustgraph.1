@@ -1,6 +1,6 @@
 .\" Man page for rustgraph (AST-aware Rust codebase navigation)
 .\" Copyright (c) 2026 Zmole Cristian. License: 0BSD.
-.TH RUSTGRAPH 1 "April 2026" "rustgraph 0.7.7" "User Commands"
+.TH RUSTGRAPH 1 "June 2026" "rustgraph 0.8.0" "User Commands"
 .SH NAME
 rustgraph \- AST\-aware Rust codebase navigation built for AiDX
 .SH SYNOPSIS
@@ -10,7 +10,7 @@ rustgraph \- AST\-aware Rust codebase navigation built for AiDX
 .RI [ ARGS ...]
 .PP
 .B rustgraph find
-.RB [ \-\-func | \-\-struct | \-\-enum ]
+.RB [ \-\-func | \-\-struct | \-\-enum | \-\-const | \-\-trait | \-\-alias ]
 .I QUERY
 .br
 .B rustgraph callers
@@ -31,9 +31,6 @@ rustgraph \- AST\-aware Rust codebase navigation built for AiDX
 .RB [ \-\-show\-call\-sites ]
 .I FROM
 .I TO
-.br
-.B rustgraph slice
-.IR PATH.rs : LINE [ \- END ]
 .br
 .B rustgraph mcp
 .RB [ install | uninstall | list | serve ]
@@ -102,8 +99,8 @@ Force colored / disable colored output (default off). Mutually exclusive.
 .SS Search
 .TP
 \fB\-\-search\fR \fIQUERY\fR
-Fuzzy search across functions, structs, and enums. Use \(lq|\(rq inside
-the query for OR alternatives.
+Fuzzy search across functions, structs, enums, consts/statics, traits,
+and type aliases. Use \(lq|\(rq inside the query for OR alternatives.
 .TP
 \fB\-\-search\-threshold\fR \fIF\fR
 Fuzzy match threshold in [0.0, 1.0]. Default \fB0.85\fR; raise toward
@@ -134,11 +131,13 @@ Diff base for \fB\-\-changed\fR. Any git ref (branch, tag, sha).
 .SS Inventory mode (no subcommand)
 .TP
 \fB\-\-analyze\fR \fIMODE\fR
-One of \fBfunctions\fR, \fBstructs\fR, \fBenums\fR, \fBboth\fR (default).
+One of \fBfunctions\fR, \fBstructs\fR, \fBenums\fR, \fBconsts\fR,
+\fBtraits\fR, \fBaliases\fR, \fBboth\fR (default \(em every kind).
 Inventory mode only \(em for lookup use \fBfind\fR.
 .TP
-\fB\-\-func\fR, \fB\-\-struct\fR, \fB\-\-enum\fR
-Inventory shortcuts: list only the named symbol class.
+\fB\-\-func\fR, \fB\-\-struct\fR, \fB\-\-enum\fR, \fB\-\-const\fR, \fB\-\-trait\fR, \fB\-\-alias\fR
+Inventory shortcuts: list only the named symbol class(es). Combine
+freely.
 .SS Help and version
 .TP
 \fB\-h\fR, \fB\-\-help\fR
@@ -153,19 +152,28 @@ output (with a footer reporting the original total when truncated) and
 \fB\-\-in\fR \fIPATH_SUBSTR\fR to scope to files whose path contains
 \fIPATH_SUBSTR\fR.
 .SS find
-\fBrustgraph find\fR [\fB\-\-func\fR|\fB\-\-struct\fR|\fB\-\-enum\fR]
+\fBrustgraph find\fR
+[\fB\-\-func\fR|\fB\-\-struct\fR|\fB\-\-enum\fR|\fB\-\-const\fR|\fB\-\-trait\fR|\fB\-\-alias\fR]
 [\fB\-\-exact\fR] [\fB\-\-show\-ids\fR] [\fB\-n\fR \fIN\fR]
 [\fB\-\-in\fR \fIPATH_SUBSTR\fR] \fIQUERY\fR
 .PP
 Short alias for symbol lookup; roughly equivalent to \fB\-\-search\fR
 \fIQUERY\fR \fB\-\-search\-threshold 0.85\fR across functions, structs,
-and enums. Muscle\-memory replacement for \(lq\fBrg\fR \fI<name>\fR\(rq.
-\fIQUERY\fR is name\-only or \(lq\fI<a>\fR|\fI<b>\fR\(rq alternatives \(em
-\fInot\fR \fIpath.rs\fR:\fILINE\fR (use \fBslice\fR or \fBcallers\fR for
-that).
+enums, consts/statics, traits, and type aliases. Muscle\-memory
+replacement for \(lq\fBrg\fR \fI<name>\fR\(rq. \fIQUERY\fR is a single
+identifier or \(lq\fI<a>\fR|\fI<b>\fR\(rq alternatives \(em \fInot\fR
+\fIpath.rs\fR:\fILINE\fR (use \fBcallers\fR for that) and \fInot\fR a
+multi\-word phrase (queries containing whitespace are refused with
+steering; use \fBrustgraph grep\fR for text search).
+.PP
+Exact name matches render above fuzzy ones. When only fuzzy matches
+exist, the output leads with \(lqnote: no exact name match for
+\fIQUERY\fR\(rq and every fuzzy name hit carries its similarity score
+(\fB[name ~0.89]\fR), so a guess is never dressed as an exact hit.
 .TP
-\fB\-\-func\fR, \fB\-\-struct\fR, \fB\-\-enum\fR
-Restrict to one symbol class.
+\fB\-\-func\fR, \fB\-\-struct\fR, \fB\-\-enum\fR, \fB\-\-const\fR, \fB\-\-trait\fR, \fB\-\-alias\fR
+Restrict to one or more symbol classes. \fB\-\-const\fR covers consts
+and statics (module\-level and impl\-associated).
 .TP
 .B \-\-exact
 Exact (case\-insensitive) name match with no fuzz expansion. Does not
@@ -173,9 +181,10 @@ error on 0 or many matches.
 .TP
 .B \-\-show\-ids
 Append \(lq[id: \fIsymbol_id\fR]\(rq to each text\-mode line. Use when
-round\-tripping through \fBslice \-\-symbol\-id\fR (or just pass \fB\-j\fR).
+round\-tripping through \fBcallers \-\-symbol\-id\fR /
+\fBensemble \-\-symbol\-id\fR (or just pass \fB\-j\fR).
 .PP
-\fBExample:\fR \fBrustgraph find handle_request \-\-func\fR
+\fBExample:\fR \fBrustgraph find KIND_META \-\-const\fR
 .SS def
 \fBrustgraph def\fR [\fB\-\-func\fR|\fB\-\-struct\fR|\fB\-\-enum\fR]
 [\fB\-\-in\fR \fIPATH_SUBSTR\fR] \fINAME\fR
@@ -326,7 +335,7 @@ Build a function context bundle: source code, structs touched, call
 sites, neighborhood (upstream + downstream), value\-flow hints, type
 lifecycles, and I/O boundaries. One ensemble call typically replaces
 4\(en6 grep + read cycles. Functions only \(em for structs/enums use
-\fBslice\fR.
+\fBdef\fR or \fBfind\fR and read the reported range.
 .TP
 \fB\-\-view\fR \fIV\fR
 High\-level output view: \fBsummary\fR (default; structs, call\-sites,
@@ -358,39 +367,6 @@ Resolve target by exact \fIsymbol_id\fR; positional \fIFN\fR becomes
 optional.
 .PP
 \fBExample:\fR \fBrustgraph ensemble handle_request \-\-view full\fR
-.SS slice
-\fBrustgraph slice\fR [\fB\-C\fR \fIN\fR] [\fB\-\-symbol\-id\fR \fIID\fR]
-[\fB\-\-file\fR \fIPATH\fR \fB\-\-start\-line\fR \fIS\fR
-\fB\-\-end\-line\fR \fIE\fR] [\fIQUERY\fR]
-.PP
-Print exact source for a function, struct, enum, or arbitrary file
-range. Three positional query forms:
-.IP \(bu 2
-\(lqslice \fI<name>\fR\(rq \(em symbol query (resolves to a single
-fn/struct/enum)
-.IP \(bu 2
-\(lqslice \fIpath.rs\fR:\fILINE\fR\(rq \(em slice the symbol enclosing
-\fILINE\fR
-.IP \(bu 2
-\(lqslice \fIpath.rs\fR:\fISTART\fR\-\fIEND\fR\(rq \(em literal
-line\-range slice (no symbol resolution)
-.TP
-\fB\-C\fR, \fB\-\-around\fR \fIN\fR
-Line\-centered context window: \fIN\fR lines before and after. For
-\fIpath.rs\fR:\fILINE\fR queries, returns \fILINE\-N..LINE+N\fR instead
-of the enclosing function. For \fIpath.rs\fR:\fISTART\fR\-\fIEND\fR
-queries, expands the range by \fIN\fR on each side.
-.TP
-\fB\-\-symbol\-id\fR \fIID\fR
-Exact \fIsymbol_id\fR from a prior \fB\-\-json\fR run. Functions are
-\fI<path>\fR:\fI<line>\fR:\fI<name>\fR; structs/enums prefix with
-\fBstruct:\fR or \fBenum:\fR. Round\-trips with \fBfind \-j\fR,
-\fBcallers \-j\fR, \fBensemble \-j\fR.
-.TP
-\fB\-\-file\fR \fIPATH\fR \fB\-\-start\-line\fR \fIS\fR \fB\-\-end\-line\fR \fIE\fR
-Explicit file\-range form when the positional query is too clever.
-.PP
-\fBExample:\fR \fBrustgraph slice src/foo.rs:120\-180\fR
 .SS dead-code
 \fBrustgraph dead\-code\fR [\fB\-\-in\fR \fIPATH_SUBSTR\fR]
 [\fB\-\-verbose\fR] [\fB\-n\fR \fIN\fR]
@@ -505,12 +481,12 @@ your shell to keep \fB$\fR and \fB!\fR literal.
 .PP
 \fBExample:\fR \fBrustgraph grep '\eb.unwrap\e(\e)' \-\-by\-function\fR
 .SS inventory
-\fBrustgraph inventory\fR [\fB\-\-func\fR | \fB\-\-struct\fR | \fB\-\-enum\fR]
+\fBrustgraph inventory\fR [\fB\-\-func\fR | \fB\-\-struct\fR | \fB\-\-enum\fR | \fB\-\-const\fR | \fB\-\-trait\fR | \fB\-\-alias\fR]
 .PP
-Dump every fn/struct/enum in the project (parse\-only baseline).
-Equivalent to invoking \fBrustgraph\fR with no subcommand and
-\fB\-\-func\fR/\fB\-\-struct\fR/\fB\-\-enum\fR. Useful for piping to
-\fBwc\fR(1) for symbol counts.
+Dump every fn/struct/enum/const/trait/alias in the project (parse\-only
+baseline). Equivalent to invoking \fBrustgraph\fR with no subcommand and
+the same shortcut flags. Useful for piping to \fBwc\fR(1) for symbol
+counts.
 .PP
 \fBExample:\fR \fBrustgraph inventory \-\-func | wc \-l\fR
 .SS mcp
@@ -598,11 +574,12 @@ because they resolve on the parsed AST and never match string literals
 or comments.
 .TP
 .B rustgraph_find
-Locate a Rust symbol (fn/struct/enum) by name. AST\-aware. Returns
-\fIfile\fR:\fIline\fR range plus signature plus a match\-kind tag.
-Default fuzzy threshold \fB0.85\fR; auto\-relaxes to \fB0.7\fR on 0
-results. Pick this when the agent needs to know \fIwhere\fR something
-lives.
+Locate a Rust symbol (fn/struct/enum/const/static/trait/alias) by name.
+AST\-aware. Returns \fIfile\fR:\fIline\fR range plus signature plus a
+match\-kind tag; fuzzy hits carry their similarity score. Optional
+\fBkind\fR and \fBthreshold\fR arguments mirror the CLI filters. Default
+fuzzy threshold \fB0.85\fR; auto\-relaxes to \fB0.7\fR on 0 results.
+Pick this when the agent needs to know \fIwhere\fR something lives.
 .TP
 .B rustgraph_callers
 List every function calling a target, with call\-site lines and
@@ -625,16 +602,15 @@ Answers "does \fIA\fR reach \fIB\fR, and through what?". Default
 \fBmax_results: 8\fR; pass \fB0\fR for full enumeration.
 \fBshow_call_sites: true\fR annotates each hop with the source line.
 .TP
-.B rustgraph_slice
-Print exact source of one Rust symbol. Accepts a name,
-\fIpath.rs\fR:\fILINE\fR (enclosing symbol), or
-\fIpath.rs\fR:\fISTART\fR\-\fIEND\fR (literal range). \fBcontext: N\fR
-adds \fIN\fR lines on either side. Pick this over reading the file when
-the agent only needs one definition.
+.B rustgraph_tree
+Module/file tree with per\-file symbol counts (fn, struct, enum, plus
+const/trait/alias when present). Optional \fBprefix\fR scopes to a
+subtree; \fBfiles_only\fR hides the counts. Replaces \fBls\fR(1) /
+\fBtree\fR(1) when the agent does not yet know a symbol name.
 .PP
 For everything else (def, refs, usages, members, impls, dead\-code,
-call\-graph, tree, grep, inventory) the agent should fall back to the
-CLI on PATH.
+call\-graph, grep, inventory) the agent should fall back to the CLI on
+PATH.
 .SH FILES
 .TP
 .I ~/.claude.json
@@ -697,8 +673,8 @@ Get the full context bundle for one function in JSON:
 List every type implementing a trait, hand\-written impls only:
 \fBrustgraph impls Serialize \-\-handwritten\-only\fR
 .TP
-Slice an exact line range out of a file:
-\fBrustgraph slice src/foo.rs:120\-180\fR
+Locate a const table and its exact line range for reading:
+\fBrustgraph find KIND_META \-\-const\fR
 .TP
 Cross\-crate caller lookup against a sibling crate:
 \fBrustgraph \-p ../sibling\-crate callers handle_request\fR

@@ -38,7 +38,7 @@ scoop install rustgraph
 
 ```toml
 [dependencies]
-rustgraph = "0.7"
+rustgraph = "0.8"
 ```
 
 After install, register the MCP server with Claude / Codex / Gemini:
