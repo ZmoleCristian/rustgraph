@@ -1,9 +1,9 @@
-//! Fuzzy and exact symbol search across functions, structs, and enums.
+//! Fuzzy and exact symbol search across functions, structs, enums, consts, and trait/alias decls.
 //!
 //! All public entry points delegate to the internal `search_items_full` pipeline
 //! which scores candidates by name, with optional signature/path fallback.
 
-use super::{EnumInfo, FunctionInfo, StructInfo};
+use super::{ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo};
 
 
 /// Which field of a symbol record caused it to match a query.
@@ -137,7 +137,7 @@ pub fn effective_threshold(query: &str, requested_threshold: f64) -> f64 {
     if short_query { 1.0_f64.max(requested_threshold) } else { requested_threshold }
 }
 
-/// Search functions, structs, and enums by name using fuzzy matching.
+/// Search functions, structs, enums, consts, and trait/alias decls by name using fuzzy matching.
 ///
 /// `search_terms` may be `|`-separated to match any of several names.
 /// Returns only the matched items without match-kind annotations.
@@ -145,10 +145,12 @@ pub fn search_items(
     functions: &[FunctionInfo],
     structs: &[StructInfo],
     enums: &[EnumInfo],
+    consts: &[ConstInfo],
+    type_decls: &[TypeDeclInfo],
     search_terms: &str,
     threshold: f64,
-) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>) {
-    search_items_with_options(functions, structs, enums, search_terms, threshold, false)
+) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>, Vec<ConstInfo>, Vec<TypeDeclInfo>) {
+    search_items_with_options(functions, structs, enums, consts, type_decls, search_terms, threshold, false)
 }
 
 
@@ -160,14 +162,18 @@ pub fn search_items_with_options(
     functions: &[FunctionInfo],
     structs: &[StructInfo],
     enums: &[EnumInfo],
+    consts: &[ConstInfo],
+    type_decls: &[TypeDeclInfo],
     search_terms: &str,
     threshold: f64,
     match_signature: bool,
-) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>) {
-    let (fns, structs_out, enums_out, _fallback) = search_items_full(
+) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>, Vec<ConstInfo>, Vec<TypeDeclInfo>) {
+    let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) = search_items_full(
         functions,
         structs,
         enums,
+        consts,
+        type_decls,
         search_terms,
         threshold,
         match_signature,
@@ -177,6 +183,8 @@ pub fn search_items_with_options(
         fns.into_iter().map(|(f, _)| f).collect(),
         structs_out.into_iter().map(|(s, _)| s).collect(),
         enums_out.into_iter().map(|(e, _)| e).collect(),
+        consts_out.into_iter().map(|(c, _)| c).collect(),
+        type_decls_out.into_iter().map(|(t, _)| t).collect(),
     )
 }
 
@@ -186,6 +194,8 @@ pub fn search_items_with_kinds(
     functions: &[FunctionInfo],
     structs: &[StructInfo],
     enums: &[EnumInfo],
+    consts: &[ConstInfo],
+    type_decls: &[TypeDeclInfo],
     search_terms: &str,
     threshold: f64,
     match_signature: bool,
@@ -193,17 +203,21 @@ pub fn search_items_with_kinds(
     Vec<(FunctionInfo, MatchKind)>,
     Vec<(StructInfo, MatchKind)>,
     Vec<(EnumInfo, MatchKind)>,
+    Vec<(ConstInfo, MatchKind)>,
+    Vec<(TypeDeclInfo, MatchKind)>,
 ) {
-    let (fns, structs_out, enums_out, _fallback) = search_items_full(
+    let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) = search_items_full(
         functions,
         structs,
         enums,
+        consts,
+        type_decls,
         search_terms,
         threshold,
         match_signature,
         false,
     );
-    (fns, structs_out, enums_out)
+    (fns, structs_out, enums_out, consts_out, type_decls_out)
 }
 
 
@@ -213,6 +227,8 @@ pub fn search_items_with_kinds_and_fallback(
     functions: &[FunctionInfo],
     structs: &[StructInfo],
     enums: &[EnumInfo],
+    consts: &[ConstInfo],
+    type_decls: &[TypeDeclInfo],
     search_terms: &str,
     threshold: f64,
     match_signature: bool,
@@ -220,12 +236,16 @@ pub fn search_items_with_kinds_and_fallback(
     Vec<(FunctionInfo, MatchKind)>,
     Vec<(StructInfo, MatchKind)>,
     Vec<(EnumInfo, MatchKind)>,
+    Vec<(ConstInfo, MatchKind)>,
+    Vec<(TypeDeclInfo, MatchKind)>,
     bool,
 ) {
     search_items_full(
         functions,
         structs,
         enums,
+        consts,
+        type_decls,
         search_terms,
         threshold,
         match_signature,
@@ -239,14 +259,18 @@ pub fn search_items_exact(
     functions: &[FunctionInfo],
     structs: &[StructInfo],
     enums: &[EnumInfo],
+    consts: &[ConstInfo],
+    type_decls: &[TypeDeclInfo],
     search_terms: &str,
-) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>) {
-    let (fns, structs_out, enums_out, _fallback) =
-        search_items_full(functions, structs, enums, search_terms, 1.0, false, true);
+) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>, Vec<ConstInfo>, Vec<TypeDeclInfo>) {
+    let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) =
+        search_items_full(functions, structs, enums, consts, type_decls, search_terms, 1.0, false, true);
     (
         fns.into_iter().map(|(f, _)| f).collect(),
         structs_out.into_iter().map(|(s, _)| s).collect(),
         enums_out.into_iter().map(|(e, _)| e).collect(),
+        consts_out.into_iter().map(|(c, _)| c).collect(),
+        type_decls_out.into_iter().map(|(t, _)| t).collect(),
     )
 }
 
@@ -256,15 +280,19 @@ pub fn search_items_exact_with_kinds(
     functions: &[FunctionInfo],
     structs: &[StructInfo],
     enums: &[EnumInfo],
+    consts: &[ConstInfo],
+    type_decls: &[TypeDeclInfo],
     search_terms: &str,
 ) -> (
     Vec<(FunctionInfo, MatchKind)>,
     Vec<(StructInfo, MatchKind)>,
     Vec<(EnumInfo, MatchKind)>,
+    Vec<(ConstInfo, MatchKind)>,
+    Vec<(TypeDeclInfo, MatchKind)>,
 ) {
-    let (fns, structs_out, enums_out, _fallback) =
-        search_items_full(functions, structs, enums, search_terms, 1.0, false, true);
-    (fns, structs_out, enums_out)
+    let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) =
+        search_items_full(functions, structs, enums, consts, type_decls, search_terms, 1.0, false, true);
+    (fns, structs_out, enums_out, consts_out, type_decls_out)
 }
 
 
@@ -272,6 +300,8 @@ fn search_items_full(
     functions: &[FunctionInfo],
     structs: &[StructInfo],
     enums: &[EnumInfo],
+    consts: &[ConstInfo],
+    type_decls: &[TypeDeclInfo],
     search_terms: &str,
     threshold: f64,
     match_signature: bool,
@@ -280,6 +310,8 @@ fn search_items_full(
     Vec<(FunctionInfo, MatchKind)>,
     Vec<(StructInfo, MatchKind)>,
     Vec<(EnumInfo, MatchKind)>,
+    Vec<(ConstInfo, MatchKind)>,
+    Vec<(TypeDeclInfo, MatchKind)>,
     bool,
 ) {
     let terms: Vec<String> = search_terms
@@ -329,12 +361,42 @@ fn search_items_full(
         |e| e.file_path.as_str(),
         |e| e.start_line,
     );
+    let consts_out = match_kind(
+        consts,
+        &terms,
+        search_terms,
+        threshold,
+        match_signature,
+        exact_only,
+        &mut fallback_fired,
+        |c| c.name.as_str(),
+        |c| c.signature.as_str(),
+        |c| c.file_path.as_str(),
+        |c| c.start_line,
+    );
+    let type_decls_out = match_kind(
+        type_decls,
+        &terms,
+        search_terms,
+        threshold,
+        match_signature,
+        exact_only,
+        &mut fallback_fired,
+        |t| t.name.as_str(),
+        |t| t.signature.as_str(),
+        |t| t.file_path.as_str(),
+        |t| t.start_line,
+    );
 
 
-    let any_hits = !fns.is_empty() || !structs_out.is_empty() || !enums_out.is_empty();
+    let any_hits = !fns.is_empty()
+        || !structs_out.is_empty()
+        || !enums_out.is_empty()
+        || !consts_out.is_empty()
+        || !type_decls_out.is_empty();
     let fallback = fallback_fired && any_hits;
 
-    (fns, structs_out, enums_out, fallback)
+    (fns, structs_out, enums_out, consts_out, type_decls_out, fallback)
 }
 
 fn match_kind<T: Clone>(
@@ -647,7 +709,7 @@ mod tests {
     #[test]
     fn search_items_filters_functions_by_name() {
         let funcs = vec![func("hello", "fn hello"), func("world", "fn world")];
-        let (matched_fns, _, _) = search_items(&funcs, &[], &[], "hello", 0.7);
+        let (matched_fns, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "hello", 0.7);
         assert_eq!(matched_fns.len(), 1);
         assert_eq!(matched_fns[0].name, "hello");
     }
@@ -659,7 +721,7 @@ mod tests {
             func("beta", "fn beta"),
             func("gamma", "fn gamma"),
         ];
-        let (matched_fns, _, _) = search_items(&funcs, &[], &[], "alpha | beta", 0.7);
+        let (matched_fns, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "alpha | beta", 0.7);
         assert_eq!(matched_fns.len(), 2);
     }
 
@@ -694,7 +756,7 @@ mod tests {
             func("preload", "fn preload"),
             func("unrelated", "fn unrelated"),
         ];
-        let (matched, _, _) = search_items(&funcs, &[], &[], "load", 0.85);
+        let (matched, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "load", 0.85);
         let names: Vec<&str> = matched.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(names, vec!["load"], "fast path should return exact-only: {names:?}");
     }
@@ -707,7 +769,7 @@ mod tests {
             func("load", "fn load"),
             func("load_jsonl", "fn load_jsonl"),
         ];
-        let (matched, _, _) = search_items(&funcs, &[], &[], "loa", 0.85);
+        let (matched, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "loa", 0.85);
         let names: Vec<&str> = matched.iter().map(|f| f.name.as_str()).collect();
 
         assert_eq!(matched.len(), 2, "R26-W3 fallback should rescue prefix/substring hits: {names:?}");
@@ -726,7 +788,7 @@ mod tests {
             func("new_surgery_id", "fn new_surgery_id"),
             func("preload_new", "fn preload_new"),
         ];
-        let (matched, _, _) = search_items(&funcs, &[], &[], "new", 0.85);
+        let (matched, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "new", 0.85);
         let names: Vec<&str> = matched.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(names, vec!["new"], "short-query precision violated: {names:?}");
     }
@@ -740,7 +802,7 @@ mod tests {
             func("target_files", "fn target_files"),
             func("session_budget_overhead", "fn session_budget_overhead"),
         ];
-        let (matched, _, _) = search_items(&funcs, &[], &[], "get", 0.85);
+        let (matched, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "get", 0.85);
         let names: Vec<&str> = matched.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(matched.len(), 3, "R26-W3 fallback rescues substring hits at 0.85: {names:?}");
     }
@@ -749,8 +811,8 @@ mod tests {
     fn search_items_filters_structs_and_enums() {
         let structs = vec![s("Foo"), s("Bar")];
         let enums = vec![e("Color"), e("Shape")];
-        let (_, matched_structs, matched_enums) =
-            search_items(&[], &structs, &enums, "Color", 0.7);
+        let (_, matched_structs, matched_enums, _, _) =
+            search_items(&[], &structs, &enums, &[], &[], "Color", 0.7);
         assert_eq!(matched_structs.len(), 0);
         assert_eq!(matched_enums.len(), 1);
     }

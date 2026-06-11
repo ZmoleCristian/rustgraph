@@ -623,10 +623,12 @@ fn scope_to_search(
     ),
     Box<dyn std::error::Error>,
 > {
-    let (matched_fns, _, _) = crate::search_items_with_options(
+    let (matched_fns, _, _, _, _) = crate::search_items_with_options(
         &project.functions,
         &project.structs,
         &project.enums,
+        &project.consts,
+        &project.type_decls,
         search_terms,
         threshold,
         match_signature,

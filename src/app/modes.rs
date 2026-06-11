@@ -8,66 +8,113 @@ use crate::api::{CallGraphDetail, EnsemblePreset, EnsembleView};
 use crate::cli::{AnalyzeMode, Args, ModeCommand};
 
 /// Which symbol kinds to include in an inventory or find operation.
+///
+/// Plain flags instead of a combinatorial enum: four kinds would need 15
+/// variants. All-false from user flags means "no filter" and is normalised
+/// to [`AnalyzeSelection::ALL`] by [`AnalyzeSelection::from_flags`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum AnalyzeSelection {
-    Functions,
-    Structs,
-    Enums,
-    FunctionsStructs,
-    FunctionsEnums,
-    StructsEnums,
-    All,
+pub struct AnalyzeSelection {
+    /// Include functions, methods, and trait fns.
+    pub functions: bool,
+    /// Include structs.
+    pub structs: bool,
+    /// Include enums.
+    pub enums: bool,
+    /// Include consts and statics.
+    pub consts: bool,
+    /// Include trait declarations.
+    pub traits: bool,
+    /// Include type aliases.
+    pub aliases: bool,
 }
 
 impl AnalyzeSelection {
-    /// Derives the selection from shortcut flags (`--func`, `--struct`, `--enum`) or
-    /// the `--analyze` flag, giving precedence to shortcuts when any are set.
+    /// Every symbol kind included (the no-filter default).
+    pub const ALL: Self = Self {
+        functions: true,
+        structs: true,
+        enums: true,
+        consts: true,
+        traits: true,
+        aliases: true,
+    };
+
+    /// Build a selection from raw kind flags; all-false means "no filter" → all kinds.
+    pub fn from_flags(
+        functions: bool,
+        structs: bool,
+        enums: bool,
+        consts: bool,
+        traits: bool,
+        aliases: bool,
+    ) -> Self {
+        if !(functions || structs || enums || consts || traits || aliases) {
+            Self::ALL
+        } else {
+            Self { functions, structs, enums, consts, traits, aliases }
+        }
+    }
+
+    /// Derives the selection from shortcut flags (`--func`, `--struct`, `--enum`, `--const`,
+    /// `--trait`, `--alias`) or the `--analyze` flag, giving precedence to shortcuts.
     pub fn from_args(args: &Args) -> Self {
-        let any_shortcut = args.func || args.r#struct || args.r#enum;
+        let any_shortcut = args.func
+            || args.r#struct
+            || args.r#enum
+            || args.r#const
+            || args.r#trait
+            || args.alias;
 
         if any_shortcut {
-            match (args.func, args.r#struct, args.r#enum) {
-                (true, false, false) => Self::Functions,
-                (false, true, false) => Self::Structs,
-                (false, false, true) => Self::Enums,
-                (true, true, false) => Self::FunctionsStructs,
-                (true, false, true) => Self::FunctionsEnums,
-                (false, true, true) => Self::StructsEnums,
-                (true, true, true) => Self::All,
-                (false, false, false) => Self::All,
-            }
+            Self::from_flags(
+                args.func,
+                args.r#struct,
+                args.r#enum,
+                args.r#const,
+                args.r#trait,
+                args.alias,
+            )
         } else {
             match args.analyze.unwrap_or(AnalyzeMode::Both) {
-                AnalyzeMode::Functions => Self::Functions,
-                AnalyzeMode::Structs => Self::Structs,
-                AnalyzeMode::Enums => Self::Enums,
-                AnalyzeMode::Both => Self::All,
+                AnalyzeMode::Functions => Self::from_flags(true, false, false, false, false, false),
+                AnalyzeMode::Structs => Self::from_flags(false, true, false, false, false, false),
+                AnalyzeMode::Enums => Self::from_flags(false, false, true, false, false, false),
+                AnalyzeMode::Consts => Self::from_flags(false, false, false, true, false, false),
+                AnalyzeMode::Traits => Self::from_flags(false, false, false, false, true, false),
+                AnalyzeMode::Aliases => Self::from_flags(false, false, false, false, false, true),
+                AnalyzeMode::Both => Self::ALL,
             }
         }
     }
 
     /// Returns `true` if this selection includes functions.
     pub fn show_functions(self) -> bool {
-        matches!(
-            self,
-            Self::Functions | Self::FunctionsStructs | Self::FunctionsEnums | Self::All
-        )
+        self.functions
     }
 
     /// Returns `true` if this selection includes structs.
     pub fn show_structs(self) -> bool {
-        matches!(
-            self,
-            Self::Structs | Self::FunctionsStructs | Self::StructsEnums | Self::All
-        )
+        self.structs
     }
 
     /// Returns `true` if this selection includes enums.
     pub fn show_enums(self) -> bool {
-        matches!(
-            self,
-            Self::Enums | Self::FunctionsEnums | Self::StructsEnums | Self::All
-        )
+        self.enums
+    }
+
+    /// Returns `true` if this selection includes consts/statics.
+    pub fn show_consts(self) -> bool {
+        self.consts
+    }
+
+    /// Returns `true` if this selection includes trait declarations.
+    pub fn show_traits(self) -> bool {
+        self.traits
+    }
+
+    /// Returns `true` if this selection includes type aliases.
+    pub fn show_aliases(self) -> bool {
+        self.aliases
     }
 }
 
@@ -462,37 +509,28 @@ impl ExecutionMode {
                     in_path: m.in_path,
                     max_results: m.max_results,
                 }),
-                ModeCommand::Inventory(inv) => {
-                    let selection = match (inv.func, inv.struct_only, inv.enum_only) {
-                        (false, false, false) => AnalyzeSelection::All,
-                        (true, false, false) => AnalyzeSelection::Functions,
-                        (false, true, false) => AnalyzeSelection::Structs,
-                        (false, false, true) => AnalyzeSelection::Enums,
-                        (true, true, false) => AnalyzeSelection::FunctionsStructs,
-                        (true, false, true) => AnalyzeSelection::FunctionsEnums,
-                        (false, true, true) => AnalyzeSelection::StructsEnums,
-                        _ => AnalyzeSelection::All,
-                    };
-                    Self::Inventory { selection }
-                }
+                ModeCommand::Inventory(inv) => Self::Inventory {
+                    selection: AnalyzeSelection::from_flags(
+                        inv.func,
+                        inv.struct_only,
+                        inv.enum_only,
+                        inv.const_only,
+                        inv.trait_only,
+                        inv.alias_only,
+                    ),
+                },
                 ModeCommand::Mcp(_) => unreachable!("Mcp variant intercepted in main.rs before app::run"),
                 ModeCommand::Completions(_) => unreachable!("Completions variant intercepted in main.rs before app::run"),
                 ModeCommand::GenerateMan => unreachable!("GenerateMan variant intercepted in main.rs before app::run"),
                 ModeCommand::Find(find) => {
-                    let any = find.func || find.struct_only || find.enum_only;
-                    let selection = if !any {
-                        AnalyzeSelection::All
-                    } else {
-                        match (find.func, find.struct_only, find.enum_only) {
-                            (true, false, false) => AnalyzeSelection::Functions,
-                            (false, true, false) => AnalyzeSelection::Structs,
-                            (false, false, true) => AnalyzeSelection::Enums,
-                            (true, true, false) => AnalyzeSelection::FunctionsStructs,
-                            (true, false, true) => AnalyzeSelection::FunctionsEnums,
-                            (false, true, true) => AnalyzeSelection::StructsEnums,
-                            _ => AnalyzeSelection::All,
-                        }
-                    };
+                    let selection = AnalyzeSelection::from_flags(
+                        find.func,
+                        find.struct_only,
+                        find.enum_only,
+                        find.const_only,
+                        find.trait_only,
+                        find.alias_only,
+                    );
                     Self::Find(FindRequest {
                         query: find.query,
                         threshold: args.search_threshold,
@@ -566,58 +604,56 @@ mod tests {
     fn analyze_selection_default_is_all() {
         let args = parse(&["rustgraph"]);
         let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::All);
+        assert_eq!(sel, AnalyzeSelection::ALL);
         assert!(sel.show_functions());
         assert!(sel.show_structs());
         assert!(sel.show_enums());
+        assert!(sel.show_consts());
     }
 
     #[test]
     fn analyze_selection_func_shortcut_only_functions() {
         let args = parse(&["rustgraph", "--func"]);
         let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::Functions);
+        assert_eq!(sel, AnalyzeSelection::from_flags(true, false, false, false, false, false));
         assert!(sel.show_functions());
         assert!(!sel.show_structs());
         assert!(!sel.show_enums());
+        assert!(!sel.show_consts());
+    }
+
+    #[test]
+    fn analyze_selection_const_shortcut_only_consts() {
+        let args = parse(&["rustgraph", "--const"]);
+        let sel = AnalyzeSelection::from_args(&args);
+        assert!(!sel.show_functions());
+        assert!(!sel.show_structs());
+        assert!(!sel.show_enums());
+        assert!(sel.show_consts());
     }
 
     #[test]
     fn analyze_selection_struct_and_enum_shortcuts_combine() {
         let args = parse(&["rustgraph", "--struct", "--enum"]);
         let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::StructsEnums);
+        assert_eq!(sel, AnalyzeSelection::from_flags(false, true, true, false, false, false));
         assert!(!sel.show_functions());
         assert!(sel.show_structs());
         assert!(sel.show_enums());
     }
 
     #[test]
-    fn analyze_selection_func_struct_combines() {
-        let args = parse(&["rustgraph", "--func", "--struct"]);
-        let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::FunctionsStructs);
-    }
-
-    #[test]
-    fn analyze_selection_func_enum_combines() {
-        let args = parse(&["rustgraph", "--func", "--enum"]);
-        let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::FunctionsEnums);
-    }
-
-    #[test]
     fn analyze_selection_all_shortcuts_yield_all() {
-        let args = parse(&["rustgraph", "--func", "--struct", "--enum"]);
+        let args = parse(&["rustgraph", "--func", "--struct", "--enum", "--const", "--trait", "--alias"]);
         let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::All);
+        assert_eq!(sel, AnalyzeSelection::ALL);
     }
 
     #[test]
     fn analyze_selection_via_analyze_flag() {
         let args = parse(&["rustgraph", "--analyze", "structs"]);
         let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::Structs);
+        assert_eq!(sel, AnalyzeSelection::from_flags(false, true, false, false, false, false));
     }
 
     #[test]
@@ -625,7 +661,7 @@ mod tests {
         let args = parse(&["rustgraph"]);
         match ExecutionMode::from_args(&args) {
             ExecutionMode::Inventory { selection } => {
-                assert_eq!(selection, AnalyzeSelection::All);
+                assert_eq!(selection, AnalyzeSelection::ALL);
             }
             _ => panic!("expected inventory mode"),
         }

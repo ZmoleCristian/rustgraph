@@ -76,9 +76,15 @@ fn find_fuzzy_name_hit_renders_name_tag() {
         stdout.contains("handle_event_extended_v2"),
         "expected fuzzy-name hit; got:\n{stdout}"
     );
+    // R31: fuzzy name hits must not wear the bare `[name]` tag — they carry
+    // their similarity score so an agent can tell a guess from an exact hit.
     assert!(
-        stdout.contains("[name]"),
-        "fuzzy-name hit should still tag `[name]`; got:\n{stdout}"
+        stdout.contains("[name ~0."),
+        "fuzzy-name hit must tag `[name ~0.NN]`; got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("no exact name match for 'handle_event_extended'"),
+        "fuzzy-only result must announce there was no exact hit; got:\n{stdout}"
     );
 }
 

@@ -77,9 +77,11 @@ fn additive_returns_union_when_same_kind_has_name_and_sig() {
         stdout.contains("process_state"),
         "expected name hit `process_state`; got stdout:\n{stdout}"
     );
+    // R31: process_state is a fuzzy name hit for 'State', so it carries its
+    // similarity score instead of the bare exact-hit tag.
     assert!(
-        stdout.contains("[name]"),
-        "expected `[name]` tag for process_state; got stdout:\n{stdout}"
+        stdout.contains("[name ~0."),
+        "expected scored `[name ~0.NN]` tag for process_state; got stdout:\n{stdout}"
     );
 
 

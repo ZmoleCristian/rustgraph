@@ -120,6 +120,63 @@ pub struct EnumInfo {
     pub cfg_attrs: Vec<String>,
 }
 
+/// Metadata for a `const` or `static` item extracted from source.
+///
+/// The signature deliberately excludes the initializer expression — a const
+/// table can span hundreds of lines, and the locator contract is to point at
+/// `file:start-end` for the Read tool, not to inline the data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstInfo {
+    /// Unqualified name of the const/static.
+    pub name: String,
+    /// Normalised declaration without the initializer (e.g. `pub const KIND_META: [KindMeta; 54]`).
+    pub signature: String,
+    /// Declared type as a normalised string.
+    pub ty: String,
+    /// Source file that declares this item.
+    pub file_path: String,
+    /// 1-based line where the item starts.
+    pub start_line: usize,
+    /// 1-based line where the item ends (spans the full initializer).
+    pub end_line: usize,
+    /// Whether the item has `pub` visibility.
+    pub is_pub: bool,
+    /// Item kind tag: `"const"`, `"static"`, `"static mut"`, or `"const(<Type>)"` for associated consts.
+    pub kind: String,
+
+    /// Accumulated `cfg(...)` predicates from enclosing modules and the item itself.
+    #[serde(default)]
+    pub cfg_attrs: Vec<String>,
+}
+
+/// Metadata for a `trait` declaration or `type` alias extracted from source.
+///
+/// Both are "type-shaped declarations" that share a findable surface; the
+/// `kind` tag distinguishes them so one index column covers both.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeDeclInfo {
+    /// Unqualified name of the trait or alias.
+    pub name: String,
+    /// Normalised declaration: `pub trait Foo: Bar` or `pub type Foo = Rhs`.
+    pub signature: String,
+    /// Alias right-hand side as a normalised string; `None` for traits.
+    pub rhs: Option<String>,
+    /// Source file that declares this item.
+    pub file_path: String,
+    /// 1-based line where the item starts.
+    pub start_line: usize,
+    /// 1-based line where the item ends (traits span their full body).
+    pub end_line: usize,
+    /// Whether the item has `pub` visibility.
+    pub is_pub: bool,
+    /// Item kind tag: `"trait"` or `"alias"`.
+    pub kind: String,
+
+    /// Accumulated `cfg(...)` predicates from enclosing modules and the item itself.
+    #[serde(default)]
+    pub cfg_attrs: Vec<String>,
+}
+
 /// Metadata for a free function, method, or trait function extracted from source.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FunctionInfo {

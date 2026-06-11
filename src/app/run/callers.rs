@@ -814,8 +814,51 @@ pub(crate) fn type_redirect_hint(project: &ProjectData, query: &str, threshold: 
     if let Some(hint) = type_redirect_for_path_line(project, query) {
         return Some(hint);
     }
-    let (_, structs, enums) =
-        crate::search_items(&[], &project.structs, &project.enums, query, threshold);
+    // Exact name matches outrank fuzzy ones across kinds — `KIND_META` must
+    // redirect to the const even though `KindMeta` the struct fuzzy-matches.
+    let (_, structs, enums, consts, type_decls) = {
+        let exact = crate::search_items_exact(
+            &[],
+            &project.structs,
+            &project.enums,
+            &project.consts,
+            &project.type_decls,
+            query,
+        );
+        if !exact.1.is_empty() || !exact.2.is_empty() || !exact.3.is_empty() || !exact.4.is_empty()
+        {
+            exact
+        } else {
+            crate::search_items(
+                &[],
+                &project.structs,
+                &project.enums,
+                &project.consts,
+                &project.type_decls,
+                query,
+                threshold,
+            )
+        }
+    };
+    if let Some(c) = consts.iter().next() {
+        return Some(format!(
+            "'{}' is a {} (found at {}:{}-{}), not a function. Use the Read tool on that range for the value, or `rustgraph refs {}` for use sites.",
+            query, c.kind, c.file_path, c.start_line, c.end_line, c.name
+        ));
+    }
+    if let Some(t) = type_decls.iter().next() {
+        return Some(if t.kind == "trait" {
+            format!(
+                "'{}' is a trait (found at {}:{}-{}), not a function. Use `rustgraph impls {}` for implementors or `rustgraph refs {}` for type uses.",
+                query, t.file_path, t.start_line, t.end_line, t.name, t.name
+            )
+        } else {
+            format!(
+                "'{}' is a type alias (found at {}:{}), not a function. Use `rustgraph refs {}` for use sites.",
+                query, t.file_path, t.start_line, t.name
+            )
+        });
+    }
     if let Some(s) = structs.into_iter().next() {
         return Some(format!(
             "'{}' is a struct (found at {}:{}), not a function. Try `rustgraph refs {}` or `rustgraph usages {}` to find references.",

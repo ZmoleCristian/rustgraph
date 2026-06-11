@@ -8,7 +8,8 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::{
-    EnumInfo, FunctionInfo, StructInfo, enum_symbol_id, function_id, struct_symbol_id,
+    ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo, const_symbol_id, enum_symbol_id,
+    function_id, struct_symbol_id, type_decl_symbol_id,
 };
 
 /// Wraps a serializable symbol value with its pre-computed stable symbol ID.
@@ -44,6 +45,22 @@ impl WithSymbolId<EnumInfo> {
     /// Computes the enum's symbol ID and wraps it together with the enum info.
     pub fn wrap_enum(inner: EnumInfo) -> Self {
         let symbol_id = enum_symbol_id(&inner);
+        Self { symbol_id, inner }
+    }
+}
+
+impl WithSymbolId<ConstInfo> {
+    /// Computes the const's symbol ID and wraps it together with the const info.
+    pub fn wrap_const(inner: ConstInfo) -> Self {
+        let symbol_id = const_symbol_id(&inner);
+        Self { symbol_id, inner }
+    }
+}
+
+impl WithSymbolId<TypeDeclInfo> {
+    /// Computes the trait/alias symbol ID and wraps it together with the decl info.
+    pub fn wrap_type_decl(inner: TypeDeclInfo) -> Self {
+        let symbol_id = type_decl_symbol_id(&inner);
         Self { symbol_id, inner }
     }
 }
@@ -98,6 +115,9 @@ fn guess_kind(obj: &serde_json::Map<String, Value>) -> &'static str {
     }
     if obj.contains_key("fields") {
         return "struct";
+    }
+    if obj.contains_key("ty") {
+        return "const";
     }
 
     "fn"

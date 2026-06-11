@@ -44,7 +44,13 @@ pub enum AnalyzeMode {
     Structs,
     /// List enums only.
     Enums,
-    /// List both structs and enums (excludes functions).
+    /// List consts and statics only.
+    Consts,
+    /// List trait declarations only.
+    Traits,
+    /// List type aliases only.
+    Aliases,
+    /// List every symbol kind.
     Both,
 }
 
@@ -116,7 +122,7 @@ Shell quoting trap (most-common cause of cryptic regex errors):\n  \
     )]
     Impls(ImplsCommand),
     #[command(
-        about = "Short alias for symbol lookup. `find <name>` ≈ `--search <name> --search-threshold 0.85`. Auto-shows fns + structs + enums; muscle-memory replacement for `rg <name>`. Query is name-only or `<a>|<b>` alternatives — for `path.rs:LINE` lookup use `callers path.rs:LINE`.",
+        about = "Short alias for symbol lookup. `find <name>` ≈ `--search <name> --search-threshold 0.85`. Auto-shows fns + structs + enums + consts + traits + aliases; muscle-memory replacement for `rg <name>`. Query is name-only or `<a>|<b>` alternatives — for `path.rs:LINE` lookup use `callers path.rs:LINE`.",
         after_help = GLOBALS_FOOTER_SHORT,
         after_long_help = GLOBALS_FOOTER_LONG,
         arg_required_else_help = true
@@ -162,7 +168,7 @@ Shell quoting trap (most-common cause of cryptic regex errors):\n  \
     )]
     Members(MembersCommand),
     #[command(
-        about = "Dump every fn/struct/enum in the project (parse-only baseline). Same as bare `rustgraph` with no subcommand + --func/--struct/--enum. Useful for piping to wc -l for symbol counts."
+        about = "Dump every fn/struct/enum/const/trait/alias in the project (parse-only baseline). Same as bare `rustgraph` with no subcommand + --func/--struct/--enum/--const. Useful for piping to wc -l for symbol counts."
     )]
     Inventory(InventoryCommand),
     #[command(
@@ -192,6 +198,12 @@ pub struct InventoryCommand {
     pub struct_only: bool,
     #[arg(long = "enum", help = "Enums only")]
     pub enum_only: bool,
+    #[arg(long = "const", help = "Consts/statics only")]
+    pub const_only: bool,
+    #[arg(long = "trait", help = "Trait declarations only")]
+    pub trait_only: bool,
+    #[arg(long = "alias", help = "Type aliases only")]
+    pub alias_only: bool,
 }
 
 /// Arguments for the `mcp` subcommand (MCP server + self-registration).
@@ -413,6 +425,15 @@ pub struct FindCommand {
 
     #[arg(long = "enum", help = "Restrict to enums only")]
     pub enum_only: bool,
+
+    #[arg(long = "const", help = "Restrict to consts/statics only")]
+    pub const_only: bool,
+
+    #[arg(long = "trait", help = "Restrict to trait declarations only")]
+    pub trait_only: bool,
+
+    #[arg(long = "alias", help = "Restrict to type aliases only")]
+    pub alias_only: bool,
 
     #[arg(
         short = 'n',
@@ -908,6 +929,15 @@ pub struct Args {
 
     #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: enums only")]
     pub r#enum: bool,
+
+    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: consts/statics only")]
+    pub r#const: bool,
+
+    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: trait declarations only")]
+    pub r#trait: bool,
+
+    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: type aliases only")]
+    pub alias: bool,
 
     #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Search",
         help = "Fuzzy search across fns/structs/enums (use '|' for OR)"

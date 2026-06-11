@@ -11,6 +11,9 @@ struct FileCounts {
     functions: usize,
     structs: usize,
     enums: usize,
+    consts: usize,
+    traits: usize,
+    aliases: usize,
 }
 
 #[derive(Default, Debug)]
@@ -37,10 +40,20 @@ impl TreeNode {
             let is_last = idx + 1 == total;
             let connector = if is_last { "└── " } else { "├── " };
             let label = match &child.file {
-                Some(c) if !files_only => format!(
-                    "{} ({} fn, {} struct, {} enum)",
-                    name, c.functions, c.structs, c.enums
-                ),
+                Some(c) if !files_only => {
+                    // Consts are rarer than fns/structs; only annotate when present
+                    // to keep the common line shape stable.
+                    let mut extra = String::new();
+                    for (n, label) in [(c.consts, "const"), (c.traits, "trait"), (c.aliases, "alias")] {
+                        if n > 0 {
+                            extra.push_str(&format!(", {} {}", n, label));
+                        }
+                    }
+                    format!(
+                        "{} ({} fn, {} struct, {} enum{})",
+                        name, c.functions, c.structs, c.enums, extra
+                    )
+                }
                 _ => name.clone(),
             };
             out.push_str(prefix);
@@ -121,6 +134,18 @@ pub fn run(
             .entry(super::super::relativize_for_display(&e.file_path, &args.path, &args.also))
             .or_default()
             .enums += 1;
+    }
+    for c in &project.consts {
+        per_file
+            .entry(super::super::relativize_for_display(&c.file_path, &args.path, &args.also))
+            .or_default()
+            .consts += 1;
+    }
+    for t in &project.type_decls {
+        let entry = per_file
+            .entry(super::super::relativize_for_display(&t.file_path, &args.path, &args.also))
+            .or_default();
+        if t.kind == "trait" { entry.traits += 1; } else { entry.aliases += 1; }
     }
 
 
@@ -256,6 +281,18 @@ pub fn run(
                 .or_default()
                 .enums += 1;
         }
+        for c in &project.consts {
+            counts_list
+                .entry(super::super::relativize_for_display(&c.file_path, &args.path, &args.also))
+                .or_default()
+                .consts += 1;
+        }
+        for t in &project.type_decls {
+            let entry = counts_list
+                .entry(super::super::relativize_for_display(&t.file_path, &args.path, &args.also))
+                .or_default();
+            if t.kind == "trait" { entry.traits += 1; } else { entry.aliases += 1; }
+        }
         for raw in &project.rust_files {
             let rel = super::super::relativize_for_display(&raw.to_string_lossy(), &args.path, &args.also);
             counts_list.entry(rel).or_default();
@@ -283,6 +320,9 @@ pub fn run(
                     "functions": c.functions,
                     "structs": c.structs,
                     "enums": c.enums,
+                    "consts": c.consts,
+                    "traits": c.traits,
+                    "aliases": c.aliases,
                 })
             })
             .collect();
@@ -317,11 +357,11 @@ mod tests {
         let mut root = TreeNode::default();
         root.insert(
             &["src", "lib.rs"],
-            FileCounts { functions: 2, structs: 1, enums: 0 },
+            FileCounts { functions: 2, structs: 1, enums: 0, ..Default::default() },
         );
         root.insert(
             &["src", "main.rs"],
-            FileCounts { functions: 1, structs: 0, enums: 0 },
+            FileCounts { functions: 1, ..Default::default() },
         );
         let mut out = String::new();
         root.render("", false, &mut out);
@@ -335,7 +375,7 @@ mod tests {
         let mut root = TreeNode::default();
         root.insert(
             &["lib.rs"],
-            FileCounts { functions: 5, structs: 0, enums: 0 },
+            FileCounts { functions: 5, ..Default::default() },
         );
         let mut out = String::new();
         root.render("", true, &mut out);

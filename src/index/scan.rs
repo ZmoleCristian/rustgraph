@@ -1,6 +1,6 @@
 //! File-tree scanner: walks a project directory and aggregates per-file parse results.
 
-use super::{CallSite, EnumInfo, FunctionInfo, StructInfo, parse_rust_file};
+use super::{CallSite, ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo, parse_rust_file};
 use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -15,6 +15,12 @@ pub struct ProjectAnalysis {
     pub structs: Vec<StructInfo>,
     /// All enums extracted from every parsed file.
     pub enums: Vec<EnumInfo>,
+    /// All consts and statics extracted from every parsed file.
+    #[serde(default)]
+    pub consts: Vec<ConstInfo>,
+    /// All trait declarations and type aliases extracted from every parsed file.
+    #[serde(default)]
+    pub type_decls: Vec<TypeDeclInfo>,
     /// Caller-id → list of callee names (raw, unresolved).
     pub call_map: HashMap<String, Vec<String>>,
     /// All call sites across every parsed file.
@@ -39,6 +45,8 @@ pub fn analyze_project(project_path: &Path, include_ignored: bool) -> ProjectAna
     let mut all_functions = Vec::new();
     let mut all_structs = Vec::new();
     let mut all_enums = Vec::new();
+    let mut all_consts = Vec::new();
+    let mut all_type_decls = Vec::new();
     let mut all_call_maps: HashMap<String, Vec<String>> = HashMap::new();
     let mut all_call_sites = Vec::new();
     let mut all_reexports: Vec<(String, String, String)> = Vec::new();
@@ -46,29 +54,23 @@ pub fn analyze_project(project_path: &Path, include_ignored: bool) -> ProjectAna
 
     for file_path in &rust_files {
         match parse_rust_file(file_path) {
-            Ok((
-                mut functions,
-                mut structs,
-                mut enums,
-                call_map,
-                mut call_sites,
-                _aliases,
-                mut reexports,
-            )) => {
-                all_functions.append(&mut functions);
-                all_structs.append(&mut structs);
-                all_enums.append(&mut enums);
+            Ok(mut parsed) => {
+                all_functions.append(&mut parsed.functions);
+                all_structs.append(&mut parsed.structs);
+                all_enums.append(&mut parsed.enums);
+                all_consts.append(&mut parsed.consts);
+                all_type_decls.append(&mut parsed.type_decls);
                 // `HashMap::extend` would silently overwrite collisions on
                 // file_path:line:name keys — concatenate the callee vecs
                 // instead so cross-crate `--also` merges retain every edge.
-                for (caller_id, mut callees) in call_map {
+                for (caller_id, mut callees) in parsed.call_map {
                     all_call_maps
                         .entry(caller_id)
                         .or_default()
                         .append(&mut callees);
                 }
-                all_call_sites.append(&mut call_sites);
-                all_reexports.append(&mut reexports);
+                all_call_sites.append(&mut parsed.call_sites);
+                all_reexports.append(&mut parsed.reexports);
             }
             Err(e) => {
                 parse_errors.push(format!("⚠️ {}: {}", file_path.display(), e));
@@ -80,6 +82,8 @@ pub fn analyze_project(project_path: &Path, include_ignored: bool) -> ProjectAna
         functions: all_functions,
         structs: all_structs,
         enums: all_enums,
+        consts: all_consts,
+        type_decls: all_type_decls,
         call_map: all_call_maps,
         call_sites: all_call_sites,
         files_analyzed: rust_files.len(),

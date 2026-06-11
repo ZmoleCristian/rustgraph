@@ -1,6 +1,7 @@
 use crate::{
-    CallSite, EnumInfo, FunctionInfo, ProjectAnalysis, StructInfo, find_rust_files,
-    normalize_path_separators, parse_rust_file_with_ast, search_items_with_options,
+    CallSite, ConstInfo, EnumInfo, FunctionInfo, ProjectAnalysis, StructInfo, TypeDeclInfo,
+    find_rust_files, normalize_path_separators, parse_rust_file_with_ast,
+    search_items_with_options,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -23,6 +24,12 @@ pub struct ProjectData {
     pub structs: Vec<StructInfo>,
     /// All enums parsed from `rust_files`.
     pub enums: Vec<EnumInfo>,
+    /// All consts and statics parsed from `rust_files`.
+    #[serde(default)]
+    pub consts: Vec<ConstInfo>,
+    /// All trait declarations and type aliases parsed from `rust_files`.
+    #[serde(default)]
+    pub type_decls: Vec<TypeDeclInfo>,
     /// Caller-id → list-of-callee-base-names adjacency map built from AST
     /// call expressions.
     pub call_map: HashMap<String, Vec<String>>,
@@ -66,6 +73,8 @@ impl ProjectData {
         let mut functions = Vec::new();
         let mut structs = Vec::new();
         let mut enums = Vec::new();
+        let mut consts = Vec::new();
+        let mut type_decls = Vec::new();
         let mut call_map: HashMap<String, Vec<String>> = HashMap::new();
         let mut call_sites = Vec::new();
         let mut aliases: Vec<(String, String)> = Vec::new();
@@ -75,25 +84,16 @@ impl ProjectData {
 
         for file_path in &rust_files {
             match parse_rust_file_with_ast(file_path) {
-                Ok((
-                    (
-                        mut file_functions,
-                        mut file_structs,
-                        mut file_enums,
-                        file_call_map,
-                        mut file_call_sites,
-                        mut file_aliases,
-                        mut file_reexports,
-                    ),
-                    syntax_tree,
-                )) => {
-                    functions.append(&mut file_functions);
-                    structs.append(&mut file_structs);
-                    enums.append(&mut file_enums);
-                    merge_call_map(&mut call_map, file_call_map);
-                    call_sites.append(&mut file_call_sites);
-                    aliases.append(&mut file_aliases);
-                    reexports.append(&mut file_reexports);
+                Ok((mut parsed, syntax_tree)) => {
+                    functions.append(&mut parsed.functions);
+                    structs.append(&mut parsed.structs);
+                    enums.append(&mut parsed.enums);
+                    consts.append(&mut parsed.consts);
+                    type_decls.append(&mut parsed.type_decls);
+                    merge_call_map(&mut call_map, parsed.call_map);
+                    call_sites.append(&mut parsed.call_sites);
+                    aliases.append(&mut parsed.aliases);
+                    reexports.append(&mut parsed.reexports);
                     parsed_files.insert(
                         normalize_path_separators(&file_path.to_string_lossy()),
                         syntax_tree,
@@ -173,6 +173,8 @@ impl ProjectData {
             functions,
             structs,
             enums,
+            consts,
+            type_decls,
             call_map,
             call_sites,
             aliases,
@@ -188,6 +190,8 @@ impl ProjectData {
             functions = project.functions.len(),
             structs = project.structs.len(),
             enums = project.enums.len(),
+            consts = project.consts.len(),
+            type_decls = project.type_decls.len(),
             parse_errors = project.parse_errors.len(),
             elapsed_ms = started.elapsed().as_millis(),
             "loaded project data"
@@ -220,10 +224,12 @@ impl ProjectData {
         let before_functions = self.functions.len();
         let before_structs = self.structs.len();
         let before_enums = self.enums.len();
-        let (functions, structs, enums) = search_items_with_options(
+        let (functions, structs, enums, consts, type_decls) = search_items_with_options(
             &self.functions,
             &self.structs,
             &self.enums,
+            &self.consts,
+            &self.type_decls,
             search_terms,
             threshold,
             match_signature,
@@ -231,7 +237,13 @@ impl ProjectData {
         self.functions = functions;
         self.structs = structs;
         self.enums = enums;
-        let total_matches = self.functions.len() + self.structs.len() + self.enums.len();
+        self.consts = consts;
+        self.type_decls = type_decls;
+        let total_matches = self.functions.len()
+            + self.structs.len()
+            + self.enums.len()
+            + self.consts.len()
+            + self.type_decls.len();
         if total_matches > 10 && threshold < 0.8 {
             eprintln!(
                 "hint: --search '{}' returned {} matches at threshold {:.2}; for precise lookups try --search-threshold 0.9",
@@ -339,6 +351,8 @@ impl ProjectData {
             functions: self.functions.clone(),
             structs: self.structs.clone(),
             enums: self.enums.clone(),
+            consts: self.consts.clone(),
+            type_decls: self.type_decls.clone(),
             call_map: self.call_map.clone(),
             call_sites: self.call_sites.clone(),
             files_analyzed: self.rust_files.len(),

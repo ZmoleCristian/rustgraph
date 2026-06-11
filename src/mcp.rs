@@ -27,6 +27,9 @@ pub enum FindKind {
     Func,
     Struct,
     Enum,
+    Const,
+    Trait,
+    Alias,
 }
 
 impl FindKind {
@@ -35,6 +38,9 @@ impl FindKind {
             FindKind::Func => "--func",
             FindKind::Struct => "--struct",
             FindKind::Enum => "--enum",
+            FindKind::Const => "--const",
+            FindKind::Trait => "--trait",
+            FindKind::Alias => "--alias",
         }
     }
 }
@@ -87,14 +93,17 @@ impl EnsemblePreset {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct FindArgs {
-    /// Symbol name; `a|b` for OR.
+    /// Symbol name; `a|b` for OR. Single identifiers only — no phrases.
     pub query: String,
     /// Crate root (defaults to cwd).
     #[serde(default)]
     pub path: Option<String>,
-    /// Kind filter: `func`, `struct`, or `enum`.
+    /// Kind filter: `func`, `struct`, `enum`, `const` (consts + statics), `trait`, or `alias` (type aliases).
     #[serde(default)]
     pub kind: Option<FindKind>,
+    /// Fuzzy threshold in [0,1] (default 0.85; lower = looser matching).
+    #[serde(default)]
+    pub threshold: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -198,13 +207,17 @@ impl RustgraphServer {
 
     #[tool(
         name = "rustgraph_find",
-        description = "Use INSTEAD OF Grep for 'where is X' / 'find fn|struct X'. Returns file:line + signature. Doesn't match comments or strings."
+        description = "Use INSTEAD OF Grep for 'where is X' / 'find fn|struct|enum|const|trait|alias X'. Returns file:line + signature. Doesn't match comments or strings."
     )]
     async fn find(&self, p: Parameters<FindArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
         let mut argv: Vec<String> = Vec::new();
         if let Some(path) = &p.0.path {
             argv.push("-p".into());
             argv.push(path.clone());
+        }
+        if let Some(t) = p.0.threshold {
+            argv.push("--search-threshold".into());
+            argv.push(t.to_string());
         }
         argv.push("find".into());
         argv.push(p.0.query.clone());
@@ -481,6 +494,15 @@ mod tests {
         assert!(matches!(v, FindKind::Struct));
         let v: FindKind = serde_json::from_str("\"enum\"").unwrap();
         assert!(matches!(v, FindKind::Enum));
+        let v: FindKind = serde_json::from_str("\"const\"").unwrap();
+        assert!(matches!(v, FindKind::Const));
+        assert_eq!(FindKind::Const.flag(), "--const");
+        let v: FindKind = serde_json::from_str("\"trait\"").unwrap();
+        assert!(matches!(v, FindKind::Trait));
+        assert_eq!(FindKind::Trait.flag(), "--trait");
+        let v: FindKind = serde_json::from_str("\"alias\"").unwrap();
+        assert!(matches!(v, FindKind::Alias));
+        assert_eq!(FindKind::Alias.flag(), "--alias");
     }
 
     #[test]

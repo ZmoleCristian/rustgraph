@@ -5,7 +5,7 @@ use super::super::project::ProjectData;
 use super::super::render::print_inventory_text;
 use super::super::symbol_id::WithSymbolId;
 use crate::cli::Args;
-use crate::{EnumInfo, FunctionInfo, StructInfo};
+use crate::{ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo};
 
 use super::switchboard::write_string_output;
 
@@ -25,6 +25,8 @@ pub fn run(
         project.functions.retain(|f| f.is_pub);
         project.structs.retain(|s| s.is_pub);
         project.enums.retain(|e| e.is_pub);
+        project.consts.retain(|c| c.is_pub);
+        project.type_decls.retain(|t| t.is_pub);
     }
 
     if args.json {
@@ -33,6 +35,8 @@ pub fn run(
             functions: Vec<WithSymbolId<FunctionInfo>>,
             structs: Vec<WithSymbolId<StructInfo>>,
             enums: Vec<WithSymbolId<EnumInfo>>,
+            consts: Vec<WithSymbolId<ConstInfo>>,
+            type_decls: Vec<WithSymbolId<TypeDeclInfo>>,
         }
 
         let payload = serde_json::to_string_pretty(&InventoryOutput {
@@ -51,6 +55,23 @@ pub fn run(
             } else {
                 Vec::new()
             },
+            consts: if selection.show_consts() {
+                project.consts.into_iter().map(WithSymbolId::wrap_const).collect()
+            } else {
+                Vec::new()
+            },
+            type_decls: project
+                .type_decls
+                .into_iter()
+                .filter(|t| {
+                    if t.kind == "trait" {
+                        selection.show_traits()
+                    } else {
+                        selection.show_aliases()
+                    }
+                })
+                .map(WithSymbolId::wrap_type_decl)
+                .collect(),
         })?;
         write_string_output(args.output.as_deref(), &payload)?;
     } else {
@@ -58,6 +79,8 @@ pub fn run(
             &project.functions,
             &project.structs,
             &project.enums,
+            &project.consts,
+            &project.type_decls,
             selection,
             !args.no_color && args.color,
         );

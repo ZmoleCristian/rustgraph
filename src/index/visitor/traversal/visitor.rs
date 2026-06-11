@@ -5,8 +5,9 @@ use crate::index::infer_file_module_segments;
 use crate::index::visitor::{CodeVisitor, attrs_imply_cfg_test, render_cfg_attrs};
 use syn::visit::Visit;
 use syn::{
-    ExprCall, ExprMacro, ExprMethodCall, ImplItemFn, ItemEnum, ItemFn, ItemImpl, ItemMacro,
-    ItemMod, ItemStruct, ItemTrait, ItemUse, TraitItemFn, UseTree,
+    ExprCall, ExprMacro, ExprMethodCall, ImplItemConst, ImplItemFn, ItemConst, ItemEnum, ItemFn,
+    ItemImpl, ItemMacro, ItemMod, ItemStatic, ItemStruct, ItemTrait, ItemType, ItemUse,
+    TraitItemFn, UseTree,
 };
 
 
@@ -98,6 +99,22 @@ impl<'ast> Visit<'ast> for CodeVisitor {
 
     fn visit_item_enum(&mut self, item_enum: &'ast ItemEnum) {
         types::visit_item_enum(self, item_enum);
+    }
+
+    fn visit_item_const(&mut self, item_const: &'ast ItemConst) {
+        types::visit_item_const(self, item_const);
+    }
+
+    fn visit_item_static(&mut self, item_static: &'ast ItemStatic) {
+        types::visit_item_static(self, item_static);
+    }
+
+    fn visit_impl_item_const(&mut self, item_const: &'ast ImplItemConst) {
+        types::visit_impl_item_const(self, item_const);
+    }
+
+    fn visit_item_type(&mut self, item_type: &'ast ItemType) {
+        types::visit_item_type(self, item_type);
     }
 
     fn visit_item_use(&mut self, item_use: &'ast ItemUse) {

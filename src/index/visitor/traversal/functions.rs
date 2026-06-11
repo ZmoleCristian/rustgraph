@@ -50,6 +50,7 @@ pub fn visit_item_impl(visitor: &mut CodeVisitor, item_impl: &ItemImpl) {
 }
 
 pub fn visit_item_trait(visitor: &mut CodeVisitor, item_trait: &ItemTrait) {
+    super::types::record_item_trait(visitor, item_trait);
     visitor.trait_stack.push(item_trait.ident.to_string());
     syn::visit::visit_item_trait(visitor, item_trait);
     visitor.trait_stack.pop();

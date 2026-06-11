@@ -93,6 +93,12 @@ fn relativize_project_paths(
     for e in project.enums.iter_mut() {
         e.file_path = strip(&e.file_path);
     }
+    for c in project.consts.iter_mut() {
+        c.file_path = strip(&c.file_path);
+    }
+    for t in project.type_decls.iter_mut() {
+        t.file_path = strip(&t.file_path);
+    }
     for cs in project.call_sites.iter_mut() {
         cs.file_path = strip(&cs.file_path);
     }
@@ -149,6 +155,9 @@ fn no_action_specified(args: &Args) -> bool {
         && !args.func
         && !args.r#struct
         && !args.r#enum
+        && !args.r#const
+        && !args.r#trait
+        && !args.alias
         && !args.call_graph
         && !args.dead_code
         && args.ensemble.is_none()
@@ -212,11 +221,12 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
         }
         let mut extra_project = ProjectData::load(extra, args.include_ignored);
         eprintln!(
-            "--also '{}': merged {} fn(s), {} struct(s), {} enum(s), {} file(s)",
+            "--also '{}': merged {} fn(s), {} struct(s), {} enum(s), {} const(s), {} file(s)",
             extra.display(),
             extra_project.functions.len(),
             extra_project.structs.len(),
             extra_project.enums.len(),
+            extra_project.consts.len(),
             extra_project.rust_files.len()
         );
         let extra_parsed = extra_project.take_parsed_files();
@@ -224,6 +234,8 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
         project.functions.extend(extra_project.functions);
         project.structs.extend(extra_project.structs);
         project.enums.extend(extra_project.enums);
+        project.consts.extend(extra_project.consts);
+        project.type_decls.extend(extra_project.type_decls);
         // Concatenate callee vecs on collision so cross-crate `--also`
         // merges don't drop edges when two crates happen to land on the
         // same `file:line:name` caller key after relativization.

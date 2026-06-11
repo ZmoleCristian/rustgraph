@@ -1,6 +1,6 @@
 //! Mutable visitor state accumulating all symbols and call sites found during AST traversal.
 
-use super::super::{CallSite, EnumInfo, FunctionInfo, StructInfo};
+use super::super::{CallSite, ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo};
 use super::make_function_id;
 use super::metadata::FnMetadata;
 use std::collections::HashMap;
@@ -13,6 +13,10 @@ pub(crate) struct CodeVisitor {
     pub structs: Vec<StructInfo>,
     /// Enums collected so far.
     pub enums: Vec<EnumInfo>,
+    /// Consts and statics collected so far.
+    pub consts: Vec<ConstInfo>,
+    /// Trait declarations and type aliases collected so far.
+    pub type_decls: Vec<TypeDeclInfo>,
     /// Absolute or relative path of the file being visited.
     pub file_path: String,
     /// Stable ID of the function currently being traversed, if any.
@@ -50,6 +54,8 @@ impl CodeVisitor {
             functions: Vec::new(),
             structs: Vec::new(),
             enums: Vec::new(),
+            consts: Vec::new(),
+            type_decls: Vec::new(),
             file_path,
             current_function_id: None,
             current_function_name: None,

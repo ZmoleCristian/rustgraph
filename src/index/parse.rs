@@ -1,7 +1,7 @@
 //! Per-file parse entrypoint and symbol-ID helpers.
 
 use super::visitor::{CodeVisitor, make_function_id};
-use super::{CallSite, EnumInfo, FunctionInfo, StructInfo};
+use super::{CallSite, ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -9,19 +9,28 @@ use syn::visit::Visit;
 
 pub use super::scan::*;
 
-/// Return type of [`parse_rust_file`]: a tuple of all symbol collections extracted from one file.
-///
-/// Fields in order: functions, structs, enums, call map (caller-id → callee names),
-/// call sites, type aliases, and re-exports.
-pub type ParsedRustFile = (
-    Vec<FunctionInfo>,
-    Vec<StructInfo>,
-    Vec<EnumInfo>,
-    HashMap<String, Vec<String>>,
-    Vec<CallSite>,
-    Vec<(String, String)>,
-    Vec<(String, String, String)>,
-);
+/// All symbol collections extracted from one parsed `.rs` file.
+#[derive(Debug, Default)]
+pub struct ParsedRustFile {
+    /// Functions, methods, and trait functions.
+    pub functions: Vec<FunctionInfo>,
+    /// Structs.
+    pub structs: Vec<StructInfo>,
+    /// Enums.
+    pub enums: Vec<EnumInfo>,
+    /// Consts and statics (module-level and impl-associated).
+    pub consts: Vec<ConstInfo>,
+    /// Trait declarations and type aliases.
+    pub type_decls: Vec<TypeDeclInfo>,
+    /// Caller-id → list of raw callee names.
+    pub call_map: HashMap<String, Vec<String>>,
+    /// All call sites found in the file.
+    pub call_sites: Vec<CallSite>,
+    /// Type-alias pairs `(alias_name, original_name)`.
+    pub aliases: Vec<(String, String)>,
+    /// Re-export triples `(source_path, exported_name, alias)`.
+    pub reexports: Vec<(String, String, String)>,
+}
 
 /// Parse a single `.rs` file and return all extracted symbols and call sites.
 ///
@@ -78,15 +87,17 @@ pub fn parse_rust_file_with_ast(
     }
     visitor.visit_file(&syntax_tree);
 
-    let parsed = (
-        visitor.functions,
-        visitor.structs,
-        visitor.enums,
-        visitor.function_calls,
-        visitor.call_sites,
-        visitor.aliases,
-        visitor.reexports,
-    );
+    let parsed = ParsedRustFile {
+        functions: visitor.functions,
+        structs: visitor.structs,
+        enums: visitor.enums,
+        consts: visitor.consts,
+        type_decls: visitor.type_decls,
+        call_map: visitor.function_calls,
+        call_sites: visitor.call_sites,
+        aliases: visitor.aliases,
+        reexports: visitor.reexports,
+    };
     Ok((parsed, syntax_tree))
 }
 
@@ -120,6 +131,17 @@ pub fn struct_symbol_id(s: &StructInfo) -> String {
 /// Compute the stable ID for an [`EnumInfo`] in the form `"enum:file:line:name"`.
 pub fn enum_symbol_id(e: &EnumInfo) -> String {
     format!("enum:{}:{}:{}", e.file_path, e.start_line, e.name)
+}
+
+/// Compute the stable ID for a [`ConstInfo`] in the form `"const:file:line:name"`.
+pub fn const_symbol_id(c: &ConstInfo) -> String {
+    format!("const:{}:{}:{}", c.file_path, c.start_line, c.name)
+}
+
+/// Compute the stable ID for a [`TypeDeclInfo`] in the form `"trait:file:line:name"`
+/// or `"alias:file:line:name"` depending on its kind.
+pub fn type_decl_symbol_id(t: &TypeDeclInfo) -> String {
+    format!("{}:{}:{}:{}", t.kind, t.file_path, t.start_line, t.name)
 }
 
 fn path_is_under_tests_dir(file_path: &Path) -> bool {
@@ -164,14 +186,36 @@ mod tests {
         )
         .expect("write");
 
-        let (funcs, structs, enums, _calls, _sites, _aliases, _reexports) =
-            parse_rust_file(&path).expect("parse ok");
-        assert_eq!(funcs.len(), 1);
-        assert_eq!(funcs[0].name, "foo");
-        assert!(funcs[0].is_pub);
-        assert_eq!(structs.len(), 1);
-        assert_eq!(structs[0].name, "S");
-        assert!(enums.is_empty());
+        let parsed = parse_rust_file(&path).expect("parse ok");
+        assert_eq!(parsed.functions.len(), 1);
+        assert_eq!(parsed.functions[0].name, "foo");
+        assert!(parsed.functions[0].is_pub);
+        assert_eq!(parsed.structs.len(), 1);
+        assert_eq!(parsed.structs[0].name, "S");
+        assert!(parsed.enums.is_empty());
+    }
+
+    #[test]
+    fn parse_rust_file_returns_consts_and_statics() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("c.rs");
+        std::fs::write(
+            &path,
+            "pub const KIND_META: [u8; 2] = [1, 2];\nstatic GLOBAL: u32 = 7;\n",
+        )
+        .expect("write");
+
+        let parsed = parse_rust_file(&path).expect("parse ok");
+        assert_eq!(parsed.consts.len(), 2);
+        assert_eq!(parsed.consts[0].name, "KIND_META");
+        assert_eq!(parsed.consts[0].kind, "const");
+        assert!(parsed.consts[0].is_pub);
+        assert_eq!(parsed.consts[1].name, "GLOBAL");
+        assert_eq!(parsed.consts[1].kind, "static");
+        assert_eq!(
+            const_symbol_id(&parsed.consts[0]),
+            format!("const:{}:1:KIND_META", parsed.consts[0].file_path)
+        );
     }
 
     #[test]
@@ -184,11 +228,10 @@ mod tests {
         )
         .expect("write");
 
-        let (funcs, _structs, _enums, _calls, sites, _aliases, _reexports) =
-            parse_rust_file(&path).expect("parse ok");
-        let driver = funcs.iter().find(|f| f.name == "driver").expect("driver fn");
+        let parsed = parse_rust_file(&path).expect("parse ok");
+        let driver = parsed.functions.iter().find(|f| f.name == "driver").expect("driver fn");
         let driver_id = function_id(driver);
-        let driver_calls = sites
+        let driver_calls = parsed.call_sites
             .iter()
             .filter(|s| s.caller_id.as_deref() == Some(&driver_id))
             .count();
@@ -251,13 +294,12 @@ mod tests {
         let path = nested.join("a.rs");
         std::fs::write(&path, "pub fn foo() {}\n").expect("write fixture");
 
-        let (funcs, _structs, _enums, _calls, _sites, _aliases, _reexports) =
-            parse_rust_file(&path).expect("parse ok");
-        assert_eq!(funcs.len(), 1);
+        let parsed = parse_rust_file(&path).expect("parse ok");
+        assert_eq!(parsed.functions.len(), 1);
         assert!(
-            !funcs[0].file_path.contains('\\'),
+            !parsed.functions[0].file_path.contains('\\'),
             "visitor file_path must not contain backslashes; got: {}",
-            funcs[0].file_path
+            parsed.functions[0].file_path
         );
     }
 

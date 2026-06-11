@@ -1,9 +1,91 @@
 use super::color::colorize_parameter;
 use super::color::colorize_type;
+use crate::ConstInfo;
 use crate::EnumInfo;
 use crate::FunctionInfo;
 use crate::StructInfo;
+use crate::TypeDeclInfo;
 use colored::*;
+
+/// Format a trait declaration or type alias as a one-line display string.
+///
+/// Without color: `path:start-end - <signature>`.
+/// With color: file location dimmed, then a colored keyword/name line.
+pub fn format_type_decl_signature(decl: &TypeDeclInfo, use_color: bool) -> String {
+    if !use_color {
+        return format!(
+            "{}:{}-{} - {}",
+            decl.file_path, decl.start_line, decl.end_line, decl.signature
+        );
+    }
+
+    let file_info = format!("{}:{}-{}", decl.file_path, decl.start_line, decl.end_line)
+        .dimmed()
+        .italic();
+
+    let mut signature_parts = Vec::new();
+
+    if decl.is_pub {
+        signature_parts.push("pub".bright_green().bold().to_string());
+    }
+
+    let keyword = if decl.kind == "trait" { "trait" } else { "type" };
+    signature_parts.push(keyword.bright_blue().bold().to_string());
+    signature_parts.push(decl.name.bright_yellow().bold().underline().to_string());
+
+    if let Some(rhs) = &decl.rhs {
+        signature_parts.push(format!("= {}", colorize_type(rhs)));
+    }
+
+    format!(
+        "{} {} {}",
+        file_info,
+        "→".bright_white().bold(),
+        signature_parts.join(" ")
+    )
+}
+
+/// Format a const/static as a one-line display string.
+///
+/// Without color: `path:start-end - <signature>`.
+/// With color: file location dimmed, then a colored keyword/name/type line.
+pub fn format_const_signature(const_info: &ConstInfo, use_color: bool) -> String {
+    if !use_color {
+        return format!(
+            "{}:{}-{} - {}",
+            const_info.file_path, const_info.start_line, const_info.end_line, const_info.signature
+        );
+    }
+
+    let file_info = format!(
+        "{}:{}-{}",
+        const_info.file_path, const_info.start_line, const_info.end_line
+    )
+    .dimmed()
+    .italic();
+
+    let mut signature_parts = Vec::new();
+
+    if const_info.is_pub {
+        signature_parts.push("pub".bright_green().bold().to_string());
+    }
+
+    let keyword = if const_info.kind.starts_with("static") {
+        const_info.kind.as_str()
+    } else {
+        "const"
+    };
+    signature_parts.push(keyword.bright_magenta().bold().to_string());
+    signature_parts.push(const_info.name.bright_yellow().bold().underline().to_string());
+    signature_parts.push(format!(": {}", colorize_type(&const_info.ty)));
+
+    format!(
+        "{} {} {}",
+        file_info,
+        "→".bright_white().bold(),
+        signature_parts.join(" ")
+    )
+}
 
 /// Format a struct as a one-line display string.
 ///

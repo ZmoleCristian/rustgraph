@@ -697,6 +697,8 @@ mod tests {
             functions: vec![],
             structs: vec![],
             enums: vec![],
+            consts: vec![],
+            type_decls: vec![],
             call_map: HashMap::new(),
             call_sites: vec![],
             files_analyzed: 0,
