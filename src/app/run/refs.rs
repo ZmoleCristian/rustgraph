@@ -12,19 +12,34 @@ use super::super::project::ProjectData;
 use crate::FunctionInfo;
 use crate::cli::Args;
 
-/// Implements `rustgraph refs <ident>` — walks every Rust source file via `syn` and records each
-/// AST-level reference to the given identifier.
-///
-/// Classifies each hit as one of: `call`, `method`, `field`, `type`, `struct`, `pattern`,
-/// `path`, `variant`, or `assoc_call`. Supports `--kind` filtering, `--in` scoping,
-/// `--by-function` grouping, `--exclude-tests`, `--changed`, and `--max-results` capping.
-/// Emits actionable hints when zero references are found.
-pub fn run(
+/// Priority order used when two hits land on the same `file:line:col` — the
+/// most specific classification survives the location dedup.
+fn kind_priority(k: &str) -> u8 {
+    match k {
+        "call" => 0,
+        "method" => 1,
+        "variant" => 2,
+        "assoc_call" => 3,
+        "struct" => 4,
+        "pattern" => 5,
+        "type" => 6,
+        "field" => 7,
+        "path" => 8,
+        "macro" => 9,
+        _ => 10,
+    }
+}
+
+/// Shared collection pipeline for `refs` and `usages`: walks every parsed file and records
+/// each AST-level reference to `request.ident`, descending into macro bodies (`vec![...]`,
+/// `assert_eq!(...)`) by re-parsing their token streams. Annotates each hit with its
+/// innermost enclosing function, applies `--exclude-tests`, then sorts and dedups by
+/// location keeping the highest-priority kind tag.
+pub(crate) fn collect_hits(
     args: &Args,
     project: &ProjectData,
-    request: RefsRequest,
-    changed: Option<&ChangedRanges>,
-) -> Result<(), Box<dyn std::error::Error>> {
+    request: &RefsRequest,
+) -> Vec<RefHit> {
     let allowed_kinds: Option<HashSet<&str>> = if request.kind.is_empty() {
         None
     } else {
@@ -78,7 +93,57 @@ pub fn run(
         v.visit_file(syntax);
     }
 
+    let mut hit_is_test: Vec<bool> = vec![false; hits.len()];
+    for (idx, hit) in hits.iter_mut().enumerate() {
+        if let Some(funcs) = by_file.get(&hit.file_path) {
+            if let Some(f) = innermost_enclosing(funcs, hit.line) {
+                hit.enclosing_function = Some(f.name.clone());
+                hit.enclosing_function_start = Some(f.start_line);
+                hit.enclosing_function_end = Some(f.end_line);
+                hit.enclosing_function_is_test = f.is_test;
+                hit_is_test[idx] = f.is_test;
+            }
+        }
+    }
+    if args.exclude_tests {
+        let mut iter = hit_is_test.into_iter();
+        hits.retain(|_| !iter.next().unwrap_or(false));
+    }
+
+    hits.sort_by(|a, b| {
+        a.file_path
+            .cmp(&b.file_path)
+            .then(a.line.cmp(&b.line))
+            .then(a.col.cmp(&b.col))
+            .then(kind_priority(a.kind).cmp(&kind_priority(b.kind)))
+    });
+    hits.dedup_by(|a, b| {
+        a.file_path == b.file_path && a.line == b.line && a.col == b.col
+    });
+    hits
+}
+
+/// Implements `rustgraph refs <ident>` — walks every Rust source file via `syn` and records each
+/// AST-level reference to the given identifier.
+///
+/// Classifies each hit as one of: `call`, `method`, `field`, `type`, `struct`, `pattern`,
+/// `path`, `variant`, `assoc_call`, or `macro` (best-effort ident hit inside a macro body
+/// that doesn't re-parse as exprs/stmts). Supports `--kind` filtering, `--in` scoping,
+/// `--by-function` grouping, `--exclude-tests`, `--changed`, and `--max-results` capping.
+/// Emits actionable hints when zero references are found.
+pub fn run(
+    args: &Args,
+    project: &ProjectData,
+    request: RefsRequest,
+    changed: Option<&ChangedRanges>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut hits = collect_hits(args, project, &request);
+
     if hits.is_empty() {
+        let project_enum_names: HashSet<String> =
+            project.enums.iter().map(|e| e.name.clone()).collect();
+        let project_struct_names: HashSet<String> =
+            project.structs.iter().map(|s| s.name.clone()).collect();
 
 
         let mut notes: Vec<String> = Vec::new();
@@ -249,63 +314,12 @@ pub fn run(
     }
 
 
-    let mut hit_is_test: Vec<bool> = vec![false; hits.len()];
-    for (idx, hit) in hits.iter_mut().enumerate() {
-        if let Some(funcs) = by_file.get(&hit.file_path) {
-            if let Some(f) = innermost_enclosing(funcs, hit.line) {
-                hit.enclosing_function = Some(f.name.clone());
-                hit.enclosing_function_start = Some(f.start_line);
-                hit.enclosing_function_end = Some(f.end_line);
-                hit.enclosing_function_is_test = f.is_test;
-                hit_is_test[idx] = f.is_test;
-            }
-        }
-    }
-    if args.exclude_tests {
-        let mut iter = hit_is_test.into_iter();
-        hits.retain(|_| !iter.next().unwrap_or(false));
-    }
-
-
     if let Some(ranges) = changed {
         hits.retain(|h| match (h.enclosing_function_start, h.enclosing_function_end) {
             (Some(start), Some(end)) => fn_was_changed(&h.file_path, start, end, ranges),
             _ => false,
         });
     }
-
-    hits.sort_by(|a, b| {
-        a.file_path
-            .cmp(&b.file_path)
-            .then(a.line.cmp(&b.line))
-            .then(a.col.cmp(&b.col))
-    });
-
-
-    let kind_priority = |k: &str| -> u8 {
-        match k {
-            "call" => 0,
-            "method" => 1,
-            "variant" => 2,
-            "assoc_call" => 3,
-            "struct" => 4,
-            "pattern" => 5,
-            "type" => 6,
-            "field" => 7,
-            "path" => 8,
-            _ => 9,
-        }
-    };
-    hits.sort_by(|a, b| {
-        a.file_path
-            .cmp(&b.file_path)
-            .then(a.line.cmp(&b.line))
-            .then(a.col.cmp(&b.col))
-            .then(kind_priority(a.kind).cmp(&kind_priority(b.kind)))
-    });
-    hits.dedup_by(|a, b| {
-        a.file_path == b.file_path && a.line == b.line && a.col == b.col
-    });
 
 
     let total_hits = hits.len();
@@ -457,19 +471,19 @@ pub fn run(
 /// One resolved reference to the queried identifier: its location, kind tag, source line text,
 /// and the enclosing function (if any).
 #[derive(Debug, Clone, Serialize)]
-struct RefHit {
-    file_path: String,
-    line: usize,
-    col: usize,
-    kind: &'static str,
-    line_text: String,
-    enclosing_function: Option<String>,
-    enclosing_function_start: Option<usize>,
-    enclosing_function_end: Option<usize>,
+pub(crate) struct RefHit {
+    pub(crate) file_path: String,
+    pub(crate) line: usize,
+    pub(crate) col: usize,
+    pub(crate) kind: &'static str,
+    pub(crate) line_text: String,
+    pub(crate) enclosing_function: Option<String>,
+    pub(crate) enclosing_function_start: Option<usize>,
+    pub(crate) enclosing_function_end: Option<usize>,
 
 
     #[serde(skip_serializing_if = "std::ops::Not::not")]
-    enclosing_function_is_test: bool,
+    pub(crate) enclosing_function_is_test: bool,
 }
 
 /// `syn` AST visitor that walks a single parsed file and appends `RefHit` entries for every node
@@ -544,6 +558,24 @@ impl<'a> RefsVisitor<'a> {
             "path"
         }
     }
+
+
+    /// Last-resort macro coverage: when a macro body parses as neither an expr list nor a
+    /// statement list, walk its raw token stream and record bare ident matches as kind
+    /// `macro` — exact line, approximate classification. Never silently misses.
+    fn scan_macro_tokens(&mut self, tokens: proc_macro2::TokenStream) {
+        for tt in tokens {
+            match tt {
+                proc_macro2::TokenTree::Ident(ident) => {
+                    if ident == self.ident {
+                        self.record(ident.span(), "macro");
+                    }
+                }
+                proc_macro2::TokenTree::Group(group) => self.scan_macro_tokens(group.stream()),
+                _ => {}
+            }
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for RefsVisitor<'_> {
@@ -615,6 +647,28 @@ impl<'ast> Visit<'ast> for RefsVisitor<'_> {
             self.record(node.path.span(), self.classify_qualifier(&node.path));
         }
         syn::visit::visit_expr_struct(self, node);
+    }
+
+    // syn does not descend into macro token streams, so `vec![SellOrder { .. }]` and
+    // `assert_eq!(o.field, 1)` were invisible. Re-parse the body (spans survive, so
+    // line numbers stay exact): expr list first, then statement list, then a raw
+    // token scan tagged `macro` so a reference inside a macro is NEVER silently lost.
+    fn visit_macro(&mut self, node: &'ast syn::Macro) {
+        use syn::punctuated::Punctuated;
+        if let Ok(exprs) = node
+            .parse_body_with(Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated)
+        {
+            for e in &exprs {
+                Visit::visit_expr(self, e);
+            }
+        } else if let Ok(stmts) = node.parse_body_with(syn::Block::parse_within) {
+            for s in &stmts {
+                Visit::visit_stmt(self, s);
+            }
+        } else {
+            self.scan_macro_tokens(node.tokens.clone());
+        }
+        syn::visit::visit_macro(self, node);
     }
 }
 

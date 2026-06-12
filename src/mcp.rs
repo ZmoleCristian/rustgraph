@@ -45,6 +45,42 @@ impl FindKind {
     }
 }
 
+/// Strongly-typed `kind` filter for `rustgraph_usages`.
+///
+/// Variants are doc-free on purpose — see the note on [`FindKind`]; value
+/// meanings live on the `kind` field of [`UsagesArgs`].
+#[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum RefKind {
+    Call,
+    Method,
+    Variant,
+    AssocCall,
+    Struct,
+    Pattern,
+    Type,
+    Field,
+    Path,
+    Macro,
+}
+
+impl RefKind {
+    fn as_cli(self) -> &'static str {
+        match self {
+            RefKind::Call => "call",
+            RefKind::Method => "method",
+            RefKind::Variant => "variant",
+            RefKind::AssocCall => "assoc_call",
+            RefKind::Struct => "struct",
+            RefKind::Pattern => "pattern",
+            RefKind::Type => "type",
+            RefKind::Field => "field",
+            RefKind::Path => "path",
+            RefKind::Macro => "macro",
+        }
+    }
+}
+
 /// Strongly-typed `view` selector for `rustgraph_ensemble`.
 ///
 /// Variants are doc-free on purpose — see the note on [`FindKind`]; value
@@ -159,6 +195,32 @@ pub struct PathsBetweenArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct UsagesArgs {
+    /// Exact identifier: type, field, or fn name (single ident — not a path or phrase).
+    pub target: String,
+    /// Crate root (defaults to cwd).
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Restrict results to files whose path contains this substring.
+    #[serde(default)]
+    pub in_path: Option<String>,
+    /// Filter the refs section by classification: `struct` (literals/construction), `type`
+    /// (ascriptions: `Vec<X>`, params, returns, impl blocks), `pattern` (match arms,
+    /// destructuring), `field` (`.field` reads/writes — pass the FIELD name as target),
+    /// `variant`, `assoc_call`, `method`, `call`, `path`, `macro` (unparseable macro body,
+    /// best-effort). Omit for all kinds. Callers section is unaffected.
+    #[serde(default)]
+    pub kind: Option<Vec<RefKind>>,
+    /// Cap on usages emitted (default 100; 0 = unlimited).
+    #[serde(default)]
+    pub max_results: Option<u32>,
+    /// Drop hits whose enclosing fn is #[test]. Default false — when adding a struct field
+    /// you WANT the test literals too.
+    #[serde(default)]
+    pub exclude_tests: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct TreeArgs {
     /// Crate root (defaults to cwd).
     #[serde(default)]
@@ -171,7 +233,7 @@ pub struct TreeArgs {
     pub files_only: Option<bool>,
 }
 
-/// MCP server that exposes the five core rustgraph tools over stdio JSON-RPC.
+/// MCP server that exposes the six core rustgraph tools over stdio JSON-RPC.
 ///
 /// Each tool is implemented by building a `rustgraph` CLI argv and spawning
 /// the current executable as a subprocess, so the server is always in sync
@@ -286,6 +348,40 @@ impl RustgraphServer {
 
 
     #[tool(
+        name = "rustgraph_usages",
+        description = "Use INSTEAD OF Grep for 'where is TYPE X used' / 'who constructs X' / 'what breaks if I add a field'. Returns every AST-resolved reference site: struct literals, type ascriptions (Vec<X>, fn params/returns, impl blocks), pattern matches, field accesses, assoc/method calls — INCLUDING inside macro bodies (vec!, assert_eq!). Complement to rustgraph_callers (fn-call edges only): callers can't target a struct/enum/field, this can. For a fn target it also bundles the caller list. Pass the FIELD name as target for field read/write sites."
+    )]
+    async fn usages(
+        &self,
+        p: Parameters<UsagesArgs>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let mut argv: Vec<String> = Vec::new();
+        if let Some(path) = &p.0.path {
+            argv.push("-p".into());
+            argv.push(path.clone());
+        }
+        if p.0.exclude_tests == Some(true) {
+            argv.push("--exclude-tests".into());
+        }
+        argv.push("usages".into());
+        argv.push(p.0.target.clone());
+        if let Some(needle) = &p.0.in_path {
+            argv.push("--in".into());
+            argv.push(needle.clone());
+        }
+        for kind in p.0.kind.iter().flatten() {
+            argv.push("--kind".into());
+            argv.push(kind.as_cli().into());
+        }
+        if let Some(n) = p.0.max_results {
+            argv.push("--max-results".into());
+            argv.push(n.to_string());
+        }
+        Ok(run_rustgraph(&self.binary, &argv))
+    }
+
+
+    #[tool(
         name = "rustgraph_paths_between",
         description = "Use INSTEAD OF manual tracing for 'walk me through' / 'trace flow' / 'does A reach B'. Enumerates call-graph paths with file:line per hop. Deterministic; better than guessing."
     )]
@@ -352,7 +448,8 @@ impl ServerHandler for RustgraphServer {
                  comments/strings) and one call here saves 4-10 Grep+Read cycles.\n\n\
                  When you see:\n\
                  \x20 'where is X'                          → rustgraph_find\n\
-                 \x20 'who calls X'                         → rustgraph_callers\n\
+                 \x20 'who calls X' (X = fn)                → rustgraph_callers\n\
+                 \x20 'where is TYPE/field X used' / 'who constructs X' / 'what breaks if I add a field' → rustgraph_usages\n\
                  \x20 'understand X' / 'how does X work'    → rustgraph_ensemble  (one call > 5 Reads)\n\
                  \x20 'walk me through' / 'trace flow'      → rustgraph_paths_between\n\
                  \x20 'show me X' / 'read source of X'      → use the Read tool (rustgraph_find gives you the path:line to Read)\n\
@@ -454,6 +551,7 @@ mod tests {
             ("EnsembleArgs", arg_schema_json::<EnsembleArgs>()),
             ("PathsBetweenArgs", arg_schema_json::<PathsBetweenArgs>()),
             ("TreeArgs", arg_schema_json::<TreeArgs>()),
+            ("UsagesArgs", arg_schema_json::<UsagesArgs>()),
         ];
         for (name, json) in schemas {
             assert!(
@@ -503,6 +601,23 @@ mod tests {
         let v: FindKind = serde_json::from_str("\"alias\"").unwrap();
         assert!(matches!(v, FindKind::Alias));
         assert_eq!(FindKind::Alias.flag(), "--alias");
+    }
+
+    #[test]
+    fn ref_kind_serde_accepts_cli_value_set() {
+        // Every CLI --kind value must deserialize, and round-trip back to the same flag.
+        for s in crate::cli::REFS_KIND_VALUES {
+            let raw = format!("\"{s}\"");
+            let v: RefKind = serde_json::from_str(&raw)
+                .unwrap_or_else(|e| panic!("MCP RefKind must accept CLI kind '{s}': {e}"));
+            assert_eq!(&v.as_cli(), s, "as_cli must round-trip '{s}'");
+        }
+    }
+
+    #[test]
+    fn ref_kind_serde_rejects_unknown_values() {
+        let err = serde_json::from_str::<RefKind>("\"banana\"").err();
+        assert!(err.is_some(), "unknown ref kinds must be rejected");
     }
 
     #[test]

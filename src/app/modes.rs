@@ -284,6 +284,8 @@ pub struct PathsBetweenRequest {
 pub struct UsagesRequest {
     /// Type or identifier name whose usages to find.
     pub name: String,
+    /// Optional list of reference kinds for the refs section (same values as [`RefsRequest::kind`]).
+    pub kind: Vec<String>,
     /// Restrict results to files under this path prefix.
     pub in_path: Option<String>,
     /// Maximum number of usages to return.
@@ -494,6 +496,7 @@ impl ExecutionMode {
                 }),
                 ModeCommand::Usages(u) => Self::Usages(UsagesRequest {
                     name: u.name,
+                    kind: u.kind,
                     in_path: u.in_path,
                     max_results: u.max_results,
                 }),

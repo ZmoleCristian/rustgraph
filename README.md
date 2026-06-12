@@ -73,16 +73,17 @@ rustgraph ensemble <fn>          # full context bundle (replaces 4-6 grep+read)
 rustgraph dead-code              # unreachable pub fns
 rustgraph impls <Trait>          # types implementing a trait
 rustgraph refs <ident>           # every reference (field/path/type/etc.)
-# + def, members, usages, tree, grep, inventory, call-graph
+rustgraph usages <Type>          # who constructs/mentions a type (callers + refs)
+# + def, members, tree, grep, inventory, call-graph
 ```
 
 Run `rustgraph --help` for the full list, `rustgraph <cmd> --help` for flags.
 
 ## MCP server (Claude / Codex / Gemini)
 
-`rustgraph` ships an MCP server that exposes 5 of the most-used subcommands as
-agent-callable tools (find, callers, ensemble, paths-between, tree). Self-
-register with one command:
+`rustgraph` ships an MCP server that exposes 6 of the most-used subcommands as
+agent-callable tools (find, callers, usages, ensemble, paths-between, tree).
+Self-register with one command:
 
 ```bash
 rustgraph mcp install            # detect installed clients + register all

@@ -18,6 +18,7 @@ pub const REFS_KIND_VALUES: &[&str] = &[
     "pattern",
     "method",
     "call",
+    "macro",
 ];
 
 
@@ -360,6 +361,14 @@ pub struct UsagesCommand {
     pub in_path: Option<String>,
 
     #[arg(
+        long,
+        value_name = "KIND",
+        value_parser = PossibleValuesParser::new(REFS_KIND_VALUES),
+        help = "Filter the refs half by classification tag (multi-value; repeat to allow several). Same values as `refs --kind`. The callers half is unaffected."
+    )]
+    pub kind: Vec<String>,
+
+    #[arg(
         short = 'n',
         long = "max-results",
         value_name = "N",
@@ -381,7 +390,7 @@ pub struct RefsCommand {
         long,
         value_name = "KIND",
         value_parser = PossibleValuesParser::new(REFS_KIND_VALUES),
-        help = "Filter by classification tag (multi-value). Default: all. Allowed: field | path | assoc_call | variant | type | struct | pattern | method | call. Repeat (`--kind field --kind path`) to allow multiple. `variant` = enum-variant qualifier uses (e.g. `Color::Red`); `assoc_call` = struct/type associated functions (e.g. `SessionDocument::load`); `method` = `.method()` calls regardless of receiver type. NOTE: unknown values error with the allowed list (was: silently 0 hits). NOTE: `assoc_call` and `variant` filter on the QUALIFIER (Type/Enum), NOT the leaf method/variant name — so `refs load --kind assoc_call` returns 0 because `load` is matched as the leaf, not as a Type qualifier. Query the TYPE instead: `refs SessionDocument --kind assoc_call`."
+        help = "Filter by classification tag (multi-value). Default: all. Allowed: field | path | assoc_call | variant | type | struct | pattern | method | call | macro. Repeat (`--kind field --kind path`) to allow multiple. `variant` = enum-variant qualifier uses (e.g. `Color::Red`); `assoc_call` = struct/type associated functions (e.g. `SessionDocument::load`); `method` = `.method()` calls regardless of receiver type; `macro` = best-effort ident hit inside a macro body that doesn't re-parse as exprs/stmts (exact line, approximate classification — bodies that DO parse, like `vec![X { .. }]`, get normal tags). NOTE: unknown values error with the allowed list (was: silently 0 hits). NOTE: `assoc_call` and `variant` filter on the QUALIFIER (Type/Enum), NOT the leaf method/variant name — so `refs load --kind assoc_call` returns 0 because `load` is matched as the leaf, not as a Type qualifier. Query the TYPE instead: `refs SessionDocument --kind assoc_call`."
     )]
     pub kind: Vec<String>,
 

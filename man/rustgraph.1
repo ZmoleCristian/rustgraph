@@ -1,6 +1,6 @@
 .\" Man page for rustgraph (AST-aware Rust codebase navigation)
 .\" Copyright (c) 2026 Zmole Cristian. License: 0BSD.
-.TH RUSTGRAPH 1 "June 2026" "rustgraph 0.8.0" "User Commands"
+.TH RUSTGRAPH 1 "June 2026" "rustgraph 0.8.1" "User Commands"
 .SH NAME
 rustgraph \- AST\-aware Rust codebase navigation built for AiDX
 .SH SYNOPSIS
@@ -235,31 +235,39 @@ optional.
 .PP
 \fBExample:\fR \fBrustgraph callers \-C 2 \-\-depth 2 build_ledger\fR
 .SS usages
-\fBrustgraph usages\fR [\fB\-\-in\fR \fIPATH_SUBSTR\fR]
-[\fB\-n\fR \fIN\fR] \fINAME\fR
+\fBrustgraph usages\fR [\fB\-\-kind\fR \fIKIND\fR]...
+[\fB\-\-in\fR \fIPATH_SUBSTR\fR] [\fB\-n\fR \fIN\fR] \fINAME\fR
 .PP
 Combined \(lqcallers \fI<name>\fR\(rq + \(lqrefs \fI<name>\fR\(rq. One
 stop for "what touches this name" when you do not yet know whether
 \fINAME\fR is a function (use \fBcallers\fR) or a type/field (use
-\fBrefs\fR). Default cap \fB100\fR.
+\fBrefs\fR). \fB\-\-kind\fR filters the refs half only (same values as
+\fBrefs \-\-kind\fR); the callers half is unaffected. Default cap
+\fB100\fR. Also exposed over MCP as \fBrustgraph_usages\fR.
 .PP
-\fBExample:\fR \fBrustgraph usages SessionDocument\fR
+\fBExample:\fR \fBrustgraph usages SellOrder \-\-kind struct\fR
 .SS refs
 \fBrustgraph refs\fR [\fB\-\-kind\fR \fIKIND\fR]... [\fB\-\-by\-function\fR]
 [\fB\-\-in\fR \fIPATH_SUBSTR\fR] [\fB\-n\fR \fIN\fR] \fIIDENT\fR
 .PP
 Find every reference to \fIIDENT\fR: type uses, field reads, struct
-construction, pattern matches, method calls, plain paths. Complement to
+construction, pattern matches, method calls, plain paths — including
+inside macro bodies (\fBvec![...]\fR, \fBassert_eq!(...)\fR), whose
+token streams are re\-parsed with exact line numbers. Complement to
 \fBcallers\fR (which only walks function\-call edges). Matched by exact
 last\-segment name.
 .TP
 \fB\-\-kind\fR \fIKIND\fR
 Filter by classification tag. Allowed: \fBfield\fR, \fBpath\fR,
 \fBassoc_call\fR, \fBvariant\fR, \fBtype\fR, \fBstruct\fR, \fBpattern\fR,
-\fBmethod\fR, \fBcall\fR. Repeat to allow multiple. \fBvariant\fR matches
+\fBmethod\fR, \fBcall\fR, \fBmacro\fR. Repeat to allow multiple.
+\fBvariant\fR matches
 enum\-variant qualifiers (e.g. \fIColor\fR::\fIRed\fR); \fBassoc_call\fR
 matches associated functions (e.g. \fISessionDocument\fR::\fIload\fR);
-\fBmethod\fR matches \fI.method()\fR calls regardless of receiver type.
+\fBmethod\fR matches \fI.method()\fR calls regardless of receiver type;
+\fBmacro\fR is the best\-effort ident hit inside a macro body that does
+not re\-parse as expressions or statements (exact line, approximate
+classification).
 \fBassoc_call\fR and \fBvariant\fR filter on the \fIqualifier\fR
 (Type/Enum), not the leaf name.
 .TP
@@ -567,7 +575,7 @@ TOML table.
 with \fBtrust = true\fR.
 .PP
 Each entry invokes the binary as \(lq\fBrustgraph mcp serve\fR\(rq. The server
-announces itself as \fBrustgraph\fR on the MCP wire and exposes five
+announces itself as \fBrustgraph\fR on the MCP wire and exposes six
 tools that map to the highest\-leverage CLI subcommands. Agents should
 reach for the MCP tools over text \fBgrep\fR(1) when navigating Rust
 because they resolve on the parsed AST and never match string literals
@@ -587,6 +595,16 @@ enclosing\-fn context. Handles \fIType\fR::\fImethod\fR collisions.
 \fBdepth: 0\fR = unlimited transitive (cycle\-safe). \fBflat: true\fR =
 deduplicated \fIpath\fR:\fIline\fR:\fIname\fR list. Pick this for "who
 depends on this fn" questions.
+.TP
+.B rustgraph_usages
+Every AST\-resolved reference to a type, field, or fn: struct literals,
+type ascriptions (\fBVec<X>\fR, params, returns, impl blocks), pattern
+matches, field accesses, assoc/method calls \(em including inside macro
+bodies. Optional \fBkind\fR filter narrows the refs section
+(\fBstruct\fR, \fBtype\fR, \fBpattern\fR, \fBfield\fR, ...). Pick this
+for "where is this \fItype\fR used" / "who constructs \fIX\fR" / "what
+breaks if I add a field" \(em questions \fBrustgraph_callers\fR cannot
+answer because a struct literal is not a call edge.
 .TP
 .B rustgraph_ensemble
 Function context bundle: structs touched, call sites, neighborhood,
@@ -608,7 +626,7 @@ const/trait/alias when present). Optional \fBprefix\fR scopes to a
 subtree; \fBfiles_only\fR hides the counts. Replaces \fBls\fR(1) /
 \fBtree\fR(1) when the agent does not yet know a symbol name.
 .PP
-For everything else (def, refs, usages, members, impls, dead\-code,
+For everything else (def, refs, members, impls, dead\-code,
 call\-graph, grep, inventory) the agent should fall back to the CLI on
 PATH.
 .SH FILES
