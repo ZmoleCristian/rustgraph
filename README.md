@@ -167,6 +167,34 @@ The value flow hints in ensemble are the real unlock. Knowing session -> context
 </details>
 
 
+### **Claude Sonnet 5 - Max**
+> "One `ensemble` call gave me callers, callees, struct defs, dataflow, and auto-tagged I/O boundaries for a function — a dozen+ grep-then-read round trips by hand, collapsed into one shot. Not a faster grep. A different job description."
+
+<details>
+<summary><b>Process</b></summary>
+<br/>
+
+```
+Loading the rustgraph MCP tools and using them cold on this actual codebase (brainsurgeon), not a toy repo.
+
+tree gave the whole crate — 127 files, per-file fn/struct/enum counts — in one call. That's ls+find+skimming, gone.
+
+find on a guessed name ("inject_context") missed, but failed soft: ranked fuzzy suggestions with similarity scores instead of an empty result. Retried on the top suggestion and landed exactly.
+
+ensemble --view full on cmd_inject_read_with_context was the one-shot: signature, struct fields inlined, both call sites, depth-2 callers/callees (18 downstream fns across 8 files), type lifecycle for InjectReadOptions, value-flow hints per param, and auto-tagged file/http I/O boundaries. That's what would've been a dozen+ grep-then-read cycles by hand.
+
+paths_between handle_request → propagate_symbol_ids returned one deterministic 5-hop chain with the call-site line at every hop. No guessing which branch actually connects.
+
+callers --depth 0 on dedupe_specs walked the full transitive closure — 8 hops, tree-rendered, exact call-site line at each — clean up to both binary entrypoints (main.rs and loboto-my-ai.rs).
+
+usages on SyntheticReadSpec returned 38 AST-resolved hits correctly classified by kind (type ascription vs struct literal vs assoc_call) and tagged with the enclosing function for each.
+
+Didn't touch grep once. Verdict formed from the actual output, not the pitch.
+```
+
+</details>
+
+
 
 ### **Claude (Haiku 4.5)**
 
@@ -190,6 +218,32 @@ You've actually solved the problem. Not "find faster," but "understand the shape
 
 
 
+
+
+### **Codex - gpt-5.6-sol Max**
+
+> “rustgraph turned a 127-file Rust repo into an actionable, call-site-aware map in minutes; `ensemble` and `paths-between` are AiDX measured in the only currency an agent cares about—fewer turns.”
+
+<details>
+<summary><b>Process</b></summary>
+<br/>
+
+```
+Dropped cold into brainsurgeon and drove rustgraph 0.8.1 through tree, find,
+ensemble, callers, members, refs, and paths-between.
+
+tree exposed the shape of all 127 Rust files immediately. ensemble on
+build_symbol_context returned its relevant structs, call sites, 17 downstream
+functions, and value-flow hints without a file-opening loop. paths-between then
+traced both the CLI and HTTP routes into that function with the exact call-site
+line at every hop.
+
+Honest wart: callers --depth 0 attached loboto-my-ai's main beneath both
+same-named run_cli nodes, even with --strict-resolution; paths-between with
+canonical symbol IDs resolved the two routes correctly.
+```
+
+</details>
 
 
 ### **Codex - gpt-5.5 xHigh**
