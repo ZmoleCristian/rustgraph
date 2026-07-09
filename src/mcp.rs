@@ -476,6 +476,7 @@ fn run_rustgraph(binary: &str, args: &[String]) -> CallToolResult {
             let stderr = String::from_utf8_lossy(&out.stderr).to_string();
             if out.status.success() {
                 let body = if stdout.is_empty() {
+                    log_misuse(args, "empty", &json!({}));
                     "(no output)".to_string()
                 } else {
                     stdout
@@ -505,6 +506,7 @@ fn run_rustgraph(binary: &str, args: &[String]) -> CallToolResult {
                     "stdout": stdout,
                     "stderr": stderr,
                 });
+                log_misuse(args, "subprocess_failure", &payload);
                 CallToolResult::structured_error(payload)
             }
         }
@@ -516,8 +518,49 @@ fn run_rustgraph(binary: &str, args: &[String]) -> CallToolResult {
                 "argv": args,
                 "io_error_kind": format!("{:?}", e.kind()),
             });
+            log_misuse(args, "spawn_failure", &payload);
             CallToolResult::structured_error(payload)
         }
+    }
+}
+
+/// Opt-in misuse logger. No-op unless `RUSTGRAPH_MISUSE_LOG` points at a file.
+/// Appends one JSON line per failed/zero-hit MCP call so the operator can mine
+/// where agents misfire across projects. The env var path *is* the on switch;
+/// unset = dead path, every install logs nothing. Fully best-effort: any IO or
+/// clock error is swallowed so logging can never break a tool call.
+fn log_misuse(args: &[String], outcome: &str, detail: &serde_json::Value) {
+    let Ok(path) = std::env::var("RUSTGRAPH_MISUSE_LOG") else {
+        return;
+    };
+    if path.is_empty() {
+        return;
+    }
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let cwd = std::env::current_dir()
+        .ok()
+        .and_then(|p| p.to_str().map(String::from));
+    let record = json!({
+        "ts": ts,
+        "version": env!("CARGO_PKG_VERSION"),
+        "cwd": cwd,
+        "outcome": outcome,
+        "args": args,
+        "detail": detail,
+    });
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(f, "{record}");
     }
 }
 

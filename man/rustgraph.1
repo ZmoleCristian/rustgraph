@@ -1,6 +1,6 @@
 .\" Man page for rustgraph (AST-aware Rust codebase navigation)
 .\" Copyright (c) 2026 Zmole Cristian. License: 0BSD.
-.TH RUSTGRAPH 1 "June 2026" "rustgraph 0.8.1" "User Commands"
+.TH RUSTGRAPH 1 "July 2026" "rustgraph 0.8.2" "User Commands"
 .SH NAME
 rustgraph \- AST\-aware Rust codebase navigation built for AiDX
 .SH SYNOPSIS
@@ -671,6 +671,14 @@ Overrides the directory containing \fI.claude.json\fR. When set,
 \fI$CLAUDE_CONFIG_DIR/.claude.json\fR instead of \fI~/.claude.json\fR.
 Useful for parallelizing multiple Claude accounts (e.g.
 \(lqCLAUDE_CONFIG_DIR=~/.claude\-alt rustgraph mcp install\(rq).
+.TP
+.B RUSTGRAPH_MISUSE_LOG
+Opt\-in diagnostics for the MCP server. When set to a file path, each
+failed or zero\-output MCP tool call appends one JSON line (timestamp,
+version, cwd, argv, outcome) to that file, letting an operator mine
+where agents misfire across projects. Unset or empty (the default),
+nothing is ever written \(em no log files, no caches. Best\-effort:
+logging errors never affect the tool call itself.
 .SH EXAMPLES
 .TP
 Trace upstream callers of a function with two\-line context:

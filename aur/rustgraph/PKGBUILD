@@ -1,6 +1,6 @@
 # Maintainer: Zmole Cristian <tragdate@gmail.com>
 pkgname=rustgraph
-pkgver=0.8.1
+pkgver=0.8.2
 pkgrel=1
 pkgdesc="Rust code navigation built for AiDX — AST-aware, MCP-native, token-efficient."
 arch=('x86_64')
