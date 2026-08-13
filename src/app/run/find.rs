@@ -391,6 +391,62 @@ pub fn run(
                 render_type_decl_lines(&disp_types, request.show_ids, Some(&terms), &mut relaxed_out);
                 relaxed_out.push_str(&format!("\n{}\n", READ_TOOL_HINT));
                 write_string_output(args.output.as_deref(), relaxed_out.trim_end_matches('\n'))?;
+            } else {
+                #[derive(Serialize)]
+                struct RelaxedOutput {
+                    query: String,
+                    threshold: f64,
+                    relaxed_threshold: f64,
+                    note: String,
+                    functions: Vec<TaggedHit<WithSymbolId<FunctionInfo>>>,
+                    structs: Vec<TaggedHit<WithSymbolId<StructInfo>>>,
+                    enums: Vec<TaggedHit<WithSymbolId<EnumInfo>>>,
+                    consts: Vec<TaggedHit<WithSymbolId<ConstInfo>>>,
+                    type_decls: Vec<TaggedHit<WithSymbolId<TypeDeclInfo>>>,
+                }
+                let terms = exact_terms(&request.query);
+                let payload = serde_json::to_string_pretty(&RelaxedOutput {
+                    query: request.query.clone(),
+                    threshold: request.threshold,
+                    relaxed_threshold: 0.7,
+                    note,
+                    functions: disp_fns
+                        .into_iter()
+                        .map(|(f, k)| {
+                            let score = Some(best_name_score(&f.name, &terms));
+                            TaggedHit::wrap(WithSymbolId::wrap_fn(f), k, score)
+                        })
+                        .collect(),
+                    structs: disp_structs
+                        .into_iter()
+                        .map(|(s, k)| {
+                            let score = Some(best_name_score(&s.name, &terms));
+                            TaggedHit::wrap(WithSymbolId::wrap_struct(s), k, score)
+                        })
+                        .collect(),
+                    enums: disp_enums
+                        .into_iter()
+                        .map(|(e, k)| {
+                            let score = Some(best_name_score(&e.name, &terms));
+                            TaggedHit::wrap(WithSymbolId::wrap_enum(e), k, score)
+                        })
+                        .collect(),
+                    consts: disp_consts
+                        .into_iter()
+                        .map(|(c, k)| {
+                            let score = Some(best_name_score(&c.name, &terms));
+                            TaggedHit::wrap(WithSymbolId::wrap_const(c), k, score)
+                        })
+                        .collect(),
+                    type_decls: disp_types
+                        .into_iter()
+                        .map(|(t, k)| {
+                            let score = Some(best_name_score(&t.name, &terms));
+                            TaggedHit::wrap(WithSymbolId::wrap_type_decl(t), k, score)
+                        })
+                        .collect(),
+                })?;
+                write_string_output(args.output.as_deref(), &payload)?;
             }
             return Ok(());
         }

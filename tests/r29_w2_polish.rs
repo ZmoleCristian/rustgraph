@@ -131,6 +131,56 @@ fn find_auto_relax_fires_at_default_threshold() {
 
 
 #[test]
+fn find_auto_relax_json_emits_results() {
+    let dir = tempdir().unwrap();
+    write_file(
+        &dir.path().join("src/lib.rs"),
+        "pub fn fetch_data() {}\npub fn store_data() {}\n",
+    );
+    let base = dir.path().to_string_lossy().to_string();
+    let out = run_rustgraph(&["--path", &base, "find", "feech_deta", "--json"]);
+    assert!(out.status.success(), "expected exit 0 when relaxed candidates found");
+    let stdout = stdout_of(&out);
+
+    let v: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("--json relaxed fallback must emit JSON on stdout ({e}); got: {stdout:?}"));
+    let names: Vec<&str> = v["functions"]
+        .as_array()
+        .expect("functions array")
+        .iter()
+        .map(|f| f["name"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"fetch_data"), "relaxed candidate missing: {stdout}");
+    assert!(
+        v["note"].as_str().unwrap_or("").contains("relaxed to 0.7"),
+        "note field must carry the relax explanation: {stdout}"
+    );
+}
+
+
+#[test]
+fn find_auto_relax_json_writes_output_file() {
+    let dir = tempdir().unwrap();
+    write_file(
+        &dir.path().join("src/lib.rs"),
+        "pub fn fetch_data() {}\n",
+    );
+    let base = dir.path().to_string_lossy().to_string();
+    let out_path = dir.path().join("relaxed.json");
+    let out_arg = out_path.to_string_lossy().to_string();
+    let out = run_rustgraph(&["--path", &base, "find", "feech_deta", "--json", "-o", &out_arg]);
+    assert!(out.status.success(), "stderr: {}", stderr_of(&out));
+    let contents = fs::read_to_string(&out_path)
+        .expect("--json -o on the relaxed fallback must write the output file");
+    let v: serde_json::Value = serde_json::from_str(&contents).expect("output file must be JSON");
+    assert!(
+        !v["functions"].as_array().unwrap().is_empty(),
+        "relaxed candidates missing from file: {contents}"
+    );
+}
+
+
+#[test]
 fn find_auto_relax_skips_when_threshold_explicit() {
     let dir = tempdir().unwrap();
     write_file(
