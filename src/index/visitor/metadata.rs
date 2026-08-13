@@ -1,6 +1,6 @@
 //! Helpers for extracting and normalising function metadata from `syn` AST nodes.
 
-use syn::{Signature, Visibility};
+use syn::{Meta, Signature, Token, Visibility, punctuated::Punctuated};
 
 pub(super) struct FnMetadata {
     pub name: String,
@@ -129,19 +129,29 @@ pub(super) fn is_public(vis: &Visibility) -> bool {
     matches!(vis, Visibility::Public(_))
 }
 
-/// Return `true` if any attribute in `attrs` is `#[cfg(test)]` or contains `test` as a
-/// `cfg` token (e.g. `#[cfg(all(feature = "x", test))]`).
+/// Return `true` if any attribute in `attrs` is a `#[cfg(...)]` whose predicate
+/// compiles the item only under `test` (see [`cfg_predicate_enables_test`]).
 pub(crate) fn attrs_imply_cfg_test(attrs: &[syn::Attribute]) -> bool {
-    use quote::ToTokens;
     attrs.iter().any(|attr| {
-        let path = attr.meta.path();
-        if !path.is_ident("cfg") {
-            return false;
-        }
-        let toks = attr.meta.to_token_stream().to_string();
-        toks.split(|c: char| !c.is_alphanumeric() && c != '_')
-            .any(|tok| tok == "test")
+        attr.meta.path().is_ident("cfg")
+            && attr
+                .parse_args::<Meta>()
+                .is_ok_and(|meta| cfg_predicate_enables_test(&meta))
     })
+}
+
+/// Return `true` if the cfg predicate compiles the item only under `test`:
+/// the bare `test` path, or `test` nested inside `all(...)` / `any(...)`.
+/// `not(test)` and strings that merely contain "test" (e.g.
+/// `feature = "test-utils"`) do not count.
+fn cfg_predicate_enables_test(meta: &Meta) -> bool {
+    match meta {
+        Meta::Path(path) => path.is_ident("test"),
+        Meta::List(list) if list.path.is_ident("all") || list.path.is_ident("any") => list
+            .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+            .is_ok_and(|nested| nested.iter().any(cfg_predicate_enables_test)),
+        _ => false,
+    }
 }
 
 
