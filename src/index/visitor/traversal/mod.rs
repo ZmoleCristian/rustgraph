@@ -128,4 +128,34 @@ mod tests {
         assert!(it_works.is_test);
         assert!(!not_a_test.is_test);
     }
+
+    #[test]
+    fn visit_file_marks_cfg_test_module_functions_as_test() {
+        let content = r#"
+            #[cfg(test)]
+            mod tests {
+                fn helper() {}
+            }
+        "#;
+        let file = syn::parse_file(content).expect("parse");
+        let mut visitor = CodeVisitor::new("file.rs".to_string());
+        visitor.visit_file(&file);
+        let helper = visitor.functions.iter().find(|f| f.name == "helper").expect("helper");
+        assert!(helper.is_test);
+    }
+
+    #[test]
+    fn visit_file_keeps_cfg_not_test_module_functions_production() {
+        let content = r#"
+            #[cfg(not(test))]
+            mod wiring {
+                fn wire_up() {}
+            }
+        "#;
+        let file = syn::parse_file(content).expect("parse");
+        let mut visitor = CodeVisitor::new("file.rs".to_string());
+        visitor.visit_file(&file);
+        let wire_up = visitor.functions.iter().find(|f| f.name == "wire_up").expect("wire_up");
+        assert!(!wire_up.is_test);
+    }
 }

@@ -1,6 +1,6 @@
 use super::super::CodeVisitor;
 use super::super::metadata::{FnMetadata, is_public};
-use crate::index::visitor::render_cfg_attrs;
+use crate::index::visitor::{attrs_imply_cfg_test, render_cfg_attrs};
 use syn::spanned::Spanned;
 use syn::{ImplItemFn, ItemFn, ItemImpl, ItemTrait, TraitItemFn};
 
@@ -20,6 +20,10 @@ fn has_test_attr(attrs: &[syn::Attribute]) -> bool {
 }
 
 pub fn visit_item_fn(visitor: &mut CodeVisitor, item_fn: &ItemFn) {
+    let bumped = attrs_imply_cfg_test(&item_fn.attrs);
+    if bumped {
+        visitor.cfg_test_depth += 1;
+    }
     let meta = FnMetadata::from_sig(&item_fn.sig, item_fn.span());
     let is_test = has_test_attr(&item_fn.attrs) || visitor.in_cfg_test();
     let cfg_attrs = visitor.effective_cfg_attrs(render_cfg_attrs(&item_fn.attrs));
@@ -39,21 +43,38 @@ pub fn visit_item_fn(visitor: &mut CodeVisitor, item_fn: &ItemFn) {
 
     visitor.current_function_id = prev_id;
     visitor.current_function_name = prev_name;
+    if bumped {
+        visitor.cfg_test_depth -= 1;
+    }
 }
 
 pub fn visit_item_impl(visitor: &mut CodeVisitor, item_impl: &ItemImpl) {
+    let bumped = attrs_imply_cfg_test(&item_impl.attrs);
+    if bumped {
+        visitor.cfg_test_depth += 1;
+    }
     let self_ty = &item_impl.self_ty;
     let ty = format!("{}", quote::quote! { #self_ty });
     visitor.impl_stack.push(ty);
     syn::visit::visit_item_impl(visitor, item_impl);
     visitor.impl_stack.pop();
+    if bumped {
+        visitor.cfg_test_depth -= 1;
+    }
 }
 
 pub fn visit_item_trait(visitor: &mut CodeVisitor, item_trait: &ItemTrait) {
+    let bumped = attrs_imply_cfg_test(&item_trait.attrs);
+    if bumped {
+        visitor.cfg_test_depth += 1;
+    }
     super::types::record_item_trait(visitor, item_trait);
     visitor.trait_stack.push(item_trait.ident.to_string());
     syn::visit::visit_item_trait(visitor, item_trait);
     visitor.trait_stack.pop();
+    if bumped {
+        visitor.cfg_test_depth -= 1;
+    }
 }
 
 pub fn visit_impl_item_fn(visitor: &mut CodeVisitor, item_fn: &ImplItemFn) {
@@ -63,7 +84,9 @@ pub fn visit_impl_item_fn(visitor: &mut CodeVisitor, item_fn: &ImplItemFn) {
         .last()
         .cloned()
         .unwrap_or_else(|| "<impl>".to_string());
-    let is_test = has_test_attr(&item_fn.attrs) || visitor.in_cfg_test();
+    let is_test = has_test_attr(&item_fn.attrs)
+        || attrs_imply_cfg_test(&item_fn.attrs)
+        || visitor.in_cfg_test();
     let cfg_attrs = visitor.effective_cfg_attrs(render_cfg_attrs(&item_fn.attrs));
     let func_id = visitor.push_function(
         &meta,
@@ -95,7 +118,9 @@ pub fn visit_trait_item_fn(visitor: &mut CodeVisitor, item_fn: &TraitItemFn) {
         .last()
         .cloned()
         .unwrap_or_else(|| "<trait>".to_string());
-    let is_test = has_test_attr(&item_fn.attrs) || visitor.in_cfg_test();
+    let is_test = has_test_attr(&item_fn.attrs)
+        || attrs_imply_cfg_test(&item_fn.attrs)
+        || visitor.in_cfg_test();
     let cfg_attrs = visitor.effective_cfg_attrs(render_cfg_attrs(&item_fn.attrs));
     let func_id = visitor.push_function(
         &meta,
@@ -228,5 +253,146 @@ mod tests {
         visit_item_trait(&mut visitor, &item_trait);
         assert_eq!(visitor.functions.len(), 1);
         assert!(visitor.functions[0].is_test);
+    }
+
+    #[test]
+    fn visit_item_fn_marks_cfg_test_fn_as_test() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_fn: ItemFn = parse_quote! {
+            #[cfg(test)]
+            fn helper() {}
+        };
+        visit_item_fn(&mut visitor, &item_fn);
+        assert_eq!(visitor.functions.len(), 1);
+        assert!(visitor.functions[0].is_test);
+    }
+
+    #[test]
+    fn visit_item_impl_marks_methods_of_cfg_test_impl_as_test() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_impl: ItemImpl = parse_quote! {
+            #[cfg(test)]
+            impl Config {
+                pub fn test_default() -> Self {
+                    Self::default()
+                }
+            }
+        };
+        visit_item_impl(&mut visitor, &item_impl);
+        assert_eq!(visitor.functions.len(), 1);
+        assert!(visitor.functions[0].is_test);
+
+        // The cfg-test scope must not leak past the impl block.
+        let item_fn: ItemFn = parse_quote! {
+            fn production() {}
+        };
+        visit_item_fn(&mut visitor, &item_fn);
+        assert_eq!(visitor.functions.len(), 2);
+        assert!(!visitor.functions[1].is_test);
+    }
+
+    #[test]
+    fn visit_item_impl_without_cfg_test_keeps_methods_production() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_impl: ItemImpl = parse_quote! {
+            impl Config {
+                pub fn new() -> Self {
+                    Self::default()
+                }
+            }
+        };
+        visit_item_impl(&mut visitor, &item_impl);
+        assert_eq!(visitor.functions.len(), 1);
+        assert!(!visitor.functions[0].is_test);
+    }
+
+    #[test]
+    fn visit_item_trait_marks_methods_of_cfg_test_trait_as_test() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_trait: ItemTrait = parse_quote! {
+            #[cfg(test)]
+            trait Fixture {
+                fn build(&self);
+            }
+        };
+        visit_item_trait(&mut visitor, &item_trait);
+        assert_eq!(visitor.functions.len(), 1);
+        assert!(visitor.functions[0].is_test);
+    }
+
+    #[test]
+    fn visit_item_fn_keeps_cfg_not_test_fn_production() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_fn: ItemFn = parse_quote! {
+            #[cfg(not(test))]
+            fn wire_up() {}
+        };
+        visit_item_fn(&mut visitor, &item_fn);
+        assert_eq!(visitor.functions.len(), 1);
+        assert!(!visitor.functions[0].is_test);
+    }
+
+    #[test]
+    fn visit_item_impl_keeps_methods_of_cfg_not_test_impl_production() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_impl: ItemImpl = parse_quote! {
+            #[cfg(not(test))]
+            impl Config {
+                pub fn wire_up() -> Self {
+                    Self::default()
+                }
+            }
+        };
+        visit_item_impl(&mut visitor, &item_impl);
+        assert_eq!(visitor.functions.len(), 1);
+        assert!(!visitor.functions[0].is_test);
+    }
+
+    #[test]
+    fn visit_item_fn_keeps_test_feature_fn_production() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_fn: ItemFn = parse_quote! {
+            #[cfg(feature = "test-utils")]
+            fn helper() {}
+        };
+        visit_item_fn(&mut visitor, &item_fn);
+        assert_eq!(visitor.functions.len(), 1);
+        assert!(!visitor.functions[0].is_test);
+    }
+
+    #[test]
+    fn visit_item_fn_marks_cfg_all_test_fn_as_test() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_fn: ItemFn = parse_quote! {
+            #[cfg(all(test, unix))]
+            fn helper() {}
+        };
+        visit_item_fn(&mut visitor, &item_fn);
+        assert_eq!(visitor.functions.len(), 1);
+        assert!(visitor.functions[0].is_test);
+    }
+
+    #[test]
+    fn visit_item_fn_marks_fn_nested_in_cfg_test_fn_body_as_test() {
+        let mut visitor = CodeVisitor::new("test.rs".to_string());
+        let item_fn: ItemFn = parse_quote! {
+            #[cfg(test)]
+            fn outer() {
+                fn inner() {}
+            }
+        };
+        visit_item_fn(&mut visitor, &item_fn);
+        assert_eq!(visitor.functions.len(), 2);
+        assert_eq!(visitor.functions[1].name, "inner");
+        assert!(visitor.functions[0].is_test);
+        assert!(visitor.functions[1].is_test);
+
+        // The cfg-test scope must not leak past the outer fn.
+        let item_fn2: ItemFn = parse_quote! {
+            fn production() {}
+        };
+        visit_item_fn(&mut visitor, &item_fn2);
+        assert_eq!(visitor.functions.len(), 3);
+        assert!(!visitor.functions[2].is_test);
     }
 }
