@@ -480,7 +480,13 @@ fn json_output_is_pretty_formatted() {
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-    assert!(stdout.contains('\n'));
+    let json: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert!(json.is_object());
+    assert!(stdout.starts_with("{\n"), "pretty JSON opens the object on its own line");
+    assert!(
+        stdout.contains("\n  \"functions\": ["),
+        "pretty JSON indents keys and separates them with \": \""
+    );
 }
 
 #[test]
