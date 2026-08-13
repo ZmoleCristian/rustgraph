@@ -47,7 +47,7 @@ pub fn run(
             flat: false,
         };
         let report =
-            crate::app::callers::build_callers_report_with_options(
+            crate::callers::build_callers_report_with_options(
                 project,
                 &callers_req.query,
                 args.search_threshold,

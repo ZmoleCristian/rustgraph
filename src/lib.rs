@@ -23,8 +23,13 @@
 /// Stable serializable types consumed by library users and downstream crates.
 pub mod api;
 /// Application dispatch layer: wires parsed [`cli::Args`] to analysis backends.
+#[cfg(feature = "cli")]
 pub mod app;
+/// AST-based callers report builder (engine layer, always available to lib
+/// consumers).
+pub mod callers;
 /// Clap-derived CLI structs and enums for the `rustgraph` binary.
+#[cfg(feature = "cli")]
 pub mod cli;
 /// Project-level loader that aggregates per-file parse results into a single
 /// queryable [`project::ProjectData`].
@@ -34,9 +39,11 @@ pub mod query;
 
 /// MCP (Model Context Protocol) stdio server exposing rustgraph tools to AI
 /// clients.
+#[cfg(feature = "mcp")]
 pub mod mcp;
 /// Self-registration helpers for injecting the rustgraph MCP entry into
 /// Claude, Codex, and Gemini config files.
+#[cfg(feature = "mcp")]
 pub mod mcp_install;
 
 mod source_refs;

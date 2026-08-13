@@ -1,6 +1,6 @@
 //! Plain-text renderer for [`CallersReport`] output.
 
-use crate::app::callers::CallersReport;
+use crate::callers::CallersReport;
 use crate::format_cfg_annotation;
 use std::fmt::Write;
 
@@ -114,7 +114,7 @@ pub fn print_callers_text(report: &CallersReport) {
 mod tests {
     use super::*;
     use crate::FunctionInfo;
-    use crate::app::callers::{CallersMatch, UnresolvedCallSite};
+    use crate::callers::{CallersMatch, UnresolvedCallSite};
 
     fn fn_info(name: &str, file_path: &str, start_line: usize) -> FunctionInfo {
         FunctionInfo {

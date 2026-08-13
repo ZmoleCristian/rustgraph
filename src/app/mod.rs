@@ -4,7 +4,6 @@
 //! loads [`project::ProjectData`], applies optional search / changed-range filters,
 //! and delegates to `run::execute`.
 
-pub mod callers;
 pub mod changed;
 pub mod modes;
 pub mod project;
@@ -168,6 +167,7 @@ fn no_action_specified(args: &Args) -> bool {
 /// `ProjectData`, applies filters, then dispatches to the appropriate subcommand runner.
 pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
     if no_action_specified(&args) {
+        #[cfg(feature = "mcp")]
         crate::mcp_install::print_nudge_if_needed();
         Args::command().print_help()?;
         println!();

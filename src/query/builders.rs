@@ -3,7 +3,7 @@
 //! tracing around each call.
 
 use crate::api::{EnsemblePreset, EnsembleView};
-use crate::app::callers::{CallersReport, build_callers_report};
+use crate::callers::{CallersReport, build_callers_report};
 use crate::dead_code::{DeadCodeReport, build_dead_code_report};
 use crate::project::ProjectData;
 use crate::{FunctionEnsembleOptions, FunctionEnsembleResult, build_function_ensemble};

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use serde::Serialize;
 
-use super::super::callers::{CallerFunction, CallersReport, build_callers_report, build_callers_report_with_options};
+use crate::callers::{CallerFunction, CallersReport, build_callers_report, build_callers_report_with_options};
 use super::super::changed::{ChangedRanges, fn_was_changed};
 use super::super::modes::CallersRequest;
 use super::super::project::ProjectData;
@@ -462,7 +462,7 @@ pub fn run(
     Ok(())
 }
 
-use crate::app::callers::CallerSite;
+use crate::callers::CallerSite;
 
 /// One node in the transitive caller tree, holding the function info, its depth from the query
 /// target, and recursively resolved callers.

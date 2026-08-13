@@ -1,7 +1,7 @@
 //! Core callers-report construction: resolves a query via the ensemble pipeline,
 //! then groups resulting call sites by caller function and attaches source context.
 
-use super::super::project::ProjectData;
+use crate::project::ProjectData;
 use crate::{FunctionEnsembleOptions, build_function_ensemble, function_id};
 use std::collections::{BTreeMap, HashMap};
 

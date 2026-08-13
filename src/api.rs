@@ -1,3 +1,4 @@
+#[cfg(feature = "cli")]
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
@@ -5,7 +6,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// `Internal` restricts edges to functions defined within the indexed crate;
 /// `External` shows only cross-crate/unresolved callees; `All` combines both.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ValueEnum)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "cli", derive(ValueEnum))]
 pub enum CallGraphDetail {
     /// Only intra-crate call edges.
     Internal,
@@ -32,7 +34,8 @@ impl CallGraphDetail {
 /// Sets numeric limits (max results, max call-sites, neighborhood depth,
 /// lifecycle path counts) for ensemble building. Section selection is
 /// independent and controlled by [`EnsembleView`] / `--section`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ValueEnum)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "cli", derive(ValueEnum))]
 pub enum EnsemblePreset {
     /// Tightest limits (fewest results, shallow neighborhood).
     Quick,
@@ -47,7 +50,8 @@ pub enum EnsemblePreset {
 ///
 /// Selects which sections are included in the rendered output. Independent
 /// of [`EnsemblePreset`], which only governs numeric limits.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ValueEnum)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "cli", derive(ValueEnum))]
 pub enum EnsembleView {
     /// Default view: structs, call-sites, neighborhood, and dataflow, with the
     /// neighborhood section rendered in abbreviated form.
