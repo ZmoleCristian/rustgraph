@@ -312,9 +312,11 @@ fn paths_between_max_paths_old_flag_errors() {
 fn write_loose_resolution_fixture(dir: &tempfile::TempDir) -> String {
 
 
+    // A bare-name call site plus a Type-qualified query: strict matching
+    // zeroes, loose fallback rescues, and the stderr note is emitted.
     write_file(
         &dir.path().join("lib.rs"),
-        "pub fn foo() {}\nfn caller() { Bar::foo(); }\n",
+        "pub fn foo() -> u32 { 1 }\nfn caller_a() { let _ = foo(); }\n",
     );
     dir.path().to_string_lossy().to_string()
 }
@@ -324,26 +326,31 @@ fn loose_resolution_note_includes_ratio_format() {
     let fixture = tempdir().expect("tempdir");
     let base = write_loose_resolution_fixture(&fixture);
 
-    let out = run_rustgraph(&["--path", &base, "callers", "foo"]);
+    let out = run_rustgraph(&["--path", &base, "callers", "Bar::foo"]);
+    assert!(
+        out.status.success(),
+        "callers should succeed via loose fallback. stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
 
-    if stderr.contains("note:") && (stderr.contains("call sites") || stderr.contains("call site")) {
+    assert!(
+        stderr.contains("note:") && stderr.contains("call sites"),
+        "expected loose-fallback note on stderr. stderr:\n{stderr}"
+    );
+    assert!(
+        stderr.contains(" / ") && stderr.contains("%"),
+        "expected ratio format 'X / Y call sites (Z%)' in stderr note. stderr:\n{stderr}"
+    );
 
-        assert!(
-            stderr.contains(" / ") && stderr.contains("%"),
-            "expected ratio format 'X / Y call sites (Z%)' in stderr note. stderr:\n{stderr}"
-        );
-
-        assert!(
-            !stderr.contains("R23-W1 strict filter zeroed"),
-            "old alarming wording should be gone. stderr:\n{stderr}"
-        );
-        assert!(
-            stderr.contains("type-strict matching returned 0") || stderr.contains("resolved by name"),
-            "expected neutral explanation in stderr note. stderr:\n{stderr}"
-        );
-    }
-
+    assert!(
+        !stderr.contains("R23-W1 strict filter zeroed"),
+        "old alarming wording should be gone. stderr:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("type-strict matching returned 0") || stderr.contains("resolved by name"),
+        "expected neutral explanation in stderr note. stderr:\n{stderr}"
+    );
 }
 
 
