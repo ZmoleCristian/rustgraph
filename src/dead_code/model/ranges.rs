@@ -1,9 +1,9 @@
 //! AST-based source-range collectors for `#[cfg(test)]` blocks and `macro_rules!` definitions.
 
-use quote::ToTokens;
 use std::fs;
 use syn::{
-    Attribute, ImplItemFn, ItemFn, ItemMacro, ItemMod, TraitItemFn,
+    Attribute, ImplItemFn, ItemFn, ItemMacro, ItemMod, Meta, Token, TraitItemFn,
+    punctuated::Punctuated,
     spanned::Spanned,
     visit::{self, Visit},
 };
@@ -12,11 +12,23 @@ fn has_cfg_test(attrs: &[Attribute]) -> bool {
     attrs.iter().any(|attr| {
         attr.path().is_ident("cfg")
             && attr
-                .to_token_stream()
-                .to_string()
-                .to_lowercase()
-                .contains("test")
+                .parse_args::<Meta>()
+                .is_ok_and(|meta| cfg_predicate_enables_test(&meta))
     })
+}
+
+/// Return `true` if the cfg predicate compiles the item only under `test`:
+/// the bare `test` path, or `test` nested inside `all(...)` / `any(...)`.
+/// `not(test)` and strings that merely contain "test" (e.g.
+/// `feature = "latest"`) do not count.
+fn cfg_predicate_enables_test(meta: &Meta) -> bool {
+    match meta {
+        Meta::Path(path) => path.is_ident("test"),
+        Meta::List(list) if list.path.is_ident("all") || list.path.is_ident("any") => list
+            .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+            .is_ok_and(|nested| nested.iter().any(cfg_predicate_enables_test)),
+        _ => false,
+    }
 }
 
 #[derive(Default)]
@@ -212,6 +224,49 @@ mod tests {
         let path = dir.path().join("d.rs");
         std::fs::write(&path, "fn foo() { vec![1,2,3]; }\n").expect("write");
         let ranges = collect_macro_rules_ranges(path.to_str().unwrap());
+        assert!(ranges.is_empty());
+    }
+
+    fn parse_fn_attrs(src: &str) -> Vec<Attribute> {
+        syn::parse_str::<ItemFn>(src).expect("parse fn").attrs
+    }
+
+    #[test]
+    fn has_cfg_test_accepts_bare_test() {
+        assert!(has_cfg_test(&parse_fn_attrs("#[cfg(test)] fn f() {}")));
+    }
+
+    #[test]
+    fn has_cfg_test_accepts_test_nested_in_all_and_any() {
+        assert!(has_cfg_test(&parse_fn_attrs(
+            "#[cfg(all(test, unix))] fn f() {}"
+        )));
+        assert!(has_cfg_test(&parse_fn_attrs(
+            "#[cfg(any(test, doc))] fn f() {}"
+        )));
+    }
+
+    #[test]
+    fn has_cfg_test_rejects_not_test() {
+        assert!(!has_cfg_test(&parse_fn_attrs("#[cfg(not(test))] fn f() {}")));
+        assert!(!has_cfg_test(&parse_fn_attrs(
+            "#[cfg(not(all(test)))] fn f() {}"
+        )));
+    }
+
+    #[test]
+    fn has_cfg_test_rejects_feature_names_containing_test() {
+        assert!(!has_cfg_test(&parse_fn_attrs(
+            "#[cfg(feature = \"latest-api\")] fn f() {}"
+        )));
+    }
+
+    #[test]
+    fn collect_cfg_test_ranges_ignores_cfg_not_test_function() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("f.rs");
+        std::fs::write(&path, "#[cfg(not(test))]\nfn wire_up() {}\n").expect("write");
+        let ranges = collect_cfg_test_ranges(path.to_str().unwrap());
         assert!(ranges.is_empty());
     }
 
