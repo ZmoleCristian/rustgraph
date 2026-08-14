@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,7 +15,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -27,7 +28,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 fn grep_context_fixture() -> TempDir {
     let dir = tempdir().expect("tempdir");
@@ -43,7 +43,6 @@ fn grep_context_fixture() -> TempDir {
     );
     dir
 }
-
 
 fn grep_by_file_fixture() -> TempDir {
     let dir = tempdir().expect("tempdir");
@@ -66,7 +65,6 @@ fn grep_by_file_fixture() -> TempDir {
     dir
 }
 
-
 #[test]
 fn grep_context_dash_c_shows_n_before_and_after() {
     let fixture = grep_context_fixture();
@@ -81,8 +79,16 @@ fn grep_context_dash_c_shows_n_before_and_after() {
 
     let stdout = stdout_of(&out);
 
-    assert!(stdout.contains("before-2"), "expected before-2 in output; got:\n{}", stdout);
-    assert!(stdout.contains("after-2"), "expected after-2 in output; got:\n{}", stdout);
+    assert!(
+        stdout.contains("before-2"),
+        "expected before-2 in output; got:\n{}",
+        stdout
+    );
+    assert!(
+        stdout.contains("after-2"),
+        "expected after-2 in output; got:\n{}",
+        stdout
+    );
     assert!(
         !stdout.contains("before-3"),
         "expected before-3 NOT in output (outside -C 2 window); got:\n{}",
@@ -101,7 +107,6 @@ fn grep_context_dash_c_shows_n_before_and_after() {
     );
 }
 
-
 #[test]
 fn grep_context_dash_b_dash_a_asymmetric_window() {
     let fixture = grep_context_fixture();
@@ -116,22 +121,33 @@ fn grep_context_dash_b_dash_a_asymmetric_window() {
 
     let stdout = stdout_of(&out);
 
-    assert!(stdout.contains("before-1"), "expected before-1; got:\n{}", stdout);
+    assert!(
+        stdout.contains("before-1"),
+        "expected before-1; got:\n{}",
+        stdout
+    );
     assert!(
         !stdout.contains("before-2"),
         "expected before-2 NOT in output (outside -B 1); got:\n{}",
         stdout
     );
 
-    assert!(stdout.contains("after-1"), "expected after-1; got:\n{}", stdout);
-    assert!(stdout.contains("after-2"), "expected after-2; got:\n{}", stdout);
+    assert!(
+        stdout.contains("after-1"),
+        "expected after-1; got:\n{}",
+        stdout
+    );
+    assert!(
+        stdout.contains("after-2"),
+        "expected after-2; got:\n{}",
+        stdout
+    );
     assert!(
         !stdout.contains("after-3"),
         "expected after-3 NOT in output (outside -A 2); got:\n{}",
         stdout
     );
 }
-
 
 #[test]
 fn grep_by_file_emits_file_rollup_not_per_line() {
@@ -175,11 +191,15 @@ fn grep_by_file_emits_file_rollup_not_per_line() {
         stdout
     );
 
-
     let body_lines: Vec<&str> = stdout
         .lines()
-
-        .filter(|l| !l.starts_with("rustgraph") && !l.starts_with("total:") && !l.contains(": 1 match") && !l.contains(": 3 matches") && !l.contains(": 12 matches"))
+        .filter(|l| {
+            !l.starts_with("rustgraph")
+                && !l.starts_with("total:")
+                && !l.contains(": 1 match")
+                && !l.contains(": 3 matches")
+                && !l.contains(": 12 matches")
+        })
         .collect();
 
     let leaked_per_line = body_lines.iter().any(|l| l.contains("// needle"));
@@ -190,13 +210,20 @@ fn grep_by_file_emits_file_rollup_not_per_line() {
     );
 }
 
-
 #[test]
 fn grep_by_file_and_by_function_are_mutually_exclusive() {
     let fixture = grep_by_file_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&["-p", &base, "grep", "-F", "needle", "--by-file", "--by-function"]);
+    let out = run_rustgraph(&[
+        "-p",
+        &base,
+        "grep",
+        "-F",
+        "needle",
+        "--by-file",
+        "--by-function",
+    ]);
     assert!(
         !out.status.success(),
         "expected non-zero exit when --by-file + --by-function combined; stdout:\n{}",
@@ -214,7 +241,6 @@ fn grep_by_file_and_by_function_are_mutually_exclusive() {
         stderr
     );
 }
-
 
 #[test]
 fn grep_by_file_json_envelope_has_by_file_array() {
@@ -244,7 +270,6 @@ fn grep_by_file_json_envelope_has_by_file_array() {
         by_file
     );
 
-
     let first = by_file.first().expect("array non-empty");
     assert_eq!(
         first.get("count").and_then(|v| v.as_u64()),
@@ -253,11 +278,14 @@ fn grep_by_file_json_envelope_has_by_file_array() {
         first
     );
     assert!(
-        first.get("path").and_then(|v| v.as_str()).unwrap_or("").contains("foo.rs"),
+        first
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .contains("foo.rs"),
         "expected first entry path to contain foo.rs; got: {:?}",
         first
     );
-
 
     assert!(
         parsed.get("matches").is_none(),

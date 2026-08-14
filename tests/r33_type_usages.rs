@@ -27,7 +27,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -121,7 +124,15 @@ fn refs_finds_field_access_inside_assert_macro() {
     let dir = tempdir().unwrap();
     fixture(dir.path());
     let base = dir.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "-j", "refs", "cost_per_item", "--kind", "field"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "-j",
+        "refs",
+        "cost_per_item",
+        "--kind",
+        "field",
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let v: serde_json::Value = serde_json::from_str(&stdout_of(&out)).unwrap();
     let lines: Vec<(String, u64)> = v["refs"]
@@ -136,7 +147,9 @@ fn refs_finds_field_access_inside_assert_macro() {
         })
         .collect();
     assert!(
-        lines.iter().any(|(f, l)| f.ends_with("tests/store.rs") && *l == 8),
+        lines
+            .iter()
+            .any(|(f, l)| f.ends_with("tests/store.rs") && *l == 8),
         "assert_eq!(vm.sell_orders[0].cost_per_item, 75) read must be found: {lines:?}"
     );
     // Literal field init inside vec![SellOrder { cost_per_item: 75 }] is a
@@ -194,7 +207,10 @@ fn usages_covers_pattern_matches() {
         .flat_map(|s| s["entries"].as_array().unwrap().iter())
         .map(|e| e["kind"].as_str().unwrap().to_string())
         .collect();
-    assert!(kinds.iter().any(|k| k == "pattern"), "match-arm pattern: {kinds:?}");
+    assert!(
+        kinds.iter().any(|k| k == "pattern"),
+        "match-arm pattern: {kinds:?}"
+    );
     assert!(kinds.iter().any(|k| k == "struct"), "literals: {kinds:?}");
     assert!(kinds.iter().any(|k| k == "type"), "ascriptions: {kinds:?}");
 }
@@ -210,10 +226,10 @@ fn usages_answers_where_is_this_type_used() {
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let stdout = stdout_of(&out);
     for needle in [
-        "src/lib.rs:7",   // Vec<SellOrder> field in VendingMachine
-        "src/lib.rs:10",  // impl SellOrder
-        "src/lib.rs:16",  // fn ... -> SellOrder
-        "src/lib.rs:17",  // literal
+        "src/lib.rs:7",     // Vec<SellOrder> field in VendingMachine
+        "src/lib.rs:10",    // impl SellOrder
+        "src/lib.rs:16",    // fn ... -> SellOrder
+        "src/lib.rs:17",    // literal
         "tests/store.rs:6", // literal inside vec![]
     ] {
         assert!(stdout.contains(needle), "missing {needle} in:\n{stdout}");
@@ -227,7 +243,13 @@ fn usages_kind_filter_narrows_refs_section() {
     fixture(dir.path());
     let base = dir.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "-j", "usages", "SellOrder", "--kind", "struct",
+        "--path",
+        &base,
+        "-j",
+        "usages",
+        "SellOrder",
+        "--kind",
+        "struct",
     ]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let v: serde_json::Value = serde_json::from_str(&stdout_of(&out)).unwrap();
@@ -259,7 +281,10 @@ fn usages_on_fn_still_reports_callers() {
     let out = run_rustgraph(&["--path", &base, "usages", "to_sell_order"]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let stdout = stdout_of(&out);
-    assert!(stdout.contains("=== via callers"), "callers section: {stdout}");
+    assert!(
+        stdout.contains("=== via callers"),
+        "callers section: {stdout}"
+    );
     assert!(!stdout.contains("skipped — not a function"), "{stdout}");
 }
 
@@ -273,7 +298,10 @@ fn usages_rejects_unknown_kind() {
     let out = run_rustgraph(&["--path", &base, "usages", "SellOrder", "--kind", "banana"]);
     assert!(!out.status.success(), "unknown kind must fail");
     let stderr = stderr_of(&out);
-    assert!(stderr.contains("macro"), "error must list allowed values: {stderr}");
+    assert!(
+        stderr.contains("macro"),
+        "error must list allowed values: {stderr}"
+    );
 }
 
 /// Exact line numbers survive the macro-body re-parse (spans are preserved) —
@@ -293,7 +321,15 @@ fn macro_reparse_preserves_exact_lines() {
          }\n",
     );
     let base = dir.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "-j", "refs", "SellOrder", "--kind", "struct"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "-j",
+        "refs",
+        "SellOrder",
+        "--kind",
+        "struct",
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let v: serde_json::Value = serde_json::from_str(&stdout_of(&out)).unwrap();
     let lines: Vec<u64> = v["refs"]
@@ -302,5 +338,9 @@ fn macro_reparse_preserves_exact_lines() {
         .iter()
         .map(|r| r["line"].as_u64().unwrap())
         .collect();
-    assert_eq!(lines, vec![4, 5], "literal lines inside vec![] must be exact: {lines:?}");
+    assert_eq!(
+        lines,
+        vec![4, 5],
+        "literal lines inside vec![] must be exact: {lines:?}"
+    );
 }

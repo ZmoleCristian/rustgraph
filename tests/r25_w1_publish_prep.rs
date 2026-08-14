@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,13 +14,14 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 #[test]
 fn help_output_does_not_contain_internal_referee_codes() {
-
     let out = Command::new(env!("CARGO_BIN_EXE_rustgraph"))
         .arg("--help")
         .output()
@@ -48,7 +47,6 @@ fn help_output_does_not_contain_internal_referee_codes() {
 
 #[test]
 fn refs_long_help_does_not_contain_internal_codes() {
-
     let out = Command::new(env!("CARGO_BIN_EXE_rustgraph"))
         .args(["refs", "--help"])
         .output()
@@ -75,7 +73,6 @@ fn refs_long_help_does_not_contain_internal_codes() {
 
 #[test]
 fn call_graph_help_does_not_contain_r23_w4_reference() {
-
     let out = Command::new(env!("CARGO_BIN_EXE_rustgraph"))
         .args(["call-graph", "--help"])
         .output()
@@ -92,9 +89,7 @@ fn call_graph_help_does_not_contain_r23_w4_reference() {
     );
 }
 
-
 fn write_callers_fixture(dir: &tempfile::TempDir) -> String {
-
     let mut src = String::from("pub fn target() {}\n");
     for i in 0..10 {
         src.push_str(&format!("fn caller_{i}() {{ target(); }}\n"));
@@ -150,7 +145,6 @@ fn callers_max_results_long_flag_truncates_output() {
 
 #[test]
 fn callers_max_results_zero_shows_all() {
-
     let fixture = tempdir().expect("tempdir");
     let base = write_callers_fixture(&fixture);
 
@@ -176,9 +170,7 @@ fn callers_max_results_zero_shows_all() {
     );
 }
 
-
 fn write_find_in_fixture(dir: &tempfile::TempDir) -> String {
-
     fs::create_dir_all(dir.path().join("src/daemon")).expect("mkdir daemon");
     fs::create_dir_all(dir.path().join("src/session")).expect("mkdir session");
     write_file(
@@ -233,7 +225,6 @@ fn find_without_in_returns_global_hits() {
     );
 }
 
-
 fn write_paths_fixture(dir: &tempfile::TempDir) -> String {
     write_file(
         &dir.path().join("lib.rs"),
@@ -247,14 +238,21 @@ fn paths_between_max_results_long_flag_works() {
     let fixture = tempdir().expect("tempdir");
     let base = write_paths_fixture(&fixture);
 
-    let out = run_rustgraph(&["--path", &base, "paths-between", "a", "z", "--max-results", "1"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "paths-between",
+        "a",
+        "z",
+        "--max-results",
+        "1",
+    ]);
     assert!(
         out.status.success(),
         "paths-between --max-results 1 should succeed. stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("search clamped") || stdout.contains("[1 path(s)]"),
@@ -294,8 +292,15 @@ fn paths_between_max_paths_old_flag_errors() {
     let fixture = tempdir().expect("tempdir");
     let base = write_paths_fixture(&fixture);
 
-
-    let out = run_rustgraph(&["--path", &base, "paths-between", "a", "z", "--max-paths", "5"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "paths-between",
+        "a",
+        "z",
+        "--max-paths",
+        "5",
+    ]);
     assert!(
         !out.status.success(),
         "paths-between --max-paths should fail (hard rename). stderr:\n{}",
@@ -303,15 +308,14 @@ fn paths_between_max_paths_old_flag_errors() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("max-paths") || stderr.contains("unexpected") || stderr.contains("unrecognized"),
+        stderr.contains("max-paths")
+            || stderr.contains("unexpected")
+            || stderr.contains("unrecognized"),
         "expected error mentioning unknown flag. stderr:\n{stderr}"
     );
 }
 
-
 fn write_loose_resolution_fixture(dir: &tempfile::TempDir) -> String {
-
-
     // A bare-name call site plus a Type-qualified query: strict matching
     // zeroes, loose fallback rescues, and the stderr note is emitted.
     write_file(
@@ -352,7 +356,6 @@ fn loose_resolution_note_includes_ratio_format() {
         "expected neutral explanation in stderr note. stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn paths_between_long_help_includes_strict_resolution() {

@@ -108,19 +108,24 @@ mod tests {
 
     #[test]
     fn extract_assigned_var_from_call_line_handles_let_mut_binding() {
-        let out =
-            extract_assigned_var_from_call_line("    let mut foo = build(arg);", "build");
+        let out = extract_assigned_var_from_call_line("    let mut foo = build(arg);", "build");
         assert_eq!(out, Some("foo".to_string()));
     }
 
     #[test]
     fn extract_assigned_var_from_call_line_returns_none_when_no_assignment() {
-        assert_eq!(extract_assigned_var_from_call_line("    build(x);", "build"), None);
+        assert_eq!(
+            extract_assigned_var_from_call_line("    build(x);", "build"),
+            None
+        );
     }
 
     #[test]
     fn extract_assigned_var_from_call_line_returns_none_when_marker_missing() {
-        assert_eq!(extract_assigned_var_from_call_line("let x = noop();", "build"), None);
+        assert_eq!(
+            extract_assigned_var_from_call_line("let x = noop();", "build"),
+            None
+        );
     }
 
     #[test]

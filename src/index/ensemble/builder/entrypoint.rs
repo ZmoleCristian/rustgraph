@@ -74,7 +74,6 @@ pub fn build_function_ensemble(
 
     let mut matches = Vec::new();
 
-
     let mut callers_by_target: std::collections::HashMap<&str, std::collections::HashSet<String>> =
         std::collections::HashMap::new();
     for (caller_id, targets) in &resolved.resolved_outgoing {
@@ -99,7 +98,6 @@ pub fn build_function_ensemble(
             &structs_by_name,
         )?;
 
-
         let project_homonym_count = resolved
             .name_to_ids
             .get(func.name.as_str())
@@ -107,20 +105,15 @@ pub fn build_function_ensemble(
             .unwrap_or(0);
         let collision = project_homonym_count > 1;
 
-
         let has_method_homonym = collision
             && resolved
                 .name_to_ids
                 .get(func.name.as_str())
                 .map(|ids| {
                     ids.iter().any(|id| {
-                        resolved
-                            .function_by_id
-                            .get(id)
-                            .is_some_and(|f| {
-                                f.kind.starts_with("method(")
-                                    || f.kind.starts_with("trait_fn(")
-                            })
+                        resolved.function_by_id.get(id).is_some_and(|f| {
+                            f.kind.starts_with("method(") || f.kind.starts_with("trait_fn(")
+                        })
                     })
                 })
                 .unwrap_or(false);

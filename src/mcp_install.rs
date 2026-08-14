@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -54,11 +52,7 @@ impl RegStatus {
 /// is non-destructive (only the `rustgraph` entry is touched), so no backup
 /// copies are made.
 pub fn install_all() -> Vec<ClientReg> {
-    vec![
-        register_claude(),
-        register_codex(),
-        register_gemini(),
-    ]
+    vec![register_claude(), register_codex(), register_gemini()]
 }
 
 /// Remove the rustgraph MCP entry from every detected AI client config.
@@ -67,11 +61,7 @@ pub fn install_all() -> Vec<ClientReg> {
 /// or that do not currently contain the rustgraph entry are reported without
 /// error.
 pub fn uninstall_all() -> Vec<ClientReg> {
-    vec![
-        unregister_claude(),
-        unregister_codex(),
-        unregister_gemini(),
-    ]
+    vec![unregister_claude(), unregister_codex(), unregister_gemini()]
 }
 
 /// Query the current MCP registration state for every detected AI client.
@@ -116,7 +106,6 @@ fn target_args() -> Vec<String> {
 }
 
 fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
-
     let mut tmp_os = path.as_os_str().to_owned();
     tmp_os.push(".rustgraph-tmp");
     let tmp = PathBuf::from(tmp_os);
@@ -124,7 +113,6 @@ fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
     fs::rename(tmp, path)?;
     Ok(())
 }
-
 
 fn register_claude() -> ClientReg {
     let path = match claude_config_path() {
@@ -138,14 +126,22 @@ fn register_claude() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "claude", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "claude",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match merge_claude(&path) {
         Ok(true) => RegStatus::Registered,
         Ok(false) => RegStatus::AlreadyRegistered,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "claude", config_path: path, status }
+    ClientReg {
+        name: "claude",
+        config_path: path,
+        status,
+    }
 }
 
 fn unregister_claude() -> ClientReg {
@@ -160,14 +156,22 @@ fn unregister_claude() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "claude", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "claude",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match remove_claude(&path) {
         Ok(true) => RegStatus::Removed,
         Ok(false) => RegStatus::NotPresent,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "claude", config_path: path, status }
+    ClientReg {
+        name: "claude",
+        config_path: path,
+        status,
+    }
 }
 
 fn status_claude() -> ClientReg {
@@ -182,14 +186,22 @@ fn status_claude() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "claude", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "claude",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match check_claude(&path) {
         Ok(true) => RegStatus::AlreadyRegistered,
         Ok(false) => RegStatus::NotPresent,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "claude", config_path: path, status }
+    ClientReg {
+        name: "claude",
+        config_path: path,
+        status,
+    }
 }
 
 fn target_claude_value() -> serde_json::Value {
@@ -206,15 +218,15 @@ fn merge_claude(path: &Path) -> io::Result<bool> {
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
     let target = target_claude_value();
 
-    let obj = json
-        .as_object_mut()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "config root not a JSON object"))?;
+    let obj = json.as_object_mut().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "config root not a JSON object")
+    })?;
     let mcps = obj
         .entry("mcpServers".to_string())
         .or_insert_with(|| serde_json::json!({}));
-    let mcps_obj = mcps
-        .as_object_mut()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "mcpServers not a JSON object"))?;
+    let mcps_obj = mcps.as_object_mut().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "mcpServers not a JSON object")
+    })?;
 
     if mcps_obj.get("rustgraph") == Some(&target) {
         return Ok(false);
@@ -235,7 +247,8 @@ fn remove_claude(path: &Path) -> io::Result<bool> {
         .and_then(|m| m.as_object_mut())
         .map(|mcps| mcps.remove("rustgraph").is_some())
         .unwrap_or(false);
-    if removed {        let new_contents = serde_json::to_string_pretty(&json)?;
+    if removed {
+        let new_contents = serde_json::to_string_pretty(&json)?;
         write_atomic(path, &new_contents)?;
     }
     Ok(removed)
@@ -252,7 +265,6 @@ fn check_claude(path: &Path) -> io::Result<bool> {
     Ok(registered)
 }
 
-
 fn register_codex() -> ClientReg {
     let path = match codex_config_path() {
         Ok(p) => p,
@@ -265,14 +277,22 @@ fn register_codex() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "codex", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "codex",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match merge_codex(&path) {
         Ok(true) => RegStatus::Registered,
         Ok(false) => RegStatus::AlreadyRegistered,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "codex", config_path: path, status }
+    ClientReg {
+        name: "codex",
+        config_path: path,
+        status,
+    }
 }
 
 fn unregister_codex() -> ClientReg {
@@ -287,14 +307,22 @@ fn unregister_codex() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "codex", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "codex",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match remove_codex(&path) {
         Ok(true) => RegStatus::Removed,
         Ok(false) => RegStatus::NotPresent,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "codex", config_path: path, status }
+    ClientReg {
+        name: "codex",
+        config_path: path,
+        status,
+    }
 }
 
 fn status_codex() -> ClientReg {
@@ -309,21 +337,29 @@ fn status_codex() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "codex", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "codex",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match check_codex(&path) {
         Ok(true) => RegStatus::AlreadyRegistered,
         Ok(false) => RegStatus::NotPresent,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "codex", config_path: path, status }
+    ClientReg {
+        name: "codex",
+        config_path: path,
+        status,
+    }
 }
 
 fn merge_codex(path: &Path) -> io::Result<bool> {
     let contents = fs::read_to_string(path)?;
-    let mut doc: toml_edit::DocumentMut = contents
-        .parse()
-        .map_err(|e: toml_edit::TomlError| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+    let mut doc: toml_edit::DocumentMut = contents.parse().map_err(|e: toml_edit::TomlError| {
+        io::Error::new(io::ErrorKind::InvalidData, e.to_string())
+    })?;
 
     let already = doc
         .get("mcp_servers")
@@ -348,9 +384,9 @@ fn merge_codex(path: &Path) -> io::Result<bool> {
     let mcp_servers = doc
         .entry("mcp_servers")
         .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
-    let mcp_table = mcp_servers
-        .as_table_mut()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "mcp_servers not a TOML table"))?;
+    let mcp_table = mcp_servers.as_table_mut().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "mcp_servers not a TOML table")
+    })?;
 
     let mut entry = toml_edit::Table::new();
     entry["command"] = toml_edit::value(target_command());
@@ -366,27 +402,30 @@ fn merge_codex(path: &Path) -> io::Result<bool> {
 
 fn remove_codex(path: &Path) -> io::Result<bool> {
     let contents = fs::read_to_string(path)?;
-    let mut doc: toml_edit::DocumentMut = contents
-        .parse()
-        .map_err(|e: toml_edit::TomlError| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+    let mut doc: toml_edit::DocumentMut = contents.parse().map_err(|e: toml_edit::TomlError| {
+        io::Error::new(io::ErrorKind::InvalidData, e.to_string())
+    })?;
     let removed = doc
         .get_mut("mcp_servers")
         .and_then(|t| t.as_table_mut())
         .map(|t| t.remove("rustgraph").is_some())
         .unwrap_or(false);
-    if removed {        write_atomic(path, &doc.to_string())?;
+    if removed {
+        write_atomic(path, &doc.to_string())?;
     }
     Ok(removed)
 }
 
 fn check_codex(path: &Path) -> io::Result<bool> {
     let contents = fs::read_to_string(path)?;
-    let doc: toml_edit::DocumentMut = contents
-        .parse()
-        .map_err(|e: toml_edit::TomlError| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
-    Ok(doc.get("mcp_servers").and_then(|t| t.get("rustgraph")).is_some())
+    let doc: toml_edit::DocumentMut = contents.parse().map_err(|e: toml_edit::TomlError| {
+        io::Error::new(io::ErrorKind::InvalidData, e.to_string())
+    })?;
+    Ok(doc
+        .get("mcp_servers")
+        .and_then(|t| t.get("rustgraph"))
+        .is_some())
 }
-
 
 fn register_gemini() -> ClientReg {
     let path = match gemini_config_path() {
@@ -400,14 +439,22 @@ fn register_gemini() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "gemini", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "gemini",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match merge_gemini(&path) {
         Ok(true) => RegStatus::Registered,
         Ok(false) => RegStatus::AlreadyRegistered,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "gemini", config_path: path, status }
+    ClientReg {
+        name: "gemini",
+        config_path: path,
+        status,
+    }
 }
 
 fn unregister_gemini() -> ClientReg {
@@ -422,14 +469,22 @@ fn unregister_gemini() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "gemini", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "gemini",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match remove_gemini(&path) {
         Ok(true) => RegStatus::Removed,
         Ok(false) => RegStatus::NotPresent,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "gemini", config_path: path, status }
+    ClientReg {
+        name: "gemini",
+        config_path: path,
+        status,
+    }
 }
 
 fn status_gemini() -> ClientReg {
@@ -444,14 +499,22 @@ fn status_gemini() -> ClientReg {
         }
     };
     if !path.exists() {
-        return ClientReg { name: "gemini", config_path: path, status: RegStatus::NotFound };
+        return ClientReg {
+            name: "gemini",
+            config_path: path,
+            status: RegStatus::NotFound,
+        };
     }
     let status = match check_gemini(&path) {
         Ok(true) => RegStatus::AlreadyRegistered,
         Ok(false) => RegStatus::NotPresent,
         Err(e) => RegStatus::Failed(e.to_string()),
     };
-    ClientReg { name: "gemini", config_path: path, status }
+    ClientReg {
+        name: "gemini",
+        config_path: path,
+        status,
+    }
 }
 
 fn target_gemini_value() -> serde_json::Value {
@@ -468,15 +531,15 @@ fn merge_gemini(path: &Path) -> io::Result<bool> {
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
     let target = target_gemini_value();
 
-    let obj = json
-        .as_object_mut()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "config root not a JSON object"))?;
+    let obj = json.as_object_mut().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "config root not a JSON object")
+    })?;
     let mcps = obj
         .entry("mcpServers".to_string())
         .or_insert_with(|| serde_json::json!({}));
-    let mcps_obj = mcps
-        .as_object_mut()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "mcpServers not a JSON object"))?;
+    let mcps_obj = mcps.as_object_mut().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "mcpServers not a JSON object")
+    })?;
 
     if mcps_obj.get("rustgraph") == Some(&target) {
         return Ok(false);
@@ -497,7 +560,8 @@ fn remove_gemini(path: &Path) -> io::Result<bool> {
         .and_then(|m| m.as_object_mut())
         .map(|mcps| mcps.remove("rustgraph").is_some())
         .unwrap_or(false);
-    if removed {        let new_contents = serde_json::to_string_pretty(&json)?;
+    if removed {
+        let new_contents = serde_json::to_string_pretty(&json)?;
         write_atomic(path, &new_contents)?;
     }
     Ok(removed)
@@ -507,9 +571,11 @@ fn check_gemini(path: &Path) -> io::Result<bool> {
     let contents = fs::read_to_string(path)?;
     let json: serde_json::Value = serde_json::from_str(&contents)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
-    Ok(json.get("mcpServers").and_then(|m| m.get("rustgraph")).is_some())
+    Ok(json
+        .get("mcpServers")
+        .and_then(|m| m.get("rustgraph"))
+        .is_some())
 }
-
 
 /// Print the MCP-not-registered nudge banner to stderr if [`nudge_needed`] is true.
 pub fn print_nudge_if_needed() {
@@ -525,7 +591,10 @@ pub fn print_nudge_if_needed() {
 /// at least one AI client config exists, none of them register rustgraph yet,
 /// and the user has not opted out via `~/.config/rustgraph/no-nudge`.
 pub fn nudge_needed() -> bool {
-    if dirs::config_dir().map(|d| d.join("rustgraph/no-nudge").exists()).unwrap_or(false) {
+    if dirs::config_dir()
+        .map(|d| d.join("rustgraph/no-nudge").exists())
+        .unwrap_or(false)
+    {
         return false;
     }
     let regs = list_all();
@@ -533,7 +602,9 @@ pub fn nudge_needed() -> bool {
     if !any_client {
         return false;
     }
-    let any_registered = regs.iter().any(|r| r.status == RegStatus::AlreadyRegistered);
+    let any_registered = regs
+        .iter()
+        .any(|r| r.status == RegStatus::AlreadyRegistered);
     !any_registered
 }
 

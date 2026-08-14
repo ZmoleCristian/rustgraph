@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -35,7 +36,6 @@ fn pipe_fixture() -> tempfile::TempDir {
     );
     dir
 }
-
 
 #[test]
 fn regression_grep_escaped_pipe_zero_match_emits_hint() {
@@ -73,7 +73,6 @@ fn regression_grep_escaped_pipe_zero_match_emits_hint() {
         stderr
     );
 }
-
 
 #[test]
 fn regression_grep_unescaped_pipe_works_silently() {
@@ -114,13 +113,11 @@ fn regression_grep_unescaped_pipe_works_silently() {
     );
 }
 
-
 #[test]
 fn regression_grep_escaped_pipe_with_matches_still_emits_hint() {
     let dir = tempdir().expect("tempdir");
     write_file(
         &dir.path().join("src/lib.rs"),
-
         "// hits Foo|Bar marker\npub fn ok() {}\n",
     );
     let base = dir.path().to_string_lossy().to_string();
@@ -147,7 +144,6 @@ fn regression_grep_escaped_pipe_with_matches_still_emits_hint() {
 
     let stderr = stderr_of(&out);
     let lower_stderr = stderr.to_lowercase();
-
 
     assert!(
         lower_stderr.contains("did you mean"),

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,9 +14,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 fn fixture_same_name_free_fns() -> tempfile::TempDir {
     let fixture = tempdir().expect("tempdir");
@@ -39,7 +39,6 @@ fn fixture_same_name_free_fns() -> tempfile::TempDir {
     );
     fixture
 }
-
 
 fn fixture_method_vs_free_fn() -> tempfile::TempDir {
     let fixture = tempdir().expect("tempdir");
@@ -66,7 +65,6 @@ fn fixture_method_vs_free_fn() -> tempfile::TempDir {
     fixture
 }
 
-
 #[test]
 fn regression_callers_bare_name_returns_all_same_name_free_fns_loose() {
     let fixture = fixture_same_name_free_fns();
@@ -79,7 +77,6 @@ fn regression_callers_bare_name_returns_all_same_name_free_fns_loose() {
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("mod_a/lib.rs"),
@@ -95,7 +92,6 @@ fn regression_callers_bare_name_returns_all_same_name_free_fns_loose() {
     );
 }
 
-
 #[test]
 fn regression_callers_module_qualified_narrows_to_owning_module() {
     let fixture = fixture_same_name_free_fns();
@@ -109,7 +105,6 @@ fn regression_callers_module_qualified_narrows_to_owning_module() {
         String::from_utf8_lossy(&out.stdout)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("mod_a/lib.rs"),
@@ -129,23 +124,19 @@ fn regression_callers_module_qualified_narrows_to_owning_module() {
     );
 }
 
-
 #[test]
 fn regression_callers_symbol_id_is_authoritative_against_homonyms() {
     let fixture = fixture_same_name_free_fns();
     let base = fixture.path().to_string_lossy().to_string();
     let symbol_id = format!("{}/src/mod_a/lib.rs:1:foo", base);
 
-    let out = run_rustgraph(&[
-        "--path", &base, "callers", "--symbol-id", &symbol_id,
-    ]);
+    let out = run_rustgraph(&["--path", &base, "callers", "--symbol-id", &symbol_id]);
     assert!(
         out.status.success(),
         "callers --symbol-id should succeed. stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("mod_a/lib.rs"),
@@ -161,7 +152,6 @@ fn regression_callers_symbol_id_is_authoritative_against_homonyms() {
     );
 }
 
-
 #[test]
 fn regression_paths_between_symbol_id_to_is_authoritative() {
     let fixture = fixture_same_name_free_fns();
@@ -169,10 +159,7 @@ fn regression_paths_between_symbol_id_to_is_authoritative() {
     let mod_a_symbol = format!("{}/src/mod_a/lib.rs:1:foo", base);
     let mod_b_symbol = format!("{}/src/mod_b/lib.rs:1:foo", base);
 
-
-    let out_real = run_rustgraph(&[
-        "--path", &base, "paths-between", "caller_a", &mod_a_symbol,
-    ]);
+    let out_real = run_rustgraph(&["--path", &base, "paths-between", "caller_a", &mod_a_symbol]);
     assert!(
         out_real.status.success(),
         "paths-between to mod_a::foo should succeed. stderr:\n{}",
@@ -188,10 +175,7 @@ fn regression_paths_between_symbol_id_to_is_authoritative() {
         "expected mod_a/foo in path. stdout:\n{stdout_real}"
     );
 
-
-    let out_phantom = run_rustgraph(&[
-        "--path", &base, "paths-between", "caller_a", &mod_b_symbol,
-    ]);
+    let out_phantom = run_rustgraph(&["--path", &base, "paths-between", "caller_a", &mod_b_symbol]);
 
     let stdout_phantom = String::from_utf8_lossy(&out_phantom.stdout);
     assert!(
@@ -203,7 +187,6 @@ fn regression_paths_between_symbol_id_to_is_authoritative() {
         "PHANTOM: no path should be emitted. stdout:\n{stdout_phantom}"
     );
 }
-
 
 #[test]
 fn regression_dotted_receiver_method_call_does_not_leak_to_free_fn() {
@@ -218,7 +201,6 @@ fn regression_dotted_receiver_method_call_does_not_leak_to_free_fn() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
     assert!(
         stdout.contains("api/mod.rs"),
         "expected free fn refresh to appear in match list. stdout:\n{stdout}"
@@ -228,7 +210,6 @@ fn regression_dotted_receiver_method_call_does_not_leak_to_free_fn() {
         "expected method Daemon::refresh to appear in match list. stdout:\n{stdout}"
     );
 
-
     let lines: Vec<&str> = stdout.lines().collect();
     let mut free_fn_caller_count: Option<usize> = None;
     for (i, line) in lines.iter().enumerate() {
@@ -236,23 +217,25 @@ fn regression_dotted_receiver_method_call_does_not_leak_to_free_fn() {
             && let Some(next) = lines.get(i + 1)
             && next.contains("Callers:")
         {
-
-            let count_str: String = next.chars().filter(|c| c.is_ascii_digit()).take(1).collect();
+            let count_str: String = next
+                .chars()
+                .filter(|c| c.is_ascii_digit())
+                .take(1)
+                .collect();
             free_fn_caller_count = count_str.parse().ok();
         }
     }
     assert_eq!(
-        free_fn_caller_count, Some(0),
+        free_fn_caller_count,
+        Some(0),
         "PHANTOM: free fn `refresh` should have 0 callers (handler only calls daemon_state.refresh()). stdout:\n{stdout}"
     );
-
 
     assert!(
         stdout.contains("handler"),
         "expected handler as caller of Daemon::refresh. stdout:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_anti_oscillation_bare_name_no_narrowing() {
@@ -263,13 +246,23 @@ fn regression_anti_oscillation_bare_name_no_narrowing() {
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
-    assert!(stdout.contains("mod_a/lib.rs"), "anti-oscillation: bare query lost mod_a. stdout:\n{stdout}");
-    assert!(stdout.contains("mod_b/lib.rs"), "anti-oscillation: bare query lost mod_b. stdout:\n{stdout}");
-    assert!(stdout.contains("caller_a"), "anti-oscillation: lost caller_a. stdout:\n{stdout}");
-    assert!(stdout.contains("caller_b"), "anti-oscillation: lost caller_b. stdout:\n{stdout}");
+    assert!(
+        stdout.contains("mod_a/lib.rs"),
+        "anti-oscillation: bare query lost mod_a. stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("mod_b/lib.rs"),
+        "anti-oscillation: bare query lost mod_b. stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("caller_a"),
+        "anti-oscillation: lost caller_a. stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("caller_b"),
+        "anti-oscillation: lost caller_b. stdout:\n{stdout}"
+    );
 }
-
 
 #[test]
 fn regression_anti_oscillation_method_callers_still_show_method_callers() {
@@ -280,7 +273,6 @@ fn regression_anti_oscillation_method_callers_still_show_method_callers() {
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
     assert!(
         stdout.contains("state/mod.rs"),
         "anti-oscillation: method match block missing. stdout:\n{stdout}"
@@ -290,7 +282,6 @@ fn regression_anti_oscillation_method_callers_still_show_method_callers() {
         "anti-oscillation: handler should still appear as caller of Daemon::refresh. stdout:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_call_graph_module_qualified_drops_phantom_edges() {
@@ -305,7 +296,6 @@ fn regression_call_graph_module_qualified_drops_phantom_edges() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
     assert!(
         stdout.contains("mod_a/lib.rs"),
         "expected mod_a/foo in caller_a's expansion. stdout:\n{stdout}"
@@ -316,16 +306,13 @@ fn regression_call_graph_module_qualified_drops_phantom_edges() {
     );
 }
 
-
 #[test]
 fn regression_callers_symbol_id_other_homonym_authoritative() {
     let fixture = fixture_same_name_free_fns();
     let base = fixture.path().to_string_lossy().to_string();
     let symbol_id = format!("{}/src/mod_b/lib.rs:1:foo", base);
 
-    let out = run_rustgraph(&[
-        "--path", &base, "callers", "--symbol-id", &symbol_id,
-    ]);
+    let out = run_rustgraph(&["--path", &base, "callers", "--symbol-id", &symbol_id]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
 
@@ -343,7 +330,6 @@ fn regression_callers_symbol_id_other_homonym_authoritative() {
     );
 }
 
-
 #[test]
 fn regression_paths_between_bare_to_still_resolves_loose() {
     let fixture = fixture_same_name_free_fns();
@@ -352,7 +338,6 @@ fn regression_paths_between_bare_to_still_resolves_loose() {
     let out = run_rustgraph(&["--path", &base, "paths-between", "caller_a", "foo"]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("mod_a/lib.rs"),

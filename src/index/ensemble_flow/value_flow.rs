@@ -41,9 +41,8 @@ pub(in crate::index) fn build_value_flow_hints(
 
     for call_site in caller_call_sites {
         if !file_cache.contains_key(&call_site.file_path) {
-            let content =
-                fs::read_to_string(crate::index::resolve_read_path(&call_site.file_path))
-                    .unwrap_or_default();
+            let content = fs::read_to_string(crate::index::resolve_read_path(&call_site.file_path))
+                .unwrap_or_default();
             let lines = content
                 .lines()
                 .map(|line| line.to_string())
@@ -163,7 +162,6 @@ mod tests {
         let func = func_with_params(vec!["param: u32"]);
         let mut cache = HashMap::new();
 
-
         cache.insert(
             "src/lib.rs".to_string(),
             vec![
@@ -189,8 +187,7 @@ mod tests {
             callee_base: "second".to_string(),
             ..cs_first.clone()
         };
-        let hints =
-            build_value_flow_hints(&func, &[&cs_first, &cs_second], &mut cache, 1);
+        let hints = build_value_flow_hints(&func, &[&cs_first, &cs_second], &mut cache, 1);
         assert_eq!(hints.len(), 1);
     }
 }

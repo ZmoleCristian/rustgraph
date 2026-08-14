@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,9 +15,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 #[test]
 fn regression_callers_finds_pub_use_reexport_call_sites() {
@@ -56,8 +56,11 @@ fn regression_callers_finds_pub_use_reexport_call_sites() {
 
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let matches = json["matches"].as_array().expect("matches array");
-    assert!(!matches.is_empty(), "no matches for `target`; json:\n{}", json);
-
+    assert!(
+        !matches.is_empty(),
+        "no matches for `target`; json:\n{}",
+        json
+    );
 
     let mut real_target_callers: Vec<String> = Vec::new();
     let mut found_real_target_match = false;
@@ -91,7 +94,6 @@ fn regression_callers_finds_pub_use_reexport_call_sites() {
     );
 }
 
-
 #[test]
 fn regression_callers_and_usages_agree_on_caller_count() {
     let fixture = tempdir().expect("tempdir");
@@ -119,9 +121,14 @@ fn regression_callers_and_usages_agree_on_caller_count() {
 
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let callers_out = run_rustgraph(&[
-        "--path", &base, "callers", "target", "--target-in", "shared", "-j",
+        "--path",
+        &base,
+        "callers",
+        "target",
+        "--target-in",
+        "shared",
+        "-j",
     ]);
     assert!(
         callers_out.status.success(),
@@ -140,33 +147,23 @@ fn regression_callers_and_usages_agree_on_caller_count() {
         })
         .unwrap_or(0);
 
-
-    let usages_out = run_rustgraph(&[
-        "--path", &base, "usages", "target", "--in", "shared", "-j",
-    ]);
+    let usages_out = run_rustgraph(&["--path", &base, "usages", "target", "--in", "shared", "-j"]);
     assert!(
         usages_out.status.success(),
         "usages exited non-zero. stderr:\n{}",
         String::from_utf8_lossy(&usages_out.stderr)
     );
-    let usages_json: Value =
-        serde_json::from_slice(&usages_out.stdout).expect("valid usages json");
+    let usages_json: Value = serde_json::from_slice(&usages_out.stdout).expect("valid usages json");
     let usages_callers_section_count: usize = usages_json["sections"]
         .as_array()
         .map(|sections| {
             sections
                 .iter()
-                .filter(|s| {
-                    s["label"]
-                        .as_str()
-                        .map(|l| l == "callers")
-                        .unwrap_or(false)
-                })
+                .filter(|s| s["label"].as_str().map(|l| l == "callers").unwrap_or(false))
                 .map(|s| s["count"].as_u64().unwrap_or(0) as usize)
                 .sum()
         })
         .unwrap_or(0);
-
 
     let expected = 1;
     assert_eq!(
@@ -184,7 +181,6 @@ fn regression_callers_and_usages_agree_on_caller_count() {
     );
 }
 
-
 #[test]
 fn regression_call_graph_dot_with_root_emits_subgraph_with_edges() {
     let fixture = tempdir().expect("tempdir");
@@ -195,14 +191,7 @@ fn regression_call_graph_dot_with_root_emits_subgraph_with_edges() {
     );
 
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "--search",
-        "b",
-        "call-graph",
-        "--dot",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "--search", "b", "call-graph", "--dot"]);
     assert!(
         out.status.success(),
         "call-graph exited non-zero. stderr:\n{}",
@@ -226,7 +215,6 @@ fn regression_call_graph_dot_with_root_emits_subgraph_with_edges() {
     );
 }
 
-
 #[test]
 fn regression_call_graph_dot_root_subgraph_includes_root_node() {
     let fixture = tempdir().expect("tempdir");
@@ -237,14 +225,7 @@ fn regression_call_graph_dot_root_subgraph_includes_root_node() {
     );
 
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "--search",
-        "b",
-        "call-graph",
-        "--dot",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "--search", "b", "call-graph", "--dot"]);
     assert!(
         out.status.success(),
         "call-graph exited non-zero. stderr:\n{}",
@@ -258,7 +239,6 @@ fn regression_call_graph_dot_root_subgraph_includes_root_node() {
         stdout
     );
 
-
     let has_root_node = stdout.lines().any(|l| {
         let trimmed = l.trim_start();
         trimmed.starts_with('"')
@@ -271,7 +251,6 @@ fn regression_call_graph_dot_root_subgraph_includes_root_node() {
         "expected root node `b` in DOT subgraph, full DOT:\n{}",
         stdout
     );
-
 
     let edge_count = stdout.lines().filter(|l| l.contains(" -> ")).count();
     assert!(

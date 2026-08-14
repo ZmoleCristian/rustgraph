@@ -53,22 +53,40 @@ pub fn build_callers_report_with_options(
 ) -> Result<CallersReport, Box<dyn std::error::Error>> {
     let analysis = project.to_analysis();
     let sections = vec!["call-sites".to_string()];
-    let ensemble = build_function_ensemble(
-        &analysis,
-        query,
-        threshold,
-        FunctionEnsembleOptions {
-            max_results: 0,
-            max_call_sites: 0,
-            call_depth: 1,
-            max_related: 0,
-            max_lifecycle_paths: 0,
-            lifecycle_max_functions: 0,
-            lifecycle_types: None,
-            ensemble_sections: Some(&sections),
-            match_signature,
-        },
-    )?;
+    let options = || FunctionEnsembleOptions {
+        max_results: 0,
+        max_call_sites: 0,
+        call_depth: 1,
+        max_related: 0,
+        max_lifecycle_paths: 0,
+        lifecycle_max_functions: 0,
+        lifecycle_types: None,
+        ensemble_sections: Some(&sections),
+        match_signature,
+    };
+    let mut ensemble = build_function_ensemble(&analysis, query, threshold, options())?;
+
+    // A query naming a re-export alias (`pub use operator::add as add_operator`)
+    // matches no function, because the function's own name is the original —
+    // the alias exists only in the use tree. When nothing matched the query
+    // exactly and the reexport index maps it to a differently-named target,
+    // retry under the original name, narrowed to the module the re-export
+    // points into so a common name like `add` does not fan out project-wide.
+    let exact = ensemble.matches.iter().any(|m| m.info.name == query);
+    if !exact && let Some((target_name, module_hint)) = reexport_target(&analysis.reexports, query)
+    {
+        let mut retry = build_function_ensemble(&analysis, &target_name, threshold, options())?;
+        retry.matches.retain(|m| {
+            m.info.name == target_name
+                && match &module_hint {
+                    Some(hint) => file_in_module(&m.info.file_path, hint),
+                    None => true,
+                }
+        });
+        if !retry.matches.is_empty() {
+            ensemble = retry;
+        }
+    }
 
     let function_by_id = project
         .functions
@@ -161,12 +179,11 @@ pub fn build_callers_report_with_options(
                 .then(left.line.cmp(&right.line))
                 .then(left.column.cmp(&right.column))
         });
-        unresolved_call_site_locations
-            .dedup_by(|left, right| {
-                left.file_path == right.file_path
-                    && left.line == right.line
-                    && left.column == right.column
-            });
+        unresolved_call_site_locations.dedup_by(|left, right| {
+            left.file_path == right.file_path
+                && left.line == right.line
+                && left.column == right.column
+        });
 
         matches.push(CallersMatch {
             info: ensemble_match.info,
@@ -180,4 +197,83 @@ pub fn build_callers_report_with_options(
         query: query.to_string(),
         matches,
     })
+}
+
+/// Resolve `query` through the re-export index: returns the target's own name
+/// and the innermost real module segment of its path (skipping `crate`, `self`
+/// and `super`) when some `pub use path::original as query` renames it.
+///
+/// A plain re-export (name unchanged) returns `None` — the normal name match
+/// already covers it.
+fn reexport_target(
+    reexports: &[(String, String, String)],
+    query: &str,
+) -> Option<(String, Option<String>)> {
+    for (_module, exported, target) in reexports {
+        if exported != query {
+            continue;
+        }
+        let segments: Vec<&str> = target.split("::").collect();
+        let (last, prefix) = segments.split_last()?;
+        if *last == query {
+            continue;
+        }
+        let hint = prefix
+            .iter()
+            .rev()
+            .find(|seg| !matches!(**seg, "crate" | "self" | "super"))
+            .map(|seg| (*seg).to_string());
+        return Some(((*last).to_string(), hint));
+    }
+    None
+}
+
+fn file_in_module(file_path: &str, module: &str) -> bool {
+    file_path.ends_with(&format!("/{module}.rs"))
+        || file_path.contains(&format!("/{module}/"))
+        || file_path.ends_with(&format!("{module}.rs"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reexport_target_resolves_renamed_alias_with_module_hint() {
+        let reexports = vec![(
+            "store".to_string(),
+            "add_operator".to_string(),
+            "operator::add".to_string(),
+        )];
+        let resolved = reexport_target(&reexports, "add_operator").expect("alias resolves");
+        assert_eq!(resolved.0, "add");
+        assert_eq!(resolved.1.as_deref(), Some("operator"));
+    }
+
+    #[test]
+    fn reexport_target_skips_plain_reexports_and_crate_prefix() {
+        let reexports = vec![
+            (
+                "session".to_string(),
+                "target".to_string(),
+                "crate::shared::target".to_string(),
+            ),
+            (
+                "api".to_string(),
+                "renamed".to_string(),
+                "crate::inner".to_string(),
+            ),
+        ];
+        assert!(reexport_target(&reexports, "target").is_none());
+        let resolved = reexport_target(&reexports, "renamed").expect("renamed resolves");
+        assert_eq!(resolved.0, "inner");
+        assert_eq!(resolved.1, None);
+    }
+
+    #[test]
+    fn file_in_module_matches_file_and_directory_layouts() {
+        assert!(file_in_module("./src/store/operator.rs", "operator"));
+        assert!(file_in_module("./src/store/operator/mod.rs", "operator"));
+        assert!(!file_in_module("./src/store/org.rs", "operator"));
+    }
 }

@@ -77,8 +77,6 @@ fn print_ensemble_text_inner(ensemble: &FunctionEnsembleResult, summary_neighbor
             || !entry.neighborhood.unresolved_outgoing_calls.is_empty()
         {
             if summary_neighborhood {
-
-
                 if entry.neighborhood.upstream_total > 0 {
                     let names: Vec<&str> = entry
                         .neighborhood
@@ -87,7 +85,10 @@ fn print_ensemble_text_inner(ensemble: &FunctionEnsembleResult, summary_neighbor
                         .map(|r| r.name.as_str())
                         .take(3)
                         .collect();
-                    let extra = entry.neighborhood.upstream_total.saturating_sub(names.len());
+                    let extra = entry
+                        .neighborhood
+                        .upstream_total
+                        .saturating_sub(names.len());
                     let extra_part = if extra > 0 {
                         format!(", +{} more", extra)
                     } else {
@@ -117,7 +118,11 @@ fn print_ensemble_text_inner(ensemble: &FunctionEnsembleResult, summary_neighbor
                     } else {
                         String::new()
                     };
-                    let leading = if entry.neighborhood.upstream_total > 0 { "" } else { "\n" };
+                    let leading = if entry.neighborhood.upstream_total > 0 {
+                        ""
+                    } else {
+                        "\n"
+                    };
                     println!(
                         "{}Downstream: {} callee(s) ({}{})",
                         leading,

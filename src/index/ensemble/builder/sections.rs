@@ -77,7 +77,6 @@ pub fn build_struct_ensembles(
 
 use crate::index::resolve_read_path;
 
-
 fn path_match_score(file_path: &str, qualifier_segs: &[&str]) -> usize {
     let path_segs: Vec<&str> = file_path
         .trim_start_matches("./")
@@ -91,7 +90,6 @@ fn path_match_score(file_path: &str, qualifier_segs: &[&str]) -> usize {
         .count()
 }
 
-
 fn file_path_to_module_segs(file_path: &str) -> Vec<&str> {
     file_path
         .trim_start_matches("./")
@@ -100,7 +98,6 @@ fn file_path_to_module_segs(file_path: &str) -> Vec<&str> {
         .filter(|s| !s.is_empty() && !matches!(*s, "src" | "lib" | "main" | "mod"))
         .collect()
 }
-
 
 #[allow(clippy::too_many_arguments)]
 fn reexport_chain_matches(
@@ -116,11 +113,11 @@ fn reexport_chain_matches(
             continue;
         }
 
-
-        let cm_segs: Vec<&str> = containing_module.split("::").filter(|s| !s.is_empty()).collect();
+        let cm_segs: Vec<&str> = containing_module
+            .split("::")
+            .filter(|s| !s.is_empty())
+            .collect();
         if cm_segs.is_empty() {
-
-
             let stripped: Vec<&str> = qualifier_segs
                 .iter()
                 .copied()
@@ -130,8 +127,6 @@ fn reexport_chain_matches(
                 continue;
             }
         } else {
-
-
             let q_stripped: Vec<&str> = qualifier_segs
                 .iter()
                 .copied()
@@ -146,8 +141,10 @@ fn reexport_chain_matches(
             }
         }
 
-
-        let tfp_segs: Vec<&str> = target_full_path.split("::").filter(|s| !s.is_empty()).collect();
+        let tfp_segs: Vec<&str> = target_full_path
+            .split("::")
+            .filter(|s| !s.is_empty())
+            .collect();
         if tfp_segs.is_empty() {
             continue;
         }
@@ -158,9 +155,7 @@ fn reexport_chain_matches(
             .skip_while(|s| matches!(*s, "crate" | "self" | "super"))
             .collect();
 
-
         if tfp_qualifier.is_empty() {
-
             let our = path_match_score(target_path, &target_segs);
             let max_other = other_candidate_paths
                 .iter()
@@ -186,7 +181,6 @@ fn reexport_chain_matches(
             return true;
         }
 
-
         let target_segs_sliced = &target_segs[..];
         if target_segs_sliced.len() >= tfp_qualifier.len() {
             let tail = &target_segs_sliced[target_segs_sliced.len() - tfp_qualifier.len()..];
@@ -194,7 +188,6 @@ fn reexport_chain_matches(
                 return true;
             }
         }
-
 
         if let Some(last_q) = tfp_qualifier.pop()
             && let Some(last_t) = target_segs.last()
@@ -217,17 +210,13 @@ pub fn build_call_site_views<'a>(
     framework_refs_by_target: &HashMap<String, Vec<&'a CallSite>>,
     file_cache: &mut HashMap<String, Vec<String>>,
 
-
     resolved_caller_ids: Option<&std::collections::HashSet<String>>,
     resolver_claimed_elsewhere: &std::collections::HashSet<String>,
-
 
     other_candidate_paths: &[String],
     target_path: &str,
 
-
     name_collision: bool,
-
 
     has_method_homonym: bool,
 ) -> (usize, bool, Vec<CallSiteWithLine>) {
@@ -235,11 +224,9 @@ pub fn build_call_site_views<'a>(
         return (0, false, Vec::new());
     }
 
-
     let owner: Option<&str> = root_kind
         .strip_prefix("method(")
         .and_then(|s| s.strip_suffix(')'));
-
 
     let candidate_is_free_fn = root_kind == "function";
 
@@ -251,15 +238,12 @@ pub fn build_call_site_views<'a>(
                 return false;
             }
 
-
             if candidate_is_free_fn && has_method_homonym && cs.call_kind == "method" {
                 return false;
             }
 
             if name_collision {
                 if let Some(caller_id) = cs.caller_id.as_ref() {
-
-
                     let we_were_picked = resolved_caller_ids
                         .map(|s| s.contains(caller_id))
                         .unwrap_or(false);
@@ -268,7 +252,6 @@ pub fn build_call_site_views<'a>(
                     }
                 }
 
-
                 if cs.callee != cs.callee_base {
                     let qualifier_segs: Vec<&str> = cs
                         .callee
@@ -276,8 +259,6 @@ pub fn build_call_site_views<'a>(
                         .map(|(q, _)| q.split("::").collect())
                         .unwrap_or_default();
                     if !qualifier_segs.is_empty() {
-
-
                         let we_match_via_reexport = reexport_chain_matches(
                             func_name,
                             &qualifier_segs,
@@ -289,15 +270,12 @@ pub fn build_call_site_views<'a>(
                             return true;
                         }
 
-
                         let other_matches_via_reexport =
                             other_candidate_paths.iter().any(|other_path| {
                                 reexport_chain_matches(
                                     func_name,
                                     &qualifier_segs,
                                     other_path,
-
-
                                     &other_candidate_paths
                                         .iter()
                                         .filter(|p| p.as_str() != other_path.as_str())
@@ -323,16 +301,10 @@ pub fn build_call_site_views<'a>(
                 }
             }
 
-
             if let Some(owner) = owner {
                 if cs.callee != cs.callee_base {
-                    let qualifier = cs
-                        .callee
-                        .rsplit_once("::")
-                        .map(|(q, _)| q)
-                        .unwrap_or("");
+                    let qualifier = cs.callee.rsplit_once("::").map(|(q, _)| q).unwrap_or("");
                     let last = qualifier.rsplit("::").next().unwrap_or(qualifier);
-
 
                     let qualifier_is_type =
                         last.chars().next().is_some_and(|c| c.is_ascii_uppercase());
@@ -366,8 +338,6 @@ pub fn build_call_site_views<'a>(
     let mut views = Vec::new();
     for cs in call_sites_iter {
         if !file_cache.contains_key(&cs.file_path) {
-
-
             let resolved = resolve_read_path(&cs.file_path);
             let content = fs::read_to_string(&resolved).unwrap_or_default();
             let lines = content.lines().map(|l| l.to_string()).collect::<Vec<_>>();
@@ -625,10 +595,7 @@ mod tests {
     fn build_neighborhood_collects_unresolved_outgoing_calls() {
         let function_by_id = HashMap::new();
         let mut unresolved = HashMap::new();
-        unresolved.insert(
-            "root".to_string(),
-            vec!["external_fn".to_string()],
-        );
+        unresolved.insert("root".to_string(), vec!["external_fn".to_string()]);
         let nbh = build_neighborhood(
             "root",
             true,
@@ -639,7 +606,10 @@ mod tests {
             &function_by_id,
             &unresolved,
         );
-        assert_eq!(nbh.unresolved_outgoing_calls, vec!["external_fn".to_string()]);
+        assert_eq!(
+            nbh.unresolved_outgoing_calls,
+            vec!["external_fn".to_string()]
+        );
     }
 
     #[test]
@@ -664,14 +634,7 @@ mod tests {
     fn build_dataflow_hints_returns_empty_when_disabled() {
         let f = func("foo", "src/lib.rs", 1, 1);
         let mut cache = HashMap::new();
-        let hints = build_dataflow_hints(
-            &f,
-            "id",
-            false,
-            10,
-            &HashMap::new(),
-            &mut cache,
-        );
+        let hints = build_dataflow_hints(&f, "id", false, 10, &HashMap::new(), &mut cache);
         assert!(hints.is_empty());
     }
 

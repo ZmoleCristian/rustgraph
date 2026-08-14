@@ -93,12 +93,9 @@ mod tests {
 
     #[test]
     fn probe_binary_returns_error_for_unrunnable_binary() {
-
-
         let result = probe_binary("false");
 
         if result.is_ok() {
-
             return;
         }
         let err = result.err().unwrap().to_string();

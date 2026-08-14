@@ -44,7 +44,11 @@ impl TreeNode {
                     // Consts are rarer than fns/structs; only annotate when present
                     // to keep the common line shape stable.
                     let mut extra = String::new();
-                    for (n, label) in [(c.consts, "const"), (c.traits, "trait"), (c.aliases, "alias")] {
+                    for (n, label) in [
+                        (c.consts, "const"),
+                        (c.traits, "trait"),
+                        (c.aliases, "alias"),
+                    ] {
                         if n > 0 {
                             extra.push_str(&format!(", {} {}", n, label));
                         }
@@ -79,7 +83,6 @@ fn relative_path(file_path: &str, project_root: &Path) -> String {
     }
 }
 
-
 fn collect_prefix_suggestions(all_paths: &[String], needle: &str) -> Vec<(String, usize)> {
     use std::collections::HashMap;
     if needle.is_empty() {
@@ -89,10 +92,8 @@ fn collect_prefix_suggestions(all_paths: &[String], needle: &str) -> Vec<(String
     for raw in all_paths {
         let segments: Vec<&str> = raw.split('/').collect();
 
-
         let pos = segments.iter().position(|s| *s == needle);
         if let Some(idx) = pos {
-
             let bucket = segments[..=idx].join("/");
             *buckets.entry(bucket).or_insert(0) += 1;
         }
@@ -115,60 +116,87 @@ pub fn run(
     request: TreeRequest,
     changed: Option<&ChangedRanges>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
     let mut per_file: BTreeMap<String, FileCounts> = BTreeMap::new();
     for f in &project.functions {
         per_file
-            .entry(super::super::relativize_for_display(&f.file_path, &args.path, &args.also))
+            .entry(super::super::relativize_for_display(
+                &f.file_path,
+                &args.path,
+                &args.also,
+            ))
             .or_default()
             .functions += 1;
     }
     for s in &project.structs {
         per_file
-            .entry(super::super::relativize_for_display(&s.file_path, &args.path, &args.also))
+            .entry(super::super::relativize_for_display(
+                &s.file_path,
+                &args.path,
+                &args.also,
+            ))
             .or_default()
             .structs += 1;
     }
     for e in &project.enums {
         per_file
-            .entry(super::super::relativize_for_display(&e.file_path, &args.path, &args.also))
+            .entry(super::super::relativize_for_display(
+                &e.file_path,
+                &args.path,
+                &args.also,
+            ))
             .or_default()
             .enums += 1;
     }
     for c in &project.consts {
         per_file
-            .entry(super::super::relativize_for_display(&c.file_path, &args.path, &args.also))
+            .entry(super::super::relativize_for_display(
+                &c.file_path,
+                &args.path,
+                &args.also,
+            ))
             .or_default()
             .consts += 1;
     }
     for t in &project.type_decls {
         let entry = per_file
-            .entry(super::super::relativize_for_display(&t.file_path, &args.path, &args.also))
+            .entry(super::super::relativize_for_display(
+                &t.file_path,
+                &args.path,
+                &args.also,
+            ))
             .or_default();
-        if t.kind == "trait" { entry.traits += 1; } else { entry.aliases += 1; }
+        if t.kind == "trait" {
+            entry.traits += 1;
+        } else {
+            entry.aliases += 1;
+        }
     }
-
 
     for raw in &project.rust_files {
-        let rel = super::super::relativize_for_display(&raw.to_string_lossy(), &args.path, &args.also);
+        let rel =
+            super::super::relativize_for_display(&raw.to_string_lossy(), &args.path, &args.also);
         per_file.entry(rel).or_default();
     }
-
 
     if let Some(ranges) = changed {
         per_file.retain(|path, _| file_was_changed(path, ranges));
     }
 
-    let prefix_filter = request.prefix.as_deref().map(|p| p.trim_matches('/').to_string());
-
+    let prefix_filter = request
+        .prefix
+        .as_deref()
+        .map(|p| p.trim_matches('/').to_string());
 
     let strip_prefix = prefix_filter.as_ref().map(|p| {
-        if p.ends_with('/') { p.clone() } else { format!("{}/", p) }
+        if p.ends_with('/') {
+            p.clone()
+        } else {
+            format!("{}/", p)
+        }
     });
 
     let mut root = TreeNode::default();
     let mut included_files = 0usize;
-
 
     let all_paths: Vec<String> = per_file.keys().cloned().collect();
     for (rel, counts) in per_file {
@@ -183,20 +211,17 @@ pub fn run(
         };
         let parts: Vec<&str> = trimmed.split('/').filter(|s| !s.is_empty()).collect();
         if parts.is_empty() {
-
             continue;
         }
         root.insert(&parts, counts);
         included_files += 1;
     }
 
-
     if let Some(pf) = &prefix_filter
         && included_files == 0
         && !pf.is_empty()
     {
         let suggestions = collect_prefix_suggestions(&all_paths, pf);
-
 
         let bare_word_dir_hit = if !pf.contains('/') && !pf.contains(':') {
             let candidate_rel = format!("src/{}", pf);
@@ -219,13 +244,9 @@ pub fn run(
                 .map(|(p, n)| format!("'{}' ({} files)", p, n))
                 .collect::<Vec<_>>()
                 .join(" or ");
-            eprintln!(
-                "note: '{}' matched 0 files; try {}",
-                pf, body
-            );
+            eprintln!("note: '{}' matched 0 files; try {}", pf, body);
         }
     }
-
 
     let also_suffix = if args.also.is_empty() {
         String::new()
@@ -239,7 +260,11 @@ pub fn run(
                     .unwrap_or_else(|| p.display().to_string())
             })
             .collect();
-        format!(" + {} sibling crate(s) [{}]", labels.len(), labels.join(", "))
+        format!(
+            " + {} sibling crate(s) [{}]",
+            labels.len(),
+            labels.join(", ")
+        )
     };
     let header = match &prefix_filter {
         Some(p) => format!(
@@ -261,43 +286,69 @@ pub fn run(
     root.render("", request.files_only, &mut out);
 
     if args.json {
-
         let mut counts_list: BTreeMap<String, FileCounts> = BTreeMap::new();
         for f in &project.functions {
             counts_list
-                .entry(super::super::relativize_for_display(&f.file_path, &args.path, &args.also))
+                .entry(super::super::relativize_for_display(
+                    &f.file_path,
+                    &args.path,
+                    &args.also,
+                ))
                 .or_default()
                 .functions += 1;
         }
         for s in &project.structs {
             counts_list
-                .entry(super::super::relativize_for_display(&s.file_path, &args.path, &args.also))
+                .entry(super::super::relativize_for_display(
+                    &s.file_path,
+                    &args.path,
+                    &args.also,
+                ))
                 .or_default()
                 .structs += 1;
         }
         for e in &project.enums {
             counts_list
-                .entry(super::super::relativize_for_display(&e.file_path, &args.path, &args.also))
+                .entry(super::super::relativize_for_display(
+                    &e.file_path,
+                    &args.path,
+                    &args.also,
+                ))
                 .or_default()
                 .enums += 1;
         }
         for c in &project.consts {
             counts_list
-                .entry(super::super::relativize_for_display(&c.file_path, &args.path, &args.also))
+                .entry(super::super::relativize_for_display(
+                    &c.file_path,
+                    &args.path,
+                    &args.also,
+                ))
                 .or_default()
                 .consts += 1;
         }
         for t in &project.type_decls {
             let entry = counts_list
-                .entry(super::super::relativize_for_display(&t.file_path, &args.path, &args.also))
+                .entry(super::super::relativize_for_display(
+                    &t.file_path,
+                    &args.path,
+                    &args.also,
+                ))
                 .or_default();
-            if t.kind == "trait" { entry.traits += 1; } else { entry.aliases += 1; }
+            if t.kind == "trait" {
+                entry.traits += 1;
+            } else {
+                entry.aliases += 1;
+            }
         }
         for raw in &project.rust_files {
-            let rel = super::super::relativize_for_display(&raw.to_string_lossy(), &args.path, &args.also);
+            let rel = super::super::relativize_for_display(
+                &raw.to_string_lossy(),
+                &args.path,
+                &args.also,
+            );
             counts_list.entry(rel).or_default();
         }
-
 
         let entries: Vec<serde_json::Value> = counts_list
             .into_iter()
@@ -357,11 +408,19 @@ mod tests {
         let mut root = TreeNode::default();
         root.insert(
             &["src", "lib.rs"],
-            FileCounts { functions: 2, structs: 1, enums: 0, ..Default::default() },
+            FileCounts {
+                functions: 2,
+                structs: 1,
+                enums: 0,
+                ..Default::default()
+            },
         );
         root.insert(
             &["src", "main.rs"],
-            FileCounts { functions: 1, ..Default::default() },
+            FileCounts {
+                functions: 1,
+                ..Default::default()
+            },
         );
         let mut out = String::new();
         root.render("", false, &mut out);
@@ -375,7 +434,10 @@ mod tests {
         let mut root = TreeNode::default();
         root.insert(
             &["lib.rs"],
-            FileCounts { functions: 5, ..Default::default() },
+            FileCounts {
+                functions: 5,
+                ..Default::default()
+            },
         );
         let mut out = String::new();
         root.render("", true, &mut out);
@@ -385,7 +447,6 @@ mod tests {
 
     #[test]
     fn tree_json_round_trips_paths_with_quote_and_backslash() {
-
         let weird = r#"src/odd "file"\with-backslash.rs"#;
         let entry = serde_json::json!({
             "path": weird,
@@ -393,9 +454,7 @@ mod tests {
             "structs": 1usize,
             "enums": 0usize,
         });
-        let payload = serde_json::to_string_pretty(&vec![entry])
-            .expect("serialize entry array");
-
+        let payload = serde_json::to_string_pretty(&vec![entry]).expect("serialize entry array");
 
         let parsed: serde_json::Value =
             serde_json::from_str(&payload).expect("payload must be valid JSON");

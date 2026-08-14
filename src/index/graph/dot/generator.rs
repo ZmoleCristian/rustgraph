@@ -20,7 +20,6 @@ pub fn generate_call_graph(
     dot_graph.push_str("  node [shape=box, style=rounded];\n");
     dot_graph.push_str("  edge [color=blue, fontsize=10];\n\n");
 
-
     let mut name_to_ids: HashMap<String, Vec<String>> = HashMap::new();
     let mut node_ids = HashSet::new();
 
@@ -193,7 +192,6 @@ mod tests {
         assert!(dot.contains("\"src/a.rs:1:alpha\""));
         assert!(dot.contains("\"src/b.rs:2:beta\""));
 
-
         assert!(dot.contains(r"alpha\\na.rs:1"));
         assert!(dot.contains(r"beta\\nb.rs:2"));
     }
@@ -215,7 +213,8 @@ mod tests {
             line: 1,
             column: 0,
         };
-        let dot = generate_call_graph(&project, &funcs, &HashMap::new(), &[cs], "internal").unwrap();
+        let dot =
+            generate_call_graph(&project, &funcs, &HashMap::new(), &[cs], "internal").unwrap();
         assert!(dot.contains("\"src/a.rs:1:caller\" -> \"src/b.rs:5:callee\";"));
     }
 
@@ -234,7 +233,8 @@ mod tests {
             line: 1,
             column: 0,
         };
-        let dot = generate_call_graph(&project, &funcs, &HashMap::new(), &[cs], "external").unwrap();
+        let dot =
+            generate_call_graph(&project, &funcs, &HashMap::new(), &[cs], "external").unwrap();
         assert!(dot.contains("ext::std::fs::read_to_string"));
         assert!(dot.contains("style=dashed"));
     }

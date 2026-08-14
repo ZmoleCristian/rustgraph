@@ -82,7 +82,10 @@ mod refs_tests {
     fn extract_macro_function_refs_finds_known_callees_in_macro_body() {
         let path = write_temp("fn x() { tokio::join!(my_handler(), other()); }\n");
         let mut cache = HashMap::new();
-        let candidate: HashSet<String> = ["my_handler", "other"].iter().map(|s| s.to_string()).collect();
+        let candidate: HashSet<String> = ["my_handler", "other"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         let cs = macro_cs("join", path.to_str().unwrap());
 
         let refs = extract_macro_function_refs(&[cs], &mut cache, &candidate);

@@ -248,7 +248,9 @@ mod tests {
 
     #[test]
     fn has_cfg_test_rejects_not_test() {
-        assert!(!has_cfg_test(&parse_fn_attrs("#[cfg(not(test))] fn f() {}")));
+        assert!(!has_cfg_test(&parse_fn_attrs(
+            "#[cfg(not(test))] fn f() {}"
+        )));
         assert!(!has_cfg_test(&parse_fn_attrs(
             "#[cfg(not(all(test)))] fn f() {}"
         )));
@@ -274,11 +276,7 @@ mod tests {
     fn collect_cfg_test_ranges_marks_cfg_test_function_attr() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("e.rs");
-        std::fs::write(
-            &path,
-            "fn live() {}\n#[cfg(test)]\nfn helper() {}\n",
-        )
-        .expect("write");
+        std::fs::write(&path, "fn live() {}\n#[cfg(test)]\nfn helper() {}\n").expect("write");
         let ranges = collect_cfg_test_ranges(path.to_str().unwrap());
         assert!(!ranges.is_empty());
     }

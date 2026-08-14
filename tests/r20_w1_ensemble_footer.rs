@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -47,7 +48,6 @@ pub fn r20_caller_fn() {
     dir
 }
 
-
 #[test]
 fn regression_ensemble_summary_default_shows_truncation_footer() {
     let fixture = small_fixture();
@@ -69,15 +69,12 @@ fn regression_ensemble_summary_default_shows_truncation_footer() {
     );
 }
 
-
 #[test]
 fn regression_ensemble_view_full_suppresses_truncation_footer() {
     let fixture = small_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "-p", &base, "ensemble", "r20_target_fn", "--view", "full",
-    ]);
+    let out = run_rustgraph(&["-p", &base, "ensemble", "r20_target_fn", "--view", "full"]);
     assert!(
         out.status.success(),
         "--view full ensemble failed: stdout={} stderr={}",
@@ -97,16 +94,20 @@ fn regression_ensemble_view_full_suppresses_truncation_footer() {
     );
 }
 
-
 #[test]
 fn regression_ensemble_section_override_suppresses_truncation_footer() {
     let fixture = small_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "ensemble", "r20_target_fn",
-        "--section", "dataflow",
-        "--section", "neighborhood",
+        "-p",
+        &base,
+        "ensemble",
+        "r20_target_fn",
+        "--section",
+        "dataflow",
+        "--section",
+        "neighborhood",
     ]);
     assert!(
         out.status.success(),
@@ -134,12 +135,10 @@ fn regression_ensemble_section_override_suppresses_truncation_footer() {
     );
 }
 
-
 #[test]
 fn regression_ensemble_footer_only_references_documented_flags() {
     let fixture = small_fixture();
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let help = run_rustgraph(&["ensemble", "--help"]);
     assert!(
@@ -149,7 +148,6 @@ fn regression_ensemble_footer_only_references_documented_flags() {
     );
     let help_text = stdout_of(&help);
 
-
     let run = run_rustgraph(&["-p", &base, "ensemble", "r20_target_fn"]);
     assert!(
         run.status.success(),
@@ -158,7 +156,6 @@ fn regression_ensemble_footer_only_references_documented_flags() {
     );
     let run_text = stdout_of(&run);
 
-
     let footer_start = run_text
         .find("[summary view")
         .expect("expected the summary-view footer block in default output");
@@ -166,7 +163,6 @@ fn regression_ensemble_footer_only_references_documented_flags() {
         .find(']')
         .expect("expected the footer block to be terminated by `]`");
     let footer = &run_text[footer_start..footer_start + footer_end + 1];
-
 
     let flag_tokens: Vec<&str> = footer
         .split(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
@@ -179,8 +175,6 @@ fn regression_ensemble_footer_only_references_documented_flags() {
     );
 
     for tok in &flag_tokens {
-
-
         let needle_with_space = format!("{} ", tok);
         let needle_with_newline = format!("{}\n", tok);
         let needle_with_eq = format!("{}=", tok);

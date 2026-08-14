@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,13 +15,15 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 #[test]
 fn regression_short_query_suggestions_drop_similarity_one() {
@@ -39,7 +39,6 @@ pub fn delta_probe() {}
 "#,
     );
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["--path", &base, "find", "zyq"]);
     assert!(
@@ -58,13 +57,11 @@ pub fn delta_probe() {}
         "rescue note must NOT fire when fallback also returns 0 (genuine no-match); got:\n{stderr}"
     );
 
-
     assert!(
         !stderr.contains("similarity 1.00"),
         "short-query did-you-mean must drop similarity 1.00 entries; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn regression_short_query_run_now_rescues_via_fallback() {
@@ -101,7 +98,6 @@ pub fn unrelated_helper() {}
     );
 }
 
-
 #[test]
 fn regression_multi_term_or_query_unaffected_by_suggestion_filter() {
     let fixture = tempdir().expect("tempdir");
@@ -135,11 +131,9 @@ pub fn unrelated() {}
     );
 }
 
-
 #[test]
 fn regression_long_query_drops_suggestions_above_threshold() {
     let fixture = tempdir().expect("tempdir");
-
 
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -150,7 +144,6 @@ pub fn complete_unrelated() {}
 "#,
     );
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&[
         "--path",
@@ -167,8 +160,10 @@ pub fn complete_unrelated() {}
         stderr_of(&out)
     );
     let stderr = stderr_of(&out);
-    assert!(stderr.contains("no match"), "expected 'no match' header; got: {stderr}");
-
+    assert!(
+        stderr.contains("no match"),
+        "expected 'no match' header; got: {stderr}"
+    );
 
     assert!(
         !stderr.contains("similarity 1.00"),
@@ -176,11 +171,9 @@ pub fn complete_unrelated() {}
     );
 }
 
-
 #[test]
 fn regression_suggestions_still_surface_genuine_fuzz_below_threshold() {
     let fixture = tempdir().expect("tempdir");
-
 
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -211,7 +204,6 @@ fn regression_suggestions_still_surface_genuine_fuzz_below_threshold() {
     );
 }
 
-
 #[test]
 fn regression_match_signature_matches_param_and_return_text() {
     let fixture = tempdir().expect("tempdir");
@@ -227,9 +219,7 @@ pub fn unrelated_helper() -> u32 { 0 }
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-
-    let out_default =
-        run_rustgraph(&["--path", &base, "find", "InventoryState", "-j", "--func"]);
+    let out_default = run_rustgraph(&["--path", &base, "find", "InventoryState", "-j", "--func"]);
     assert!(
         !out_default.status.success(),
         "expected non-zero exit when filtering to fns only with no fn name match; \
@@ -242,7 +232,6 @@ pub fn unrelated_helper() -> u32 { 0 }
         stderr_default.contains("no match"),
         "expected 'no match' for fn-only without --match-signature; got: {stderr_default}"
     );
-
 
     let out_wide = run_rustgraph(&[
         "--path",
@@ -273,4 +262,3 @@ pub fn unrelated_helper() -> u32 { 0 }
         "expected both signature-text matches; got: {names:?}"
     );
 }
-

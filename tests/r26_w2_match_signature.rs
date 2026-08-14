@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,7 +15,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -27,7 +28,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 fn state_mixed_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -44,7 +44,6 @@ pub fn unrelated_helper() -> u32 { 0 }
     dir
 }
 
-
 fn zorblax_sig_only_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
@@ -54,16 +53,12 @@ fn zorblax_sig_only_fixture() -> tempfile::TempDir {
     dir
 }
 
-
 #[test]
 fn additive_returns_union_when_same_kind_has_name_and_sig() {
     let fixture = state_mixed_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-
-    let out = run_rustgraph(&[
-        "-p", &base, "--match-signature", "find", "State", "--func",
-    ]);
+    let out = run_rustgraph(&["-p", &base, "--match-signature", "find", "State", "--func"]);
     assert!(
         out.status.success(),
         "find --match-signature --func should succeed; status={:?} stderr={}",
@@ -71,7 +66,6 @@ fn additive_returns_union_when_same_kind_has_name_and_sig() {
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-
 
     assert!(
         stdout.contains("process_state"),
@@ -83,7 +77,6 @@ fn additive_returns_union_when_same_kind_has_name_and_sig() {
         stdout.contains("[name ~0."),
         "expected scored `[name ~0.NN]` tag for process_state; got stdout:\n{stdout}"
     );
-
 
     assert!(
         stdout.contains("handle_event"),
@@ -103,7 +96,6 @@ fn additive_returns_union_when_same_kind_has_name_and_sig() {
         "unrelated_helper has no State match anywhere; should not appear; got stdout:\n{stdout}"
     );
 }
-
 
 #[test]
 fn sig_only_query_preserved() {
@@ -128,7 +120,6 @@ fn sig_only_query_preserved() {
     );
 }
 
-
 #[test]
 fn default_mode_unchanged_no_match_exits_one() {
     let fixture = zorblax_sig_only_fixture();
@@ -152,7 +143,6 @@ fn default_mode_unchanged_no_match_exits_one() {
         "R26-W2 note keyed on --match-signature; default mode stays quiet; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn default_mode_unchanged_name_only() {
@@ -190,15 +180,12 @@ fn default_mode_unchanged_name_only() {
     );
 }
 
-
 #[test]
 fn additive_json_carries_match_kind_per_hit() {
     let fixture = state_mixed_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "-p", &base, "--match-signature", "find", "State", "-j",
-    ]);
+    let out = run_rustgraph(&["-p", &base, "--match-signature", "find", "State", "-j"]);
     assert!(
         out.status.success(),
         "find --match-signature -j must succeed; status={:?} stderr={}",
@@ -206,7 +193,6 @@ fn additive_json_carries_match_kind_per_hit() {
         stderr_of(&out)
     );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-
 
     let structs = json["structs"].as_array().expect("structs array");
     assert!(
@@ -220,7 +206,6 @@ fn additive_json_carries_match_kind_per_hit() {
             "struct State should be tagged `name`; got {mk:?} on {s:#?}"
         );
     }
-
 
     let funcs = json["functions"].as_array().expect("functions array");
     assert!(
@@ -250,7 +235,6 @@ fn additive_json_carries_match_kind_per_hit() {
     );
 }
 
-
 #[test]
 fn stderr_note_mixed_emits_additive_breakdown() {
     let fixture = state_mixed_fixture();
@@ -274,7 +258,6 @@ fn stderr_note_mixed_emits_additive_breakdown() {
         "OLD-format `0 name matches; showing` must not fire when name hits exist; got stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn stderr_note_silent_when_additive_added_nothing() {
@@ -307,14 +290,18 @@ fn stderr_note_silent_when_additive_added_nothing() {
     );
 }
 
-
 #[test]
 fn r22_w1_sig_tag_still_renders_in_additive_path() {
     let fixture = zorblax_sig_only_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "--match-signature", "find", "Zorblax", "--func",
+        "-p",
+        &base,
+        "--match-signature",
+        "find",
+        "Zorblax",
+        "--func",
     ]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
     let stdout = stdout_of(&out);
@@ -328,15 +315,12 @@ fn r22_w1_sig_tag_still_renders_in_additive_path() {
     );
 }
 
-
 #[test]
 fn exact_mode_ignores_match_signature_in_additive_path() {
     let fixture = state_mixed_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "-p", &base, "--match-signature", "find", "State", "--exact",
-    ]);
+    let out = run_rustgraph(&["-p", &base, "--match-signature", "find", "State", "--exact"]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
     let stdout = stdout_of(&out);
     assert!(
@@ -358,11 +342,8 @@ fn exact_mode_ignores_match_signature_in_additive_path() {
     );
 }
 
-
 #[test]
 fn help_text_documents_additive_semantic() {
-
-
     let out = run_rustgraph(&["find", "--help"]);
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     assert!(

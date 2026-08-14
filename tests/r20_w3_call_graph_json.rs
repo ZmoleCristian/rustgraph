@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,7 +15,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -31,10 +32,8 @@ const CHAIN_FIXTURE: &str = "pub fn a() { b(); }\n\
                              pub fn b() { c(); }\n\
                              pub fn c() {}\n";
 
-
 const EXTERNAL_FIXTURE: &str = "pub fn a() { b(); let _ = format!(\"x\"); }\n\
                                 pub fn b() {}\n";
-
 
 #[test]
 fn regression_call_graph_json_emits_valid_json() {
@@ -65,7 +64,6 @@ fn regression_call_graph_json_emits_valid_json() {
     );
 }
 
-
 #[test]
 fn regression_call_graph_json_includes_kept_functions() {
     let fixture = tempdir().expect("tempdir");
@@ -95,7 +93,6 @@ fn regression_call_graph_json_includes_kept_functions() {
     }
 }
 
-
 #[test]
 fn regression_call_graph_json_includes_internal_edges() {
     let fixture = tempdir().expect("tempdir");
@@ -109,8 +106,10 @@ fn regression_call_graph_json_includes_internal_edges() {
         .get("functions")
         .and_then(|v| v.as_array())
         .expect("functions[]");
-    let edges = parsed.get("edges").and_then(|v| v.as_array()).expect("edges[]");
-
+    let edges = parsed
+        .get("edges")
+        .and_then(|v| v.as_array())
+        .expect("edges[]");
 
     let id_of = |name: &str| -> Option<String> {
         for f in functions {
@@ -144,7 +143,6 @@ fn regression_call_graph_json_includes_internal_edges() {
     );
 }
 
-
 #[test]
 fn regression_call_graph_json_omits_external_edges_by_default() {
     let fixture = tempdir().expect("tempdir");
@@ -154,17 +152,26 @@ fn regression_call_graph_json_omits_external_edges_by_default() {
     let out = run_rustgraph(&["-p", &base, "call-graph", "--root", "a", "-j"]);
     assert!(out.status.success(), "exit failed: {}", stderr_of(&out));
     let parsed: Value = serde_json::from_str(&stdout_of(&out)).expect("valid JSON");
-    let edges = parsed.get("edges").and_then(|v| v.as_array()).expect("edges[]");
+    let edges = parsed
+        .get("edges")
+        .and_then(|v| v.as_array())
+        .expect("edges[]");
 
     for edge in edges {
-        let name = edge.get("callee_name").and_then(|n| n.as_str()).unwrap_or("");
+        let name = edge
+            .get("callee_name")
+            .and_then(|n| n.as_str())
+            .unwrap_or("");
         assert!(
             !name.contains("format"),
             "expected NO format-related external edge by default; found edge={:#?}\nfull edges:\n{:#?}",
             edge,
             edges
         );
-        let kind = edge.get("callee_kind").and_then(|k| k.as_str()).unwrap_or("");
+        let kind = edge
+            .get("callee_kind")
+            .and_then(|k| k.as_str())
+            .unwrap_or("");
         assert_ne!(
             kind, "external",
             "expected NO external-kind edges by default; found edge={:#?}",
@@ -172,7 +179,6 @@ fn regression_call_graph_json_omits_external_edges_by_default() {
         );
     }
 }
-
 
 #[test]
 fn regression_call_graph_json_includes_external_with_show_external() {
@@ -191,7 +197,10 @@ fn regression_call_graph_json_includes_external_with_show_external() {
     ]);
     assert!(out.status.success(), "exit failed: {}", stderr_of(&out));
     let parsed: Value = serde_json::from_str(&stdout_of(&out)).expect("valid JSON");
-    let edges = parsed.get("edges").and_then(|v| v.as_array()).expect("edges[]");
+    let edges = parsed
+        .get("edges")
+        .and_then(|v| v.as_array())
+        .expect("edges[]");
 
     let has_external_null_id = edges.iter().any(|e| {
         let kind = e.get("callee_kind").and_then(|k| k.as_str()) == Some("external");
@@ -205,7 +214,6 @@ fn regression_call_graph_json_includes_external_with_show_external() {
         edges
     );
 }
-
 
 #[test]
 fn regression_call_graph_json_scope_metadata() {
@@ -251,7 +259,6 @@ fn regression_call_graph_json_scope_metadata() {
     );
 }
 
-
 #[test]
 fn regression_call_graph_json_writes_to_output_file() {
     let fixture = tempdir().expect("tempdir");
@@ -263,7 +270,14 @@ fn regression_call_graph_json_writes_to_output_file() {
     let out_path = out_file.to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "call-graph", "--root", "a", "-j", "-o", &out_path,
+        "-p",
+        &base,
+        "call-graph",
+        "--root",
+        "a",
+        "-j",
+        "-o",
+        &out_path,
     ]);
     assert!(out.status.success(), "exit failed: {}", stderr_of(&out));
 
@@ -291,7 +305,6 @@ fn regression_call_graph_json_writes_to_output_file() {
         parsed
     );
 }
-
 
 #[test]
 fn regression_call_graph_dot_still_works_without_json() {

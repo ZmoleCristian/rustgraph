@@ -1,5 +1,3 @@
-
-
 use std::process::Command;
 use std::sync::Arc;
 
@@ -266,7 +264,6 @@ impl RustgraphServer {
         }
     }
 
-
     #[tool(
         name = "rustgraph_find",
         description = "Use INSTEAD OF Grep for 'where is X' / 'find fn|struct|enum|const|trait|alias X'. Returns file:line + signature. Doesn't match comments or strings."
@@ -289,15 +286,11 @@ impl RustgraphServer {
         Ok(run_rustgraph(&self.binary, &argv))
     }
 
-
     #[tool(
         name = "rustgraph_callers",
         description = "Use INSTEAD OF Grep for 'who calls X' / 'what depends on X'. Returns caller tree with call-site lines. depth:0 = full transitive. Handles Type::method overload collisions."
     )]
-    async fn callers(
-        &self,
-        p: Parameters<CallersArgs>,
-    ) -> Result<CallToolResult, rmcp::ErrorData> {
+    async fn callers(&self, p: Parameters<CallersArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
         let mut argv: Vec<String> = Vec::new();
         if let Some(path) = &p.0.path {
             argv.push("-p".into());
@@ -318,7 +311,6 @@ impl RustgraphServer {
         }
         Ok(run_rustgraph(&self.binary, &argv))
     }
-
 
     #[tool(
         name = "rustgraph_ensemble",
@@ -346,15 +338,11 @@ impl RustgraphServer {
         Ok(run_rustgraph(&self.binary, &argv))
     }
 
-
     #[tool(
         name = "rustgraph_usages",
         description = "Use INSTEAD OF Grep for 'where is TYPE X used' / 'who constructs X' / 'what breaks if I add a field'. Returns every AST-resolved reference site: struct literals, type ascriptions (Vec<X>, fn params/returns, impl blocks), pattern matches, field accesses, assoc/method calls — INCLUDING inside macro bodies (vec!, assert_eq!). Complement to rustgraph_callers (fn-call edges only): callers can't target a struct/enum/field, this can. For a fn target it also bundles the caller list. Pass the FIELD name as target for field read/write sites."
     )]
-    async fn usages(
-        &self,
-        p: Parameters<UsagesArgs>,
-    ) -> Result<CallToolResult, rmcp::ErrorData> {
+    async fn usages(&self, p: Parameters<UsagesArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
         let mut argv: Vec<String> = Vec::new();
         if let Some(path) = &p.0.path {
             argv.push("-p".into());
@@ -379,7 +367,6 @@ impl RustgraphServer {
         }
         Ok(run_rustgraph(&self.binary, &argv))
     }
-
 
     #[tool(
         name = "rustgraph_paths_between",
@@ -406,7 +393,6 @@ impl RustgraphServer {
         }
         Ok(run_rustgraph(&self.binary, &argv))
     }
-
 
     #[tool(
         name = "rustgraph_tree",

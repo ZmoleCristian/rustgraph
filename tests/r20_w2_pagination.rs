@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,9 +14,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 #[test]
 fn regression_refs_max_results_default_caps_at_50() {
@@ -40,7 +40,6 @@ fn regression_refs_max_results_default_caps_at_50() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
 
-
     let body_lines: Vec<&str> = stdout
         .lines()
         .filter(|l| l.contains(" [call]") || l.contains(" [path]"))
@@ -52,7 +51,6 @@ fn regression_refs_max_results_default_caps_at_50() {
         stdout
     );
 
-
     assert!(
         stdout.contains("showing") && stdout.contains("of 60"),
         "expected truncation footer mentioning the original 60; got:\n{stdout}"
@@ -62,7 +60,6 @@ fn regression_refs_max_results_default_caps_at_50() {
         "header should show full count of 60 references; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_refs_max_results_zero_unlimited() {
@@ -108,7 +105,6 @@ fn regression_refs_max_results_zero_unlimited() {
     );
 }
 
-
 #[test]
 fn regression_dead_code_max_results_caps() {
     let fixture = tempdir().expect("tempdir");
@@ -119,20 +115,13 @@ fn regression_dead_code_max_results_caps() {
     write_file(&fixture.path().join("src/lib.rs"), &src);
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "dead-code",
-        "--max-results",
-        "10",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "dead-code", "--max-results", "10"]);
     assert!(
         out.status.success(),
         "dead-code failed; stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-
 
     let body_lines: Vec<&str> = stdout
         .lines()
@@ -150,13 +139,11 @@ fn regression_dead_code_max_results_caps() {
         "expected truncation footer mentioning original 55; got:\n{stdout}"
     );
 
-
     assert!(
         stdout.contains("55 dead") || stdout.contains("55 candidates"),
         "summary should still reflect the un-capped total; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_impls_max_results_caps() {
@@ -171,21 +158,13 @@ fn regression_impls_max_results_caps() {
     write_file(&fixture.path().join("src/lib.rs"), &src);
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "impls",
-        "Display",
-        "--max-results",
-        "5",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "impls", "Display", "--max-results", "5"]);
     assert!(
         out.status.success(),
         "impls failed; stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-
 
     let body_lines: Vec<&str> = stdout
         .lines()
@@ -202,7 +181,6 @@ fn regression_impls_max_results_caps() {
         stdout.contains("showing") && stdout.contains("of 30"),
         "expected truncation footer mentioning original 30; got:\n{stdout}"
     );
-
 
     assert!(
         stdout.contains("30 total"),

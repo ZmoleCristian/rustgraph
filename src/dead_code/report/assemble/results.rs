@@ -97,7 +97,6 @@ mod tests {
     }
 
     fn ctx_with(funcs: Vec<FunctionInfo>) -> (CandidateContext<'static>, Vec<FunctionInfo>) {
-
         let leaked: &'static Vec<FunctionInfo> = Box::leak(Box::new(funcs.clone()));
         let ctx = super::super::candidates::build_candidate_context(leaked);
         (ctx, funcs)
@@ -142,10 +141,7 @@ mod tests {
 
     #[test]
     fn build_ambiguous_details_includes_candidate_locations() {
-        let funcs = vec![
-            func("dup", "src/a.rs", 5),
-            func("dup", "src/b.rs", 7),
-        ];
+        let funcs = vec![func("dup", "src/a.rs", 5), func("dup", "src/b.rs", 7)];
         let (ctx, _funcs) = ctx_with(funcs);
         let mut counts = HashMap::new();
         counts.insert("dup".to_string(), 2usize);
@@ -154,7 +150,11 @@ mod tests {
         let dup = &details[0];
         assert_eq!(dup.candidates_total, 2);
         assert_eq!(dup.candidate_locations.len(), 2);
-        assert!(dup.candidate_locations.iter().any(|loc| loc.contains("src/a.rs:5")));
+        assert!(
+            dup.candidate_locations
+                .iter()
+                .any(|loc| loc.contains("src/a.rs:5"))
+        );
     }
 
     #[test]

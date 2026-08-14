@@ -1,14 +1,14 @@
-
-
 use std::process::{Command, Output};
 
 fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 fn help_for(sub: &str) -> String {
     let out = run_rustgraph(&[sub, "--help"]);
@@ -21,14 +21,12 @@ fn help_for(sub: &str) -> String {
     String::from_utf8_lossy(&out.stdout).to_string()
 }
 
-
 #[test]
 fn regression_help_subcommand_long_form_omits_global_descriptions() {
     let banned_phrases = ["Fuzzy threshold 0.0-1.0", "Crate root (auto-discovered"];
 
     for sub in ["callers", "ensemble", "find"] {
         let help = help_for(sub);
-
 
         let has_footer_marker =
             help.contains("Globals:") || help.contains("Globals (run `rustgraph --help`");
@@ -38,7 +36,6 @@ fn regression_help_subcommand_long_form_omits_global_descriptions() {
             sub,
             help
         );
-
 
         for banned in &banned_phrases {
             assert!(
@@ -52,18 +49,15 @@ fn regression_help_subcommand_long_form_omits_global_descriptions() {
     }
 }
 
-
 #[test]
 fn regression_grep_help_documents_quoting() {
     let help = help_for("grep");
-
 
     assert!(
         help.contains("single-quote") || help.contains("'") && help.contains("double quote"),
         "grep --help should teach single-quoting the pattern; got:\n{}",
         help
     );
-
 
     assert!(
         (help.contains("\\(") && help.contains("\\)"))
@@ -74,10 +68,8 @@ fn regression_grep_help_documents_quoting() {
     );
 }
 
-
 #[test]
 fn regression_depth_help_says_zero_is_unlimited() {
-
     let callers = help_for("callers");
     assert!(
         callers.contains("--depth"),
@@ -87,7 +79,6 @@ fn regression_depth_help_says_zero_is_unlimited() {
 
     assert_block_mentions(&callers, "--depth", "unlimited", 6);
 
-
     let paths = help_for("paths-between");
     assert!(
         paths.contains("--depth"),
@@ -95,7 +86,6 @@ fn regression_depth_help_says_zero_is_unlimited() {
         paths
     );
     assert_block_mentions(&paths, "--depth", "unlimited", 6);
-
 
     let cg = help_for("call-graph");
     assert!(
@@ -106,18 +96,15 @@ fn regression_depth_help_says_zero_is_unlimited() {
     assert_block_mentions(&cg, "--depth", "unlimited", 6);
 }
 
-
 #[test]
 fn regression_find_help_explains_query_syntax() {
     let help = help_for("find");
-
 
     assert!(
         help.contains("|") && (help.contains("alternative") || help.contains("OR")),
         "find --help should explain the `name` / `<a>|<b>` query syntax; got:\n{}",
         help
     );
-
 
     let mentions_path_line = help.contains("path.rs:LINE")
         || help.contains("path:LINE")
@@ -134,7 +121,6 @@ fn regression_find_help_explains_query_syntax() {
         help
     );
 }
-
 
 fn assert_block_mentions(help: &str, marker: &str, needle: &str, window: usize) {
     let lines: Vec<&str> = help.lines().collect();

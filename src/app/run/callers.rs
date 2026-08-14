@@ -2,22 +2,23 @@ use std::collections::HashSet;
 
 use serde::Serialize;
 
-use crate::callers::{CallerFunction, CallersReport, build_callers_report, build_callers_report_with_options};
 use super::super::changed::{ChangedRanges, fn_was_changed};
 use super::super::modes::CallersRequest;
 use super::super::project::ProjectData;
 use super::super::render::render_callers_text;
 use super::super::symbol_id::inject_symbol_ids;
 use crate::FunctionInfo;
+use crate::callers::{
+    CallerFunction, CallersReport, build_callers_report, build_callers_report_with_options,
+};
 use crate::cli::Args;
 use crate::function_id;
 use crate::index::qualifier::{
-    candidate_matches_needles, module_path_qualifier, qualifier_for_callee, QualifierNeedles,
-    ResolutionStats,
+    QualifierNeedles, ResolutionStats, candidate_matches_needles, module_path_qualifier,
+    qualifier_for_callee,
 };
 
 use super::switchboard::{READ_TOOL_HINT, write_string_output};
-
 
 /// Implements `rustgraph callers <fn>` — reverse-dependency walk that reports every function that calls the target.
 ///
@@ -31,8 +32,6 @@ pub fn run(
     request: CallersRequest,
     changed: Option<&ChangedRanges>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
-
     let resolved_query = if let Some(id) = &request.symbol_id {
         if id.starts_with("struct:") || id.starts_with("enum:") {
             return Err(format!(
@@ -44,7 +43,6 @@ pub fn run(
             .into());
         }
 
-
         let s = id.strip_prefix("fn:").unwrap_or(id);
         if let Some(last) = s.rfind(':') {
             s[..last].to_string()
@@ -55,14 +53,13 @@ pub fn run(
         request.query.clone()
     };
 
-
     enum QualifierFilter {
         None,
         Type(String),
         ModulePath(Vec<String>),
     }
-    let (lookup_query, qualifier_filter): (String, QualifierFilter) = if request.symbol_id.is_some() {
-
+    let (lookup_query, qualifier_filter): (String, QualifierFilter) = if request.symbol_id.is_some()
+    {
         (resolved_query.clone(), QualifierFilter::None)
     } else if let Some(q) = qualifier_for_callee(&resolved_query) {
         let bare = resolved_query
@@ -72,8 +69,6 @@ pub fn run(
             .to_string();
         (bare, QualifierFilter::Type(q))
     } else if let Some(segs) = module_path_qualifier(&resolved_query) {
-
-
         let bare = resolved_query
             .rsplit("::")
             .next()
@@ -95,10 +90,8 @@ pub fn run(
         &args.also,
     )?;
 
-
     let mut resolution_stats = ResolutionStats::default();
     let strict_only = args.strict_resolution;
-
 
     match &qualifier_filter {
         QualifierFilter::None => {}
@@ -113,8 +106,6 @@ pub fn run(
                 .retain(|m| candidate_matches_needles(&m.info, &needles));
             if report.matches.is_empty() && before > 0 {
                 if strict_only {
-
-
                     resolution_stats.strict_suppressed += before;
                     resolution_stats.emit_stderr_note();
                     return Err(format!(
@@ -124,7 +115,6 @@ pub fn run(
                     .into());
                 }
 
-
                 report.matches = pre_filter_matches;
                 resolution_stats.fell_back_to_loose += before;
             } else {
@@ -133,8 +123,6 @@ pub fn run(
             report.query = resolved_query.clone();
         }
         QualifierFilter::ModulePath(segs) => {
-
-
             let before = report.matches.len();
             let useful: Vec<&str> = segs
                 .iter()
@@ -162,11 +150,9 @@ pub fn run(
 
             report.query = resolved_query.clone();
 
-
             if !narrowed_matched && before > 1 && !useful.is_empty() {
                 if strict_only {
                     resolution_stats.strict_suppressed += before;
-
 
                     report.matches.clear();
                 } else {
@@ -177,7 +163,6 @@ pub fn run(
             }
         }
     }
-
 
     if let Some(needle) = &request.target_in {
         let before = report.matches.len();
@@ -190,7 +175,6 @@ pub fn run(
         }
     }
 
-
     let pre_filter_caller_counts: Vec<usize> = if request.callers_in.is_some() {
         report.matches.iter().map(|m| m.callers.len()).collect()
     } else {
@@ -200,10 +184,8 @@ pub fn run(
         for m in report.matches.iter_mut() {
             m.callers.retain(|c| c.info.file_path.contains(needle));
 
-
             m.call_sites_total = m.callers.iter().map(|c| c.call_sites.len()).sum();
         }
-
 
         let any_emptied: bool = report
             .matches
@@ -222,19 +204,21 @@ pub fn run(
         }
     }
     if args.exclude_tests {
-
-
         for m in report.matches.iter_mut() {
             m.callers.retain(|c| !c.info.is_test);
             m.call_sites_total = m.callers.iter().map(|c| c.call_sites.len()).sum();
         }
     }
 
-
     if let Some(ranges) = changed {
         for m in report.matches.iter_mut() {
             m.callers.retain(|c| {
-                fn_was_changed(&c.info.file_path, c.info.start_line, c.info.end_line, ranges)
+                fn_was_changed(
+                    &c.info.file_path,
+                    c.info.start_line,
+                    c.info.end_line,
+                    ranges,
+                )
             });
             m.call_sites_total = m.callers.iter().map(|c| c.call_sites.len()).sum();
         }
@@ -242,8 +226,6 @@ pub fn run(
 
     let total_callers: usize = report.matches.iter().map(|m| m.callers.len()).sum();
     if report.matches.is_empty() {
-
-
         if let Some(hint) = type_redirect_hint(project, &request.query, args.search_threshold) {
             return Err(hint.into());
         }
@@ -252,9 +234,8 @@ pub fn run(
             request.query, request.query
         )
         .into());
-    } else if report.matches.len() > 1 && !request.all && (request.depth == 0 || request.depth >= 2) {
-
-
+    } else if report.matches.len() > 1 && !request.all && (request.depth == 0 || request.depth >= 2)
+    {
         let n = report.matches.len();
         let mut msg = format!(
             "ambiguous: {} matches for '{}' (depth={}). Transitive multi-match requires explicit --all. Disambiguate by re-running with one of these symbol ids as the target:",
@@ -270,8 +251,6 @@ pub fn run(
         ));
         return Err(msg.into());
     } else if report.matches.len() > request.ambiguity_cap && !request.all {
-
-
         let n = report.matches.len();
         let mut msg = format!(
             "ambiguous: {} matches for '{}'. Disambiguate by re-running with one of these symbol ids as the target:",
@@ -281,8 +260,8 @@ pub fn run(
             let sym_id = format!("{}:{}:{}", m.info.file_path, m.info.start_line, m.info.name);
             msg.push_str(&format!("\n  {}", sym_id));
             if n <= 5 {
-
-                let preview = read_body_preview(&args.path, &m.info.file_path, m.info.start_line, 3);
+                let preview =
+                    read_body_preview(&args.path, &m.info.file_path, m.info.start_line, 3);
                 for line in &preview {
                     msg.push_str(&format!("\n    | {}", line));
                 }
@@ -302,7 +281,10 @@ pub fn run(
             report.matches.len()
         );
         for m in &report.matches {
-            eprintln!("  - {}:{} {}", m.info.file_path, m.info.start_line, m.info.name);
+            eprintln!(
+                "  - {}:{} {}",
+                m.info.file_path, m.info.start_line, m.info.name
+            );
         }
     }
     if !report.matches.is_empty() && total_callers == 0 {
@@ -319,7 +301,6 @@ pub fn run(
         );
     }
 
-
     if request.flat {
         if args.json {
             return Err("--flat and --json are mutually exclusive; pick one output mode".into());
@@ -334,7 +315,6 @@ pub fn run(
         };
 
         if request.depth == 1 {
-
             for m in &report.matches {
                 for c in &m.callers {
                     let key = format!("{}:{}:{}", c.info.file_path, c.info.start_line, c.info.name);
@@ -344,8 +324,6 @@ pub fn run(
                 }
             }
         } else {
-
-
             let mut visited: HashSet<String> = HashSet::new();
             for direct_match in &report.matches {
                 visited.insert(function_id(&direct_match.info));
@@ -361,7 +339,12 @@ pub fn run(
                         continue;
                     }
                     if let Some(ranges) = changed
-                        && !fn_was_changed(&caller.info.file_path, caller.info.start_line, caller.info.end_line, ranges)
+                        && !fn_was_changed(
+                            &caller.info.file_path,
+                            caller.info.start_line,
+                            caller.info.end_line,
+                            ranges,
+                        )
                     {
                         continue;
                     }
@@ -388,12 +371,10 @@ pub fn run(
         return Ok(());
     }
 
-
     if request.depth == 1 {
-
-
         let max_results = request.max_results.unwrap_or(50);
-        let total_callers_across_matches: usize = report.matches.iter().map(|m| m.callers.len()).sum();
+        let total_callers_across_matches: usize =
+            report.matches.iter().map(|m| m.callers.len()).sum();
         let truncated = max_results != 0 && total_callers_across_matches > max_results;
         if truncated {
             let mut remaining = max_results;
@@ -413,7 +394,6 @@ pub fn run(
             let payload = serde_json::to_string_pretty(&value)?;
             write_string_output(args.output.as_deref(), &payload)?;
         } else {
-
             let mut rendered = render_callers_text(&report);
             if truncated {
                 rendered.push_str(&format!(
@@ -457,7 +437,6 @@ pub fn run(
         write_string_output(args.output.as_deref(), rendered.trim_end_matches('\n'))?;
     }
 
-
     resolution_stats.emit_stderr_note();
     Ok(())
 }
@@ -471,7 +450,6 @@ struct TransitiveCallerNode {
     info: FunctionInfo,
     depth: usize,
     direct_call_sites: usize,
-
 
     call_sites: Vec<CallerSite>,
     callers: Vec<TransitiveCallerNode>,
@@ -515,7 +493,6 @@ fn build_transitive(
                 continue;
             }
 
-
             if let Some(needle) = callers_in
                 && !caller.info.file_path.contains(needle)
             {
@@ -523,11 +500,29 @@ fn build_transitive(
             }
 
             if let Some(ranges) = changed
-                && !fn_was_changed(&caller.info.file_path, caller.info.start_line, caller.info.end_line, ranges)
+                && !fn_was_changed(
+                    &caller.info.file_path,
+                    caller.info.start_line,
+                    caller.info.end_line,
+                    ranges,
+                )
             {
                 continue;
             }
-            walk(project, threshold, caller, 1, max_depth, exclude_tests, before_context, after_context, callers_in, changed, &mut visited, &mut callers)?;
+            walk(
+                project,
+                threshold,
+                caller,
+                1,
+                max_depth,
+                exclude_tests,
+                before_context,
+                after_context,
+                callers_in,
+                changed,
+                &mut visited,
+                &mut callers,
+            )?;
         }
         matches.push(TransitiveMatch {
             info: direct_match.info.clone(),
@@ -570,9 +565,14 @@ fn walk(
     if current_depth < max_depth {
         let next_query = format!("{}:{}", caller.info.file_path, caller.info.start_line);
 
-        let next_report = build_callers_report(project, &next_query, threshold, before_context, after_context)?;
+        let next_report = build_callers_report(
+            project,
+            &next_query,
+            threshold,
+            before_context,
+            after_context,
+        )?;
         for m in &next_report.matches {
-
             if function_id(&m.info) != id {
                 continue;
             }
@@ -581,20 +581,36 @@ fn walk(
                     continue;
                 }
 
-
                 if let Some(needle) = callers_in
                     && !c.info.file_path.contains(needle)
                 {
                     continue;
                 }
 
-
                 if let Some(ranges) = changed
-                    && !fn_was_changed(&c.info.file_path, c.info.start_line, c.info.end_line, ranges)
+                    && !fn_was_changed(
+                        &c.info.file_path,
+                        c.info.start_line,
+                        c.info.end_line,
+                        ranges,
+                    )
                 {
                     continue;
                 }
-                walk(project, threshold, c, current_depth + 1, max_depth, exclude_tests, before_context, after_context, callers_in, changed, visited, &mut node.callers)?;
+                walk(
+                    project,
+                    threshold,
+                    c,
+                    current_depth + 1,
+                    max_depth,
+                    exclude_tests,
+                    before_context,
+                    after_context,
+                    callers_in,
+                    changed,
+                    visited,
+                    &mut node.callers,
+                )?;
             }
         }
     }
@@ -644,10 +660,8 @@ fn render_node(node: &TransitiveCallerNode, prefix: &str, is_last: bool, out: &m
     ));
     let child_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
 
-
     for site in &node.call_sites {
         let trimmed = site.line_text.trim();
-
 
         let snippet = truncate_line_text(trimmed, 80);
         out.push_str(&format!(
@@ -656,12 +670,14 @@ fn render_node(node: &TransitiveCallerNode, prefix: &str, is_last: bool, out: &m
         ));
     }
 
-
     for site in &node.call_sites {
         if site.context_lines.is_empty() {
             continue;
         }
-        out.push_str(&format!("{}    [call site @ {}:{}]\n", child_prefix, site.line, site.column));
+        out.push_str(&format!(
+            "{}    [call site @ {}:{}]\n",
+            child_prefix, site.line, site.column
+        ));
         for ctx in &site.context_lines {
             let marker = if ctx.is_match { ">" } else { " " };
             out.push_str(&format!(
@@ -678,7 +694,6 @@ fn render_node(node: &TransitiveCallerNode, prefix: &str, is_last: bool, out: &m
         render_node(c, &child_prefix, i + 1 == total, out);
     }
 }
-
 
 fn truncate_line_text(text: &str, max_chars: usize) -> String {
     if text.chars().count() <= max_chars {
@@ -699,15 +714,24 @@ fn short_path(p: &str) -> String {
     p.trim_start_matches("./").to_string()
 }
 
-
 /// Reads up to `max_lines` lines from `file_path` starting at `start_line`, used to embed
 /// function-body previews in ambiguity-resolution error messages. Public within the crate so
 /// `ensemble::run` can reuse it.
-pub(crate) fn read_body_preview_pub(root: &std::path::Path, file_path: &str, start_line: usize, max_lines: usize) -> Vec<String> {
+pub(crate) fn read_body_preview_pub(
+    root: &std::path::Path,
+    file_path: &str,
+    start_line: usize,
+    max_lines: usize,
+) -> Vec<String> {
     read_body_preview(root, file_path, start_line, max_lines)
 }
 
-fn read_body_preview(root: &std::path::Path, file_path: &str, start_line: usize, max_lines: usize) -> Vec<String> {
+fn read_body_preview(
+    root: &std::path::Path,
+    file_path: &str,
+    start_line: usize,
+    max_lines: usize,
+) -> Vec<String> {
     let full = if std::path::Path::new(file_path).is_absolute() {
         std::path::PathBuf::from(file_path)
     } else {
@@ -726,21 +750,22 @@ fn read_body_preview(root: &std::path::Path, file_path: &str, start_line: usize,
         .collect()
 }
 
-
 fn collect_flat_nodes(
     nodes: &[TransitiveCallerNode],
     seen: &mut HashSet<String>,
     lines: &mut Vec<String>,
 ) {
     for node in nodes {
-        let key = format!("{}:{}:{}", node.info.file_path, node.info.start_line, node.info.name);
+        let key = format!(
+            "{}:{}:{}",
+            node.info.file_path, node.info.start_line, node.info.name
+        );
         if seen.insert(key.clone()) {
             lines.push(key);
         }
         collect_flat_nodes(&node.callers, seen, lines);
     }
 }
-
 
 #[allow(clippy::too_many_arguments)]
 fn walk_flat(
@@ -784,7 +809,12 @@ fn walk_flat(
                     continue;
                 }
                 if let Some(ranges) = changed
-                    && !fn_was_changed(&c.info.file_path, c.info.start_line, c.info.end_line, ranges)
+                    && !fn_was_changed(
+                        &c.info.file_path,
+                        c.info.start_line,
+                        c.info.end_line,
+                        ranges,
+                    )
                 {
                     continue;
                 }
@@ -807,10 +837,13 @@ fn walk_flat(
     Ok(())
 }
 
-
 /// Returns a human-readable error hint when a callers/ensemble query resolves to a struct or enum
 /// rather than a function, guiding the user toward `refs` or `usages` instead.
-pub(crate) fn type_redirect_hint(project: &ProjectData, query: &str, threshold: f64) -> Option<String> {
+pub(crate) fn type_redirect_hint(
+    project: &ProjectData,
+    query: &str,
+    threshold: f64,
+) -> Option<String> {
     if let Some(hint) = type_redirect_for_path_line(project, query) {
         return Some(hint);
     }
@@ -874,30 +907,33 @@ pub(crate) fn type_redirect_hint(project: &ProjectData, query: &str, threshold: 
     None
 }
 
-
 fn type_redirect_for_path_line(project: &ProjectData, query: &str) -> Option<String> {
     let trimmed = query.trim();
     let (path_part, line_part) = trimmed.rsplit_once(':')?;
     let line: usize = line_part.parse().ok()?;
 
-
-    let fn_encloses = project.functions.iter().any(|f| {
-        f.file_path.ends_with(path_part) && f.start_line <= line && line <= f.end_line
-    });
+    let fn_encloses = project
+        .functions
+        .iter()
+        .any(|f| f.file_path.ends_with(path_part) && f.start_line <= line && line <= f.end_line);
     if fn_encloses {
         return None;
     }
-    if let Some(s) = project.structs.iter().find(|s| {
-        s.file_path.ends_with(path_part) && s.start_line <= line && line <= s.end_line
-    }) {
+    if let Some(s) = project
+        .structs
+        .iter()
+        .find(|s| s.file_path.ends_with(path_part) && s.start_line <= line && line <= s.end_line)
+    {
         return Some(format!(
             "'{}' is a struct (found at {}:{}), not a function. Try `rustgraph refs {}` or `rustgraph usages {}` to find references.",
             query, s.file_path, s.start_line, s.name, s.name
         ));
     }
-    if let Some(e) = project.enums.iter().find(|e| {
-        e.file_path.ends_with(path_part) && e.start_line <= line && line <= e.end_line
-    }) {
+    if let Some(e) = project
+        .enums
+        .iter()
+        .find(|e| e.file_path.ends_with(path_part) && e.start_line <= line && line <= e.end_line)
+    {
         return Some(format!(
             "'{}' is an enum (found at {}:{}), not a function. Try `rustgraph refs {}` or `rustgraph usages {}` to find references.",
             query, e.file_path, e.start_line, e.name, e.name

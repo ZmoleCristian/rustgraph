@@ -94,6 +94,9 @@ mod tests {
             .expect("must reject");
         let msg = err.to_string();
         assert!(msg.contains("too large"), "msg: {msg}");
-        assert!(msg.contains(&MAX_LSP_PAYLOAD_BYTES.to_string()), "msg: {msg}");
+        assert!(
+            msg.contains(&MAX_LSP_PAYLOAD_BYTES.to_string()),
+            "msg: {msg}"
+        );
     }
 }

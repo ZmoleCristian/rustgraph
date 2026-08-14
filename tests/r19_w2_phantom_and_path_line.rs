@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,9 +14,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 #[test]
 fn regression_call_graph_no_phantom_type_method_edges() {
@@ -41,7 +41,6 @@ fn regression_call_graph_no_phantom_type_method_edges() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
     assert!(
         stdout.contains("new") && stdout.contains("src/lib.rs:2"),
         "expected A::new (src/lib.rs:2) in rendered tree.\nstdout:\n{stdout}"
@@ -51,7 +50,6 @@ fn regression_call_graph_no_phantom_type_method_edges() {
         "B::new (src/lib.rs:4) should NOT appear; phantom edge bug must be gone.\nstdout:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_call_graph_no_phantom_method_call_edges() {
@@ -74,7 +72,6 @@ fn regression_call_graph_no_phantom_method_call_edges() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
     assert!(
         stdout.contains("compute") && stdout.contains("src/lib.rs:2"),
         "expected Foo::compute (src/lib.rs:2) in rendered tree.\nstdout:\n{stdout}"
@@ -84,7 +81,6 @@ fn regression_call_graph_no_phantom_method_call_edges() {
         "Bar::compute (src/lib.rs:4) should NOT appear; phantom edge bug must be gone.\nstdout:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_callers_path_line_on_struct_redirects_to_refs() {
@@ -106,11 +102,7 @@ fn regression_callers_path_line_on_struct_redirects_to_refs() {
         String::from_utf8_lossy(&out.stderr)
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        stderr
-    );
+    let combined = format!("{}\n{}", String::from_utf8_lossy(&out.stdout), stderr);
     assert!(
         combined.contains("is a struct"),
         "expected `is a struct` redirect text; got combined output:\n{combined}"
@@ -120,7 +112,6 @@ fn regression_callers_path_line_on_struct_redirects_to_refs() {
         "expected refs/usages redirect text; got combined output:\n{combined}"
     );
 }
-
 
 #[test]
 fn regression_call_graph_qualified_name_strict_match_anti_oscillation() {
@@ -143,7 +134,6 @@ fn regression_call_graph_qualified_name_strict_match_anti_oscillation() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
     assert!(
         stdout.contains("connect") && stdout.contains("src/lib.rs:2"),
         "expected Net::connect (src/lib.rs:2) under boot.\nstdout:\n{stdout}"
@@ -153,14 +143,15 @@ fn regression_call_graph_qualified_name_strict_match_anti_oscillation() {
         "Db::connect (src/lib.rs:4) is a phantom; strict-qualified resolution must drop it.\nstdout:\n{stdout}"
     );
 
-
     let connect_child_lines: Vec<&str> = stdout
         .lines()
         .filter(|l| (l.contains("├──") || l.contains("└──")) && l.contains("connect"))
         .collect();
     assert_eq!(
-        connect_child_lines.len(), 1,
+        connect_child_lines.len(),
+        1,
         "expected exactly one `connect` tree-child under boot; got {}: {:?}\nfull stdout:\n{stdout}",
-        connect_child_lines.len(), connect_child_lines
+        connect_child_lines.len(),
+        connect_child_lines
     );
 }

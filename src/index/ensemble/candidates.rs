@@ -14,7 +14,6 @@ pub fn find_candidates<'a>(
     find_candidates_with_options(analysis, query, threshold, max_results, false)
 }
 
-
 /// Like [`find_candidates`] but optionally falls back to matching against the
 /// full function signature when no name-based candidate meets the threshold.
 pub fn find_candidates_with_options<'a>(
@@ -66,7 +65,6 @@ pub fn find_candidates_with_options<'a>(
                 candidates.push((func, 1.0));
             }
         } else {
-
             for func in &analysis.functions {
                 let score = fuzzy_similarity(query, &func.name);
                 if score >= threshold {
@@ -135,7 +133,10 @@ mod tests {
 
     #[test]
     fn find_candidates_returns_exact_name_match() {
-        let analysis = analysis_from(vec![fn_("foo", "src/a.rs", 1, 1), fn_("bar", "src/b.rs", 1, 1)]);
+        let analysis = analysis_from(vec![
+            fn_("foo", "src/a.rs", 1, 1),
+            fn_("bar", "src/b.rs", 1, 1),
+        ]);
         let cands = find_candidates(&analysis, "foo", 0.7, 0);
         assert_eq!(cands.len(), 1);
         assert_eq!(cands[0].0.name, "foo");

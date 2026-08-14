@@ -118,7 +118,6 @@ pub(crate) fn resolve_ambiguous_call_target(
                 }
             }
 
-
             if normalized_prefix.len() > 1 {
                 let stripped: Vec<String> = normalized_prefix.iter().skip(1).cloned().collect();
                 let stripped_matched = match_prefix(&stripped);
@@ -126,7 +125,6 @@ pub(crate) fn resolve_ambiguous_call_target(
                     return stripped_matched.into_iter().next();
                 }
             }
-
 
             if let Some(last_seg) = normalized_prefix.last() {
                 let suffix_matched: Vec<String> = candidate_ids
@@ -263,8 +261,7 @@ mod tests {
 
     #[test]
     fn normalize_callee_prefix_returns_none_for_too_many_super_segments() {
-        let out =
-            normalize_callee_prefix(&s(&["super", "super", "super", "x"]), Some(&s(&["a"])));
+        let out = normalize_callee_prefix(&s(&["super", "super", "super", "x"]), Some(&s(&["a"])));
         assert_eq!(out, None);
     }
 

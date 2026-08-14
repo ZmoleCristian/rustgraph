@@ -4,7 +4,6 @@ use super::super::modes::{CallersRequest, RefsRequest, UsagesRequest};
 use super::super::project::ProjectData;
 use crate::cli::Args;
 
-
 /// Run `rustgraph usages <NAME> [--in <PATH>] [--kind K]... [--max-results N]`.
 ///
 /// Combines callers (call-site tracing via the AST call graph) and refs (the full
@@ -20,7 +19,6 @@ pub fn run(
     let has_fn = project.functions.iter().any(|f| f.name == request.name);
 
     let mut sections: Vec<Section> = Vec::new();
-
 
     if !has_fn {
         sections.push(Section {
@@ -40,23 +38,21 @@ pub fn run(
             callers_in: None,
             depth: 1,
 
-
             all: true,
             ambiguity_cap: usize::MAX,
             max_results: None,
             flat: false,
         };
-        let report =
-            crate::callers::build_callers_report_with_options(
-                project,
-                &callers_req.query,
-                args.search_threshold,
-                0,
-                0,
-                args.match_signature,
-                Some(&args.path),
-                &args.also,
-            )?;
+        let report = crate::callers::build_callers_report_with_options(
+            project,
+            &callers_req.query,
+            args.search_threshold,
+            0,
+            0,
+            args.match_signature,
+            Some(&args.path),
+            &args.also,
+        )?;
         let mut entries: Vec<UsageEntry> = Vec::new();
         for m in &report.matches {
             if let Some(needle) = &request.in_path {
@@ -65,7 +61,6 @@ pub fn run(
                 }
             }
             for c in &m.callers {
-
                 if args.exclude_tests && c.info.is_test {
                     continue;
                 }
@@ -90,7 +85,6 @@ pub fn run(
         });
     }
 
-
     let refs_req = RefsRequest {
         ident: request.name.clone(),
         kind: request.kind.clone(),
@@ -100,7 +94,6 @@ pub fn run(
         max_results: 0,
     };
     let ref_hits = super::refs::collect_hits(args, project, &refs_req);
-
 
     use std::collections::HashSet;
     let callers_sites: HashSet<(String, usize)> = sections
@@ -137,7 +130,6 @@ pub fn run(
             request.name
         );
     }
-
 
     let cap = if request.max_results == 0 {
         usize::MAX
@@ -198,7 +190,6 @@ struct UsagesReport {
     name: String,
     total: usize,
 
-
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     truncated: bool,
     sections: Vec<Section>,
@@ -233,4 +224,3 @@ fn render_text(report: &UsagesReport) -> String {
     }
     out
 }
-

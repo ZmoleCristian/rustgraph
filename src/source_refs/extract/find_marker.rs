@@ -25,9 +25,7 @@ mod tests {
 
     #[test]
     fn clamp_to_char_boundary_advances_into_multibyte_chars() {
-
         let text = "héllo";
-
 
         assert_eq!(clamp_to_char_boundary(text, 2), 3);
         assert_eq!(clamp_to_char_boundary(text, 1), 1);

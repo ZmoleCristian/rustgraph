@@ -65,7 +65,6 @@ impl WithSymbolId<TypeDeclInfo> {
     }
 }
 
-
 /// Recursively walks a JSON `Value` and injects a `symbol_id` field into every object that
 /// has `name`, `file_path`, and `start_line` fields but no existing `symbol_id`.
 ///
@@ -74,14 +73,15 @@ impl WithSymbolId<TypeDeclInfo> {
 pub fn inject_symbol_ids(value: &mut Value) {
     match value {
         Value::Object(map) => {
-
-            if let (Some(Value::String(name)), Some(Value::String(file_path)), Some(Value::Number(line))) =
-                (map.get("name"), map.get("file_path"), map.get("start_line"))
+            if let (
+                Some(Value::String(name)),
+                Some(Value::String(file_path)),
+                Some(Value::Number(line)),
+            ) = (map.get("name"), map.get("file_path"), map.get("start_line"))
             {
                 if !map.contains_key("symbol_id") {
                     let line_n = line.as_u64().unwrap_or(0);
                     let kind = guess_kind(map);
-
 
                     let id = if kind == "fn" {
                         format!("{}:{}:{}", file_path, line_n, name)
@@ -105,12 +105,13 @@ pub fn inject_symbol_ids(value: &mut Value) {
 }
 
 fn guess_kind(obj: &serde_json::Map<String, Value>) -> &'static str {
-
-
     if obj.contains_key("variants") {
         return "enum";
     }
-    if obj.contains_key("is_async") || obj.contains_key("parameters") || obj.contains_key("return_type") {
+    if obj.contains_key("is_async")
+        || obj.contains_key("parameters")
+        || obj.contains_key("return_type")
+    {
         return "fn";
     }
     if obj.contains_key("fields") {
@@ -171,19 +172,30 @@ mod tests {
             "src/a.rs:5:target"
         );
         assert_eq!(
-            v["matches"][0]["callers"][0]["info"]["symbol_id"].as_str().unwrap(),
+            v["matches"][0]["callers"][0]["info"]["symbol_id"]
+                .as_str()
+                .unwrap(),
             "src/b.rs:10:caller_a"
         );
     }
 
     #[test]
     fn inject_symbol_ids_distinguishes_struct_and_enum() {
-        let mut v: Value = serde_json::from_str(r#"{
+        let mut v: Value = serde_json::from_str(
+            r#"{
             "structs": [{"name": "S", "file_path": "src/lib.rs", "start_line": 1, "fields": []}],
             "enums":   [{"name": "E", "file_path": "src/lib.rs", "start_line": 5, "variants": []}]
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         inject_symbol_ids(&mut v);
-        assert_eq!(v["structs"][0]["symbol_id"].as_str().unwrap(), "struct:src/lib.rs:1:S");
-        assert_eq!(v["enums"][0]["symbol_id"].as_str().unwrap(), "enum:src/lib.rs:5:E");
+        assert_eq!(
+            v["structs"][0]["symbol_id"].as_str().unwrap(),
+            "struct:src/lib.rs:1:S"
+        );
+        assert_eq!(
+            v["enums"][0]["symbol_id"].as_str().unwrap(),
+            "enum:src/lib.rs:5:E"
+        );
     }
 }

@@ -22,7 +22,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -55,7 +58,6 @@ fn redstring_fixture(dir: &Path) {
          }\n",
     );
 }
-
 
 #[test]
 fn find_const_by_exact_name_returns_const_not_struct_homograph() {
@@ -94,7 +96,6 @@ fn find_const_by_exact_name_returns_const_not_struct_homograph() {
     }
 }
 
-
 #[test]
 fn find_static_and_assoc_const_are_indexed() {
     let dir = tempdir().unwrap();
@@ -118,7 +119,6 @@ fn find_static_and_assoc_const_are_indexed() {
     );
 }
 
-
 #[test]
 fn find_const_kind_filter_narrows_to_consts() {
     let dir = tempdir().unwrap();
@@ -127,13 +127,15 @@ fn find_const_kind_filter_narrows_to_consts() {
     let out = run_rustgraph(&["--path", &base, "find", "kind", "--const"]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let stdout = stdout_of(&out);
-    assert!(stdout.contains("KIND_META"), "const filter keeps consts: {stdout}");
+    assert!(
+        stdout.contains("KIND_META"),
+        "const filter keeps consts: {stdout}"
+    );
     assert!(
         !stdout.contains("struct KindMeta"),
         "--const must exclude structs: {stdout}"
     );
 }
-
 
 #[test]
 fn find_fuzzy_only_result_announces_no_exact_match_and_scores() {
@@ -164,7 +166,6 @@ fn find_fuzzy_only_result_announces_no_exact_match_and_scores() {
     );
 }
 
-
 #[test]
 fn find_exact_hit_keeps_plain_name_tag() {
     let dir = tempdir().unwrap();
@@ -172,13 +173,15 @@ fn find_exact_hit_keeps_plain_name_tag() {
     let base = dir.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "KIND_META"]);
     let stdout = stdout_of(&out);
-    assert!(stdout.contains("[name]"), "exact hits keep the bare tag: {stdout}");
+    assert!(
+        stdout.contains("[name]"),
+        "exact hits keep the bare tag: {stdout}"
+    );
     assert!(
         !stdout.contains("no exact name match"),
         "exact hit must not render the fuzzy disclaimer: {stdout}"
     );
 }
-
 
 #[test]
 fn find_whitespace_query_refuses_with_steering_and_token_suggestions() {
@@ -203,7 +206,6 @@ fn find_whitespace_query_refuses_with_steering_and_token_suggestions() {
     );
 }
 
-
 #[test]
 fn find_or_query_with_spaces_around_pipe_still_works() {
     let dir = tempdir().unwrap();
@@ -216,7 +218,6 @@ fn find_or_query_with_spaces_around_pipe_still_works() {
     assert!(stdout.contains("KIND_META"), "{stdout}");
     assert!(stdout.contains("REGISTRY"), "{stdout}");
 }
-
 
 #[test]
 fn find_no_match_hint_is_surface_neutral() {
@@ -235,7 +236,6 @@ fn find_no_match_hint_is_surface_neutral() {
         "no-match hint must stay actionable from the MCP surface: {stderr}"
     );
 }
-
 
 #[test]
 fn find_json_partitions_consts_and_scores_fuzzy_hits() {
@@ -263,7 +263,6 @@ fn find_json_partitions_consts_and_scores_fuzzy_hits() {
     );
 }
 
-
 #[test]
 fn callers_on_const_redirects_to_read_and_refs() {
     let dir = tempdir().unwrap();
@@ -278,7 +277,6 @@ fn callers_on_const_redirects_to_read_and_refs() {
     );
 }
 
-
 #[test]
 fn inventory_lists_consts_with_count_summary() {
     let dir = tempdir().unwrap();
@@ -291,7 +289,6 @@ fn inventory_lists_consts_with_count_summary() {
     assert!(stdout.contains("Consts: 3"), "{stdout}");
     assert!(!stdout.contains("struct KindMeta"), "{stdout}");
 }
-
 
 #[test]
 fn tree_counts_consts_per_file() {

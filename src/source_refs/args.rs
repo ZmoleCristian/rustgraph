@@ -63,7 +63,10 @@ mod tests {
 
     #[test]
     fn split_single_arg_returns_single_element() {
-        assert_eq!(split_top_level_call_args("alpha"), vec!["alpha".to_string()]);
+        assert_eq!(
+            split_top_level_call_args("alpha"),
+            vec!["alpha".to_string()]
+        );
     }
 
     #[test]
@@ -108,7 +111,6 @@ mod tests {
 
     #[test]
     fn split_with_unbalanced_closing_does_not_panic() {
-
         let result = split_top_level_call_args(") a, b");
         assert_eq!(result, vec![") a".to_string(), "b".to_string()]);
     }

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn line_count(s: &str) -> usize {
@@ -25,8 +26,6 @@ fn line_count(s: &str) -> usize {
 
 #[test]
 fn regression_ensemble_default_view_is_summary_not_full() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -68,7 +67,6 @@ pub fn caller_c() { let _ = pipeline(3); }
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let default_out = run_rustgraph(&["--path", &base, "ensemble", "pipeline"]);
     assert!(
         default_out.status.success(),
@@ -78,15 +76,7 @@ pub fn caller_c() { let _ = pipeline(3); }
     let default_text = String::from_utf8_lossy(&default_out.stdout);
     let default_lines = line_count(&default_text);
 
-
-    let full_out = run_rustgraph(&[
-        "--path",
-        &base,
-        "ensemble",
-        "pipeline",
-        "--view",
-        "full",
-    ]);
+    let full_out = run_rustgraph(&["--path", &base, "ensemble", "pipeline", "--view", "full"]);
     assert!(
         full_out.status.success(),
         "full ensemble failed: {}",
@@ -95,14 +85,12 @@ pub fn caller_c() { let _ = pipeline(3); }
     let full_text = String::from_utf8_lossy(&full_out.stdout);
     let full_lines = line_count(&full_text);
 
-
     assert!(
         default_lines < 100,
         "default ensemble view should be tight (< 100 lines), got {} lines:\n{}",
         default_lines,
         default_text
     );
-
 
     assert!(
         full_lines > default_lines,
@@ -122,8 +110,6 @@ pub fn caller_c() { let _ = pipeline(3); }
 
 #[test]
 fn regression_impls_zero_implementors_distinguishes_from_unknown() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -162,8 +148,6 @@ pub struct WithoutImpl;
 
 #[test]
 fn regression_impls_unknown_trait_says_check_spelling() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -194,8 +178,6 @@ pub fn helper() {}
 
 #[test]
 fn regression_grep_invalid_regex_message_includes_hint() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), "pub fn x() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
@@ -255,8 +237,6 @@ mod tests {
 
 #[test]
 fn regression_dead_code_default_omits_skip_summary() {
-
-
     let fixture = tempdir().expect("tempdir");
     dead_code_fixture(fixture.path());
     let base = fixture.path().to_string_lossy().to_string();
@@ -297,7 +277,6 @@ fn regression_dead_code_default_omits_skip_summary() {
 
 #[test]
 fn regression_dead_code_verbose_includes_skip_summary() {
-
     let fixture = tempdir().expect("tempdir");
     dead_code_fixture(fixture.path());
     let base = fixture.path().to_string_lossy().to_string();
@@ -322,8 +301,6 @@ fn regression_dead_code_verbose_includes_skip_summary() {
 
 #[test]
 fn regression_refs_by_function_tags_test_fns() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -353,7 +330,6 @@ mod tests {
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     let mut saw_test_tagged = false;
     let mut saw_prod_untagged = false;

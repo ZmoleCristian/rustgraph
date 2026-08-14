@@ -20,7 +20,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -50,7 +53,6 @@ fn fixture(dir: &Path) {
     );
 }
 
-
 #[test]
 fn find_type_alias_by_exact_name() {
     let dir = tempdir().unwrap();
@@ -63,9 +65,11 @@ fn find_type_alias_by_exact_name() {
         stdout.contains("pub type ChangedRanges = HashMap<String, Vec<(usize, usize)>>"),
         "alias must be findable with its RHS in the signature: {stdout}"
     );
-    assert!(stdout.contains("[name]"), "exact hit gets the bare tag: {stdout}");
+    assert!(
+        stdout.contains("[name]"),
+        "exact hit gets the bare tag: {stdout}"
+    );
 }
-
 
 #[test]
 fn find_trait_by_exact_name_spans_body() {
@@ -80,9 +84,11 @@ fn find_trait_by_exact_name_spans_body() {
         "trait must render with supertraits: {stdout}"
     );
     // Trait body spans lines 3-6 so Read covers the method set.
-    assert!(stdout.contains(":3-6"), "trait range must span its body: {stdout}");
+    assert!(
+        stdout.contains(":3-6"),
+        "trait range must span its body: {stdout}"
+    );
 }
-
 
 #[test]
 fn find_kind_filters_narrow_to_trait_and_alias() {
@@ -90,19 +96,36 @@ fn find_kind_filters_narrow_to_trait_and_alias() {
     fixture(dir.path());
     let base = dir.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&["--path", &base, "find", "Renderer | ChangedRanges", "--trait"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "find",
+        "Renderer | ChangedRanges",
+        "--trait",
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let stdout = stdout_of(&out);
     assert!(stdout.contains("trait Renderer"), "{stdout}");
-    assert!(!stdout.contains("ChangedRanges"), "--trait must exclude aliases: {stdout}");
+    assert!(
+        !stdout.contains("ChangedRanges"),
+        "--trait must exclude aliases: {stdout}"
+    );
 
-    let out = run_rustgraph(&["--path", &base, "find", "Renderer | ChangedRanges", "--alias"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "find",
+        "Renderer | ChangedRanges",
+        "--alias",
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let stdout = stdout_of(&out);
     assert!(stdout.contains("ChangedRanges"), "{stdout}");
-    assert!(!stdout.contains("trait Renderer"), "--alias must exclude traits: {stdout}");
+    assert!(
+        !stdout.contains("trait Renderer"),
+        "--alias must exclude traits: {stdout}"
+    );
 }
-
 
 #[test]
 fn find_json_carries_type_decl_partitions_and_ids() {
@@ -117,11 +140,13 @@ fn find_json_carries_type_decl_partitions_and_ids() {
     assert_eq!(exact[0]["name"].as_str(), Some("ChangedRanges"));
     assert_eq!(exact[0]["kind"].as_str(), Some("alias"));
     assert!(
-        exact[0]["symbol_id"].as_str().unwrap().starts_with("alias:"),
+        exact[0]["symbol_id"]
+            .as_str()
+            .unwrap()
+            .starts_with("alias:"),
         "{v}"
     );
 }
-
 
 #[test]
 fn callers_on_trait_redirects_to_impls() {
@@ -137,7 +162,6 @@ fn callers_on_trait_redirects_to_impls() {
     );
 }
 
-
 #[test]
 fn callers_on_alias_redirects_to_refs() {
     let dir = tempdir().unwrap();
@@ -152,7 +176,6 @@ fn callers_on_alias_redirects_to_refs() {
     );
 }
 
-
 #[test]
 fn inventory_counts_traits_and_aliases() {
     let dir = tempdir().unwrap();
@@ -163,9 +186,11 @@ fn inventory_counts_traits_and_aliases() {
     let stdout = stdout_of(&out);
     assert!(stdout.contains("Traits: 1"), "{stdout}");
     assert!(stdout.contains("Aliases: 2"), "{stdout}");
-    assert!(!stdout.contains("fn draw"), "kind filter must exclude fns: {stdout}");
+    assert!(
+        !stdout.contains("fn draw"),
+        "kind filter must exclude fns: {stdout}"
+    );
 }
-
 
 #[test]
 fn tree_annotates_trait_and_alias_counts() {
@@ -178,7 +203,6 @@ fn tree_annotates_trait_and_alias_counts() {
     assert!(stdout.contains("1 trait"), "{stdout}");
     assert!(stdout.contains("2 alias"), "{stdout}");
 }
-
 
 #[test]
 fn private_alias_excluded_by_public_only() {

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,9 +14,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 fn fixture_strict_zero_with_loose_fallback() -> tempfile::TempDir {
     let fixture = tempdir().expect("tempdir");
@@ -29,7 +29,6 @@ fn fixture_strict_zero_with_loose_fallback() -> tempfile::TempDir {
     );
     fixture
 }
-
 
 fn fixture_strict_succeeds() -> tempfile::TempDir {
     let fixture = tempdir().expect("tempdir");
@@ -47,7 +46,6 @@ fn fixture_strict_succeeds() -> tempfile::TempDir {
     fixture
 }
 
-
 #[test]
 fn callers_qualified_zero_falls_back_to_loose_with_stderr_note() {
     let fixture = fixture_strict_zero_with_loose_fallback();
@@ -62,18 +60,17 @@ fn callers_qualified_zero_falls_back_to_loose_with_stderr_note() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
 
-
     assert!(
         stdout.contains("caller_a"),
         "expected caller_a (loose fallback should rescue). stdout:\n{stdout}\nstderr:\n{stderr}"
     );
 
     assert!(
-        stderr.contains("loose name resolution") || stderr.contains("type-strict matching returned 0"),
+        stderr.contains("loose name resolution")
+            || stderr.contains("type-strict matching returned 0"),
         "expected fallback note on stderr. stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn callers_strict_success_emits_no_fallback_note() {
@@ -88,7 +85,6 @@ fn callers_strict_success_emits_no_fallback_note() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
-
 
     assert!(
         stdout.contains("driver"),
@@ -105,16 +101,20 @@ fn callers_strict_success_emits_no_fallback_note() {
     );
 }
 
-
 #[test]
 fn callers_strict_resolution_flag_suppresses_fallback() {
     let fixture = fixture_strict_zero_with_loose_fallback();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&["--path", &base, "--strict-resolution", "callers", "Bar::foo"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "--strict-resolution",
+        "callers",
+        "Bar::foo",
+    ]);
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
-
 
     assert!(
         !out.status.success(),
@@ -131,11 +131,8 @@ fn callers_strict_resolution_flag_suppresses_fallback() {
     );
 }
 
-
 #[test]
 fn call_graph_multi_fallback_aggregates_counter() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -162,11 +159,16 @@ fn call_graph_multi_fallback_aggregates_counter() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
 
-
     let note_line = stderr
         .lines()
-        .find(|line| line.contains("call sites") && line.contains("type-strict matching returned 0"))
-        .or_else(|| stderr.lines().find(|line| line.contains("loose name resolution")));
+        .find(|line| {
+            line.contains("call sites") && line.contains("type-strict matching returned 0")
+        })
+        .or_else(|| {
+            stderr
+                .lines()
+                .find(|line| line.contains("loose name resolution"))
+        });
     assert!(
         note_line.is_some(),
         "expected loose-fallback note for multi-fallback fixture. stderr:\n{stderr}"
@@ -182,7 +184,6 @@ fn call_graph_multi_fallback_aggregates_counter() {
         "expected >= 4 call site(s) flagged as loose-fallback (got {count}). stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn anti_oscillation_r23_w1_bare_name_loose_preserved() {
@@ -208,13 +209,23 @@ fn anti_oscillation_r23_w1_bare_name_loose_preserved() {
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
-    assert!(stdout.contains("mod_a/lib.rs"), "anti-oscillation: bare query lost mod_a. stdout:\n{stdout}");
-    assert!(stdout.contains("mod_b/lib.rs"), "anti-oscillation: bare query lost mod_b. stdout:\n{stdout}");
-    assert!(stdout.contains("caller_a"), "anti-oscillation: lost caller_a. stdout:\n{stdout}");
-    assert!(stdout.contains("caller_b"), "anti-oscillation: lost caller_b. stdout:\n{stdout}");
+    assert!(
+        stdout.contains("mod_a/lib.rs"),
+        "anti-oscillation: bare query lost mod_a. stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("mod_b/lib.rs"),
+        "anti-oscillation: bare query lost mod_b. stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("caller_a"),
+        "anti-oscillation: lost caller_a. stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("caller_b"),
+        "anti-oscillation: lost caller_b. stdout:\n{stdout}"
+    );
 }
-
 
 #[test]
 fn anti_oscillation_r19_w2_strict_qualifier_preserved() {
@@ -251,7 +262,6 @@ fn anti_oscillation_r19_w2_strict_qualifier_preserved() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
 
-
     assert!(
         stdout.contains("daemon.rs"),
         "anti-oscillation: expected Daemon::new match. stdout:\n{stdout}"
@@ -267,7 +277,6 @@ fn anti_oscillation_r19_w2_strict_qualifier_preserved() {
     );
 }
 
-
 #[test]
 fn paths_between_strict_resolution_no_op_when_strict_succeeds() {
     let fixture = tempdir().expect("tempdir");
@@ -279,7 +288,14 @@ fn paths_between_strict_resolution_no_op_when_strict_succeeds() {
 
     let base = fixture.path().to_string_lossy().to_string();
     let out_default = run_rustgraph(&["--path", &base, "paths-between", "driver", "target"]);
-    let out_strict = run_rustgraph(&["--path", &base, "--strict-resolution", "paths-between", "driver", "target"]);
+    let out_strict = run_rustgraph(&[
+        "--path",
+        &base,
+        "--strict-resolution",
+        "paths-between",
+        "driver",
+        "target",
+    ]);
     assert!(out_default.status.success());
     assert!(out_strict.status.success());
     let stdout_default = String::from_utf8_lossy(&out_default.stdout);
@@ -287,31 +303,54 @@ fn paths_between_strict_resolution_no_op_when_strict_succeeds() {
     let stderr_default = String::from_utf8_lossy(&out_default.stderr);
     let stderr_strict = String::from_utf8_lossy(&out_strict.stderr);
 
+    assert!(
+        stdout_default.contains("[1 path(s)]"),
+        "default mode missing path. stdout:\n{stdout_default}"
+    );
+    assert!(
+        stdout_strict.contains("[1 path(s)]"),
+        "strict mode missing path. stdout:\n{stdout_strict}"
+    );
 
-    assert!(stdout_default.contains("[1 path(s)]"), "default mode missing path. stdout:\n{stdout_default}");
-    assert!(stdout_strict.contains("[1 path(s)]"), "strict mode missing path. stdout:\n{stdout_strict}");
-
-    assert!(!stderr_default.contains("loose name resolution"), "default unexpectedly emitted note. stderr:\n{stderr_default}");
-    assert!(!stderr_strict.contains("loose name resolution"), "strict unexpectedly emitted note. stderr:\n{stderr_strict}");
-    assert!(!stderr_strict.contains("suppressed by --strict-resolution"), "strict unexpectedly emitted suppression note. stderr:\n{stderr_strict}");
+    assert!(
+        !stderr_default.contains("loose name resolution"),
+        "default unexpectedly emitted note. stderr:\n{stderr_default}"
+    );
+    assert!(
+        !stderr_strict.contains("loose name resolution"),
+        "strict unexpectedly emitted note. stderr:\n{stderr_strict}"
+    );
+    assert!(
+        !stderr_strict.contains("suppressed by --strict-resolution"),
+        "strict unexpectedly emitted suppression note. stderr:\n{stderr_strict}"
+    );
 }
-
 
 #[test]
 fn cli_accepts_strict_resolution_flag() {
     let fixture = fixture_strict_succeeds();
     let base = fixture.path().to_string_lossy().to_string();
 
-
-    let out_before = run_rustgraph(&["--path", &base, "--strict-resolution", "callers", "Daemon::run"]);
+    let out_before = run_rustgraph(&[
+        "--path",
+        &base,
+        "--strict-resolution",
+        "callers",
+        "Daemon::run",
+    ]);
     assert!(
         out_before.status.success(),
         "expected --strict-resolution before subcommand to parse. stderr:\n{}",
         String::from_utf8_lossy(&out_before.stderr)
     );
 
-
-    let out_after = run_rustgraph(&["--path", &base, "callers", "Daemon::run", "--strict-resolution"]);
+    let out_after = run_rustgraph(&[
+        "--path",
+        &base,
+        "callers",
+        "Daemon::run",
+        "--strict-resolution",
+    ]);
     assert!(
         out_after.status.success(),
         "expected --strict-resolution after subcommand to parse. stderr:\n{}",

@@ -17,7 +17,6 @@ pub fn search_symbols(
     search_symbols_with_options(project, query, threshold, limit, false)
 }
 
-
 /// Search `project` for symbols matching `query`, with full control over options.
 ///
 /// When `match_signature` is `true` and no name matches are found, the search
@@ -31,7 +30,6 @@ pub fn search_symbols_with_options(
     match_signature: bool,
 ) -> SearchResults {
     let q_lower = query.to_lowercase();
-
 
     let mut exact: Vec<SymbolRef> = Vec::new();
     for f in &project.functions {
@@ -52,7 +50,6 @@ pub fn search_symbols_with_options(
     let symbols = if !exact.is_empty() {
         exact
     } else {
-
         let mut name_hits: Vec<SymbolRef> = Vec::new();
         for f in &project.functions {
             if crate::fuzzy_match(query, &f.name, threshold) {
@@ -72,7 +69,6 @@ pub fn search_symbols_with_options(
         if !name_hits.is_empty() || !match_signature {
             name_hits
         } else {
-
             let mut wide: Vec<SymbolRef> = Vec::new();
             for f in &project.functions {
                 if crate::fuzzy_match(query, &f.signature, threshold)

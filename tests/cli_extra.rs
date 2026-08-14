@@ -15,7 +15,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn write_simple_lib(fixture: &tempfile::TempDir) -> String {
@@ -106,7 +109,15 @@ fn func_shortcut_flag_implies_functions_only() {
 fn search_filter_filters_by_name() {
     let fixture = tempdir().expect("tempdir");
     let base = write_simple_lib(&fixture);
-    let out = run_rustgraph(&["--path", &base, "--analyze", "functions", "--search", "alpha", "--json"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "--analyze",
+        "functions",
+        "--search",
+        "alpha",
+        "--json",
+    ]);
     assert!(out.status.success());
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let names: Vec<String> = json["functions"]
@@ -123,7 +134,15 @@ fn search_filter_filters_by_name() {
 fn search_filter_supports_or_via_pipe() {
     let fixture = tempdir().expect("tempdir");
     let base = write_simple_lib(&fixture);
-    let out = run_rustgraph(&["--path", &base, "--analyze", "functions", "--search", "alpha|beta", "--json"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "--analyze",
+        "functions",
+        "--search",
+        "alpha|beta",
+        "--json",
+    ]);
     assert!(out.status.success());
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let names: Vec<String> = json["functions"]
@@ -174,8 +193,6 @@ fn search_threshold_extreme_filters_more_aggressively() {
 
 #[test]
 fn ensemble_summary_view_includes_structs_and_call_sites_no_code() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -202,7 +219,10 @@ pub fn handle(req: Req) -> u32 { req.x }
         .iter()
         .filter_map(|v| v.as_str())
         .collect::<Vec<_>>();
-    assert!(!sections.contains(&"code"), "summary should NOT include full code body");
+    assert!(
+        !sections.contains(&"code"),
+        "summary should NOT include full code body"
+    );
     assert!(sections.contains(&"structs"));
     assert!(sections.contains(&"call-sites"));
 
@@ -217,10 +237,7 @@ pub fn handle(req: Req) -> u32 { req.x }
 #[test]
 fn ensemble_full_view_includes_all_sections() {
     let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub fn solo() {}\n",
-    );
+    write_file(&fixture.path().join("src/lib.rs"), "pub fn solo() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
         "--path",
@@ -254,7 +271,10 @@ fn output_flag_writes_file_instead_of_stdout() {
         &out_path_str,
     ]);
     assert!(out.status.success());
-    assert!(out.stdout.is_empty(), "stdout should be empty when --output writes to file");
+    assert!(
+        out.stdout.is_empty(),
+        "stdout should be empty when --output writes to file"
+    );
 
     let written = fs::read_to_string(&out_path).expect("output file");
     let parsed: Value = serde_json::from_str(&written).expect("valid json file");
@@ -275,7 +295,10 @@ pub fn caller() { target(); }
     let out = run_rustgraph(&["--path", &base, "callers", "target"]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(!stdout.contains("\u{1b}["), "default callers output should be uncolored");
+    assert!(
+        !stdout.contains("\u{1b}["),
+        "default callers output should be uncolored"
+    );
     assert!(stdout.contains("Callers:"));
 }
 
@@ -301,7 +324,6 @@ pub fn beta() {}
     assert!(stdout.contains("rankdir=LR"));
 }
 
-
 #[test]
 fn call_graph_default_emits_text_tree_header() {
     let fixture = tempdir().expect("tempdir");
@@ -311,7 +333,11 @@ fn call_graph_default_emits_text_tree_header() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "call-graph"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("rustgraph call-graph --text"),
@@ -333,7 +359,14 @@ pub fn run() {
 "#,
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "call-graph", "--dot", "--detail", "external"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "call-graph",
+        "--dot",
+        "--detail",
+        "external",
+    ]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("ext::"));
@@ -341,12 +374,16 @@ pub fn run() {
 
 #[test]
 fn callers_unknown_query_exits_nonzero() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), "pub fn one() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "--callers", "completely_unknown_xyz", "--json"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "--callers",
+        "completely_unknown_xyz",
+        "--json",
+    ]);
     assert!(!out.status.success(), "should exit non-zero on no match");
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -408,7 +445,6 @@ pub fn run() { let _a = make_a(); let _b = make_b(); }
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let out = run_rustgraph(&[
         "--path",
         &base,
@@ -422,7 +458,9 @@ pub fn run() { let _a = make_a(); let _b = make_b(); }
     ]);
     assert!(out.status.success());
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    let lifecycles = json["matches"][0]["lifecycles"].as_array().expect("lifecycles");
+    let lifecycles = json["matches"][0]["lifecycles"]
+        .as_array()
+        .expect("lifecycles");
     let names: Vec<&str> = lifecycles
         .iter()
         .filter_map(|l| l["type_name"].as_str())
@@ -454,10 +492,7 @@ fn search_threshold_zero_matches_everything() {
 #[test]
 fn dead_code_alias_orphans_works() {
     let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub fn dead() {}\n",
-    );
+    write_file(&fixture.path().join("src/lib.rs"), "pub fn dead() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "orphans", "--json"]);
     assert!(out.status.success());
@@ -482,7 +517,10 @@ fn json_output_is_pretty_formatted() {
 
     let json: Value = serde_json::from_str(&stdout).expect("valid json");
     assert!(json.is_object());
-    assert!(stdout.starts_with("{\n"), "pretty JSON opens the object on its own line");
+    assert!(
+        stdout.starts_with("{\n"),
+        "pretty JSON opens the object on its own line"
+    );
     assert!(
         stdout.contains("\n  \"functions\": ["),
         "pretty JSON indents keys and separates them with \": \""
@@ -550,7 +588,6 @@ fn ensemble_balanced_preset_is_default() {
     assert_eq!(n["max_results"], b["max_results"]);
 }
 
-
 #[test]
 fn top_level_help_lists_subcommands() {
     let out = run_rustgraph(&["--help"]);
@@ -563,10 +600,8 @@ fn top_level_help_lists_subcommands() {
     assert!(stdout.contains("tree"));
 }
 
-
 #[test]
 fn ensemble_no_match_exits_nonzero() {
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -590,7 +625,6 @@ pub fn anything() {}
     );
 }
 
-
 #[test]
 fn callers_subcommand_separate_before_after_context() {
     let fixture = tempdir().expect("tempdir");
@@ -607,17 +641,13 @@ pub fn alpha() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "callers",
-        "-B",
-        "1",
-        "-A",
-        "1",
-        "target",
-        "--json",
+        "--path", &base, "callers", "-B", "1", "-A", "1", "target", "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let context = json["matches"][0]["callers"][0]["call_sites"][0]["context_lines"]
         .as_array()
@@ -625,7 +655,6 @@ pub fn alpha() {
         .unwrap_or_default();
     assert!(context.len() >= 2);
 }
-
 
 #[test]
 fn color_with_json_flag_keeps_json_pure() {
@@ -645,13 +674,16 @@ pub fn x() {}
         "--json",
         "--color",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(!stdout.contains('\u{1b}'));
     let _: Value = serde_json::from_slice(&out.stdout).expect("valid json");
 }
-
 
 #[test]
 fn empty_project_dead_code_returns_no_dead_functions() {
@@ -659,12 +691,15 @@ fn empty_project_dead_code_returns_no_dead_functions() {
     write_file(&fixture.path().join("src/lib.rs"), "");
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "--dead-code", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     assert_eq!(json["dead_functions"].as_array().map(|a| a.len()), Some(0));
     assert_eq!(json["candidates_total"].as_u64(), Some(0));
 }
-
 
 #[test]
 fn empty_project_inventory_returns_zero_counts() {
@@ -672,11 +707,14 @@ fn empty_project_inventory_returns_zero_counts() {
     write_file(&fixture.path().join("src/lib.rs"), "");
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "--analyze", "functions", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     assert_eq!(json["functions"].as_array().map(|a| a.len()), Some(0));
 }
-
 
 #[test]
 fn callers_context_flag_unifies_before_and_after() {
@@ -693,16 +731,12 @@ pub fn caller() {
 "#,
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "callers",
-        "-C",
-        "2",
-        "target",
-        "--json",
-    ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&["--path", &base, "callers", "-C", "2", "target", "--json"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let context = json["matches"][0]["callers"][0]["call_sites"][0]["context_lines"]
         .as_array()
@@ -711,7 +745,6 @@ pub fn caller() {
 
     assert!(context.len() >= 3);
 }
-
 
 #[test]
 fn ensemble_deep_preset_disables_call_site_cap() {
@@ -726,22 +759,19 @@ pub fn caller() { target(); }
 
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "ensemble",
-        "target",
-        "--preset",
-        "deep",
-        "--json",
+        "--path", &base, "ensemble", "target", "--preset", "deep", "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     assert_eq!(json["max_call_sites"].as_u64(), Some(0));
     assert_eq!(json["max_results"].as_u64(), Some(10));
     assert_eq!(json["call_depth"].as_u64(), Some(3));
 }
-
 
 #[test]
 fn callers_with_after_context_only_includes_trailing_lines() {
@@ -760,16 +790,12 @@ pub fn driver() {
     );
 
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "callers",
-        "target",
-        "-A",
-        "2",
-        "--json",
-    ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&["--path", &base, "callers", "target", "-A", "2", "--json"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let context_lines = &json["matches"][0]["callers"][0]["call_sites"][0]["context_lines"];
@@ -783,7 +809,6 @@ pub fn driver() {
     assert!(arr.len() > 1);
 }
 
-
 #[test]
 fn dead_code_returns_skipped_metric_keys() {
     let fixture = tempdir().expect("tempdir");
@@ -796,7 +821,11 @@ pub fn driver() {}
 
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "--dead-code", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let skipped = &json["skipped"];
@@ -814,7 +843,6 @@ pub fn driver() {}
     }
 }
 
-
 #[test]
 fn dead_code_text_output_lists_dead_function_signatures() {
     let fixture = tempdir().expect("tempdir");
@@ -828,14 +856,17 @@ pub fn driver() {}
 
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "--dead-code"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("unused_api"),
         "expected dead function name in text output, got: {stdout}"
     );
 }
-
 
 #[test]
 fn ensemble_query_with_file_line_returns_innermost_function() {
@@ -854,7 +885,11 @@ pub fn inner() {}
     let base = fixture.path().to_string_lossy().to_string();
     let target = format!("{}/src/lib.rs:6", base);
     let out = run_rustgraph(&["--path", &base, "ensemble", &target, "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let matches = json["matches"].as_array().unwrap_or(&Vec::new()).clone();
@@ -862,7 +897,11 @@ pub fn inner() {}
     assert_eq!(matches[0]["info"]["name"].as_str(), Some("inner"));
 
     let rel = run_rustgraph(&["--path", &base, "--ensemble", "src/lib.rs:6", "--json"]);
-    assert!(rel.status.success(), "{}", String::from_utf8_lossy(&rel.stderr));
+    assert!(
+        rel.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rel.stderr)
+    );
     let rel_json: Value = serde_json::from_slice(&rel.stdout).expect("valid rel json");
     assert_eq!(
         rel_json["matches"][0]["info"]["name"].as_str(),
@@ -871,14 +910,10 @@ pub fn inner() {}
     );
 }
 
-
 #[test]
 fn analyze_with_invalid_rust_emits_parse_error_to_stderr() {
     let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/good.rs"),
-        "pub fn good() {}\n",
-    );
+    write_file(&fixture.path().join("src/good.rs"), "pub fn good() {}\n");
     write_file(
         &fixture.path().join("src/broken.rs"),
         "this is not parseable rust",
@@ -886,7 +921,11 @@ fn analyze_with_invalid_rust_emits_parse_error_to_stderr() {
 
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "--analyze", "functions", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("broken.rs"),
@@ -897,7 +936,6 @@ fn analyze_with_invalid_rust_emits_parse_error_to_stderr() {
     let functions = json["functions"].as_array().expect("array");
     assert_eq!(functions.len(), 1);
 }
-
 
 #[test]
 fn callers_subcommand_with_context_includes_match_marker_in_lines() {
@@ -915,16 +953,12 @@ pub fn driver() {
     );
 
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "callers",
-        "target",
-        "-C",
-        "1",
-        "--json",
-    ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&["--path", &base, "callers", "target", "-C", "1", "--json"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let context = &json["matches"][0]["callers"][0]["call_sites"][0]["context_lines"];
@@ -936,7 +970,6 @@ pub fn driver() {
     assert_eq!(match_count, 1, "expected exactly one match-marked line");
 }
 
-
 #[test]
 fn call_graph_with_empty_project_emits_only_header_and_footer() {
     let fixture = tempdir().expect("tempdir");
@@ -944,7 +977,11 @@ fn call_graph_with_empty_project_emits_only_header_and_footer() {
 
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "call-graph", "--dot"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("digraph call_graph"));
@@ -952,7 +989,6 @@ fn call_graph_with_empty_project_emits_only_header_and_footer() {
 
     assert!(!stdout.contains("->"), "expected no edges, got: {stdout}");
 }
-
 
 #[test]
 fn regression_grep_by_function_attributes_to_enclosing_fn_not_orphan() {
@@ -963,21 +999,28 @@ fn regression_grep_by_function_attributes_to_enclosing_fn_not_orphan() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "grep", "--by-function", "unwrap"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("alpha"),
         "alpha should be attributed; got: {}",
         stdout
     );
-    assert!(stdout.contains("beta"), "beta should be attributed; got: {}", stdout);
+    assert!(
+        stdout.contains("beta"),
+        "beta should be attributed; got: {}",
+        stdout
+    );
     assert!(
         stdout.contains("0 orphan") || !stdout.contains("orphan"),
         "no matches should be orphaned; got: {}",
         stdout
     );
 }
-
 
 #[test]
 fn regression_callers_homonym_attributes_by_module() {
@@ -996,7 +1039,11 @@ fn regression_callers_homonym_attributes_by_module() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "callers", "shared", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let matches = json["matches"].as_array().unwrap();
     for m in matches {
@@ -1027,7 +1074,6 @@ fn regression_callers_homonym_attributes_by_module() {
         }
     }
 }
-
 
 #[test]
 fn regression_callers_symbol_id_bypasses_fuzzy() {
@@ -1063,7 +1109,6 @@ fn regression_callers_symbol_id_bypasses_fuzzy() {
     assert_eq!(matches[0]["info"]["name"].as_str().unwrap(), "target");
 }
 
-
 #[test]
 fn regression_find_text_emits_symbol_id() {
     let fixture = tempdir().expect("tempdir");
@@ -1081,7 +1126,6 @@ fn regression_find_text_emits_symbol_id() {
     );
 }
 
-
 #[test]
 fn regression_callers_method_does_not_pull_unrelated_type_methods() {
     let fixture = tempdir().expect("tempdir");
@@ -1091,7 +1135,11 @@ fn regression_callers_method_does_not_pull_unrelated_type_methods() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "callers", "build", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let matches = json["matches"].as_array().unwrap();
     assert_eq!(matches.len(), 1, "should resolve Foo::build only");
@@ -1100,13 +1148,15 @@ fn regression_callers_method_does_not_pull_unrelated_type_methods() {
         .iter()
         .map(|c| c["info"]["name"].as_str().unwrap())
         .collect();
-    assert!(names.contains(&"caller_b"), "Foo::build caller missing: {names:?}");
+    assert!(
+        names.contains(&"caller_b"),
+        "Foo::build caller missing: {names:?}"
+    );
     assert!(
         !names.contains(&"caller_a"),
         "Vec::build caller should be dropped: {names:?}"
     );
 }
-
 
 #[test]
 fn regression_callers_free_fn_accepts_module_path_qualified_calls() {
@@ -1120,9 +1170,12 @@ fn regression_callers_free_fn_accepts_module_path_qualified_calls() {
     assert!(out.status.success());
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let callers = json["matches"][0]["callers"].as_array().unwrap();
-    assert_eq!(callers.len(), 2, "both qualified call styles should match: {callers:?}");
+    assert_eq!(
+        callers.len(),
+        2,
+        "both qualified call styles should match: {callers:?}"
+    );
 }
-
 
 #[test]
 fn regression_callers_in_filter_narrows_caller_results() {
@@ -1135,7 +1188,10 @@ fn regression_callers_in_filter_narrows_caller_results() {
         &fixture.path().join("src/drop/b.rs"),
         "fn caller_drop() { crate::target(); }\n",
     );
-    write_file(&fixture.path().join("src/lib.rs"), "pub fn target() {}\nmod keep; mod drop;\n");
+    write_file(
+        &fixture.path().join("src/lib.rs"),
+        "pub fn target() {}\nmod keep; mod drop;\n",
+    );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
         "--path",
@@ -1146,7 +1202,11 @@ fn regression_callers_in_filter_narrows_caller_results() {
         "keep",
         "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let callers = json["matches"][0]["callers"].as_array().unwrap();
     let names: Vec<&str> = callers
@@ -1157,7 +1217,6 @@ fn regression_callers_in_filter_narrows_caller_results() {
     assert!(!names.contains(&"caller_drop"));
 }
 
-
 #[test]
 fn regression_global_threshold_default_is_strict() {
     use clap::Parser;
@@ -1165,7 +1224,6 @@ fn regression_global_threshold_default_is_strict() {
     let args = Args::try_parse_from(["rustgraph"]).expect("parse");
     assert_eq!(args.search_threshold, 0.85, "default tightened from 0.6");
 }
-
 
 #[test]
 fn regression_callers_does_not_signature_match_struct_name() {
@@ -1179,13 +1237,13 @@ fn regression_callers_does_not_signature_match_struct_name() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     let stdout = String::from_utf8_lossy(&out.stdout);
 
-
     assert!(
-        stderr.contains("is a struct") || stderr.contains("no function matches") || stdout.contains("\"matches\": []"),
+        stderr.contains("is a struct")
+            || stderr.contains("no function matches")
+            || stdout.contains("\"matches\": []"),
         "callers should not signature-match a struct name; stderr={stderr} stdout={stdout}"
     );
 }
-
 
 #[test]
 fn regression_also_paths_get_relative_form_with_crate_prefix() {
@@ -1208,15 +1266,28 @@ fn regression_also_paths_get_relative_form_with_crate_prefix() {
         .to_string_lossy()
         .to_string();
 
-
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let out = std::process::Command::new(bin)
-        .args(["--no-auto-path", "--path", &p_base, "--also", &s_base, "impls", "Serialize"])
+        .args([
+            "--no-auto-path",
+            "--path",
+            &p_base,
+            "--also",
+            &s_base,
+            "impls",
+            "Serialize",
+        ])
         .output()
         .expect("run rustgraph");
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("PrimaryStruct"), "primary missing: {stdout}");
-    assert!(stdout.contains("SiblingStruct"), "sibling missing: {stdout}");
+    assert!(
+        stdout.contains("PrimaryStruct"),
+        "primary missing: {stdout}"
+    );
+    assert!(
+        stdout.contains("SiblingStruct"),
+        "sibling missing: {stdout}"
+    );
 
     let sibling_line: &str = stdout
         .lines()
@@ -1231,7 +1302,6 @@ fn regression_also_paths_get_relative_form_with_crate_prefix() {
         "sibling line should NOT include absolute path; got: {sibling_line}"
     );
 }
-
 
 #[test]
 fn regression_match_signature_opt_in_restores_wide_fuzz() {
@@ -1251,7 +1321,14 @@ fn regression_match_signature_opt_in_restores_wide_fuzz() {
         fns.len()
     );
 
-    let out_wide = run_rustgraph(&["--path", &base, "--match-signature", "find", "DaemonState", "--json"]);
+    let out_wide = run_rustgraph(&[
+        "--path",
+        &base,
+        "--match-signature",
+        "find",
+        "DaemonState",
+        "--json",
+    ]);
     assert!(out_wide.status.success());
     let json_wide: Value = serde_json::from_slice(&out_wide.stdout).expect("valid json");
     let fns_wide = json_wide["functions"].as_array().expect("functions array");
@@ -1262,14 +1339,9 @@ fn regression_match_signature_opt_in_restores_wide_fuzz() {
     );
 }
 
-
 #[test]
 fn regression_bad_path_emits_clear_error_not_silent_empty() {
-    let out = run_rustgraph(&[
-        "--path",
-        "/this/path/does/not/exist/xyz/abc/123",
-        "tree",
-    ]);
+    let out = run_rustgraph(&["--path", "/this/path/does/not/exist/xyz/abc/123", "tree"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         !out.status.success(),
@@ -1280,7 +1352,6 @@ fn regression_bad_path_emits_clear_error_not_silent_empty() {
         "expected a clear 'does not exist' error on stderr; got: {stderr}"
     );
 }
-
 
 #[test]
 fn regression_find_exact_name_fast_path_suppresses_substring() {
@@ -1297,7 +1368,11 @@ pub fn unrelated() {}
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "load", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let names: Vec<String> = json["functions"]
         .as_array()
@@ -1305,9 +1380,12 @@ pub fn unrelated() {}
         .iter()
         .map(|f| f["name"].as_str().unwrap().to_string())
         .collect();
-    assert_eq!(names, vec!["load".to_string()], "fast path violated: {names:?}");
+    assert_eq!(
+        names,
+        vec!["load".to_string()],
+        "fast path violated: {names:?}"
+    );
 }
-
 
 #[test]
 fn regression_callers_ambiguous_bails_unless_all() {
@@ -1331,9 +1409,18 @@ fn caller() { handle_a(); handle_b(); handle_c(); handle_d(); handle_e(); handle
 
     let out = run_rustgraph(&["--path", &base, "callers", "handle"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(!out.status.success(), "expected non-zero exit; stderr={stderr}");
-    assert!(stderr.contains("ambiguous"), "expected 'ambiguous' in stderr; got: {stderr}");
-    assert!(stderr.contains("--all"), "expected --all hint in stderr; got: {stderr}");
+    assert!(
+        !out.status.success(),
+        "expected non-zero exit; stderr={stderr}"
+    );
+    assert!(
+        stderr.contains("ambiguous"),
+        "expected 'ambiguous' in stderr; got: {stderr}"
+    );
+    assert!(
+        stderr.contains("--all"),
+        "expected --all hint in stderr; got: {stderr}"
+    );
 
     let out_all = run_rustgraph(&["--path", &base, "callers", "handle", "--all", "--json"]);
     assert!(
@@ -1364,19 +1451,25 @@ pub fn handle_i() {}
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let out = run_rustgraph(&["--path", &base, "ensemble", "handle", "--preset", "deep"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(!out.status.success(), "expected non-zero exit; stderr={stderr}");
-    assert!(stderr.contains("ambiguous"), "expected 'ambiguous' in stderr; got: {stderr}");
-    let out_all = run_rustgraph(&["--path", &base, "ensemble", "handle", "--preset", "deep", "--all", "--json"]);
+    assert!(
+        !out.status.success(),
+        "expected non-zero exit; stderr={stderr}"
+    );
+    assert!(
+        stderr.contains("ambiguous"),
+        "expected 'ambiguous' in stderr; got: {stderr}"
+    );
+    let out_all = run_rustgraph(&[
+        "--path", &base, "ensemble", "handle", "--preset", "deep", "--all", "--json",
+    ]);
     assert!(
         out_all.status.success(),
         "expected --all to bypass; stderr={}",
         String::from_utf8_lossy(&out_all.stderr)
     );
 }
-
 
 #[test]
 fn regression_ensemble_resolves_relative_paths_via_root_hint() {
@@ -1400,9 +1493,11 @@ fn regression_ensemble_resolves_relative_paths_via_root_hint() {
         String::from_utf8_lossy(&out.stderr)
     );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-    assert_eq!(json["matches"][0]["info"]["name"].as_str(), Some("snowflake_target"));
+    assert_eq!(
+        json["matches"][0]["info"]["name"].as_str(),
+        Some("snowflake_target")
+    );
 }
-
 
 #[test]
 fn regression_paths_between_resolves_method_receiver_calls() {
@@ -1419,16 +1514,30 @@ fn caller_via_method(s: &State) { s.target_method(); }
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "caller_via_method", "target_method", "--json",
+        "--path",
+        &base,
+        "paths-between",
+        "caller_via_method",
+        "target_method",
+        "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let paths = json["paths"].as_array().expect("paths");
-    assert!(!paths.is_empty(), "method-receiver path should resolve; got 0 paths");
+    assert!(
+        !paths.is_empty(),
+        "method-receiver path should resolve; got 0 paths"
+    );
     let first = paths[0].as_array().unwrap();
-    assert_eq!(first.last().unwrap()["name"].as_str(), Some("target_method"));
+    assert_eq!(
+        first.last().unwrap()["name"].as_str(),
+        Some("target_method")
+    );
 }
-
 
 #[test]
 fn regression_callers_callers_in_recomputes_total() {
@@ -1443,11 +1552,21 @@ fn regression_callers_callers_in_recomputes_total() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "callers", "target", "--callers-in", "src/keep", "--all", "--json",
+        "--path",
+        &base,
+        "callers",
+        "target",
+        "--callers-in",
+        "src/keep",
+        "--all",
+        "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
-
 
     let total: u64 = json["matches"]
         .as_array()
@@ -1455,9 +1574,11 @@ fn regression_callers_callers_in_recomputes_total() {
         .iter()
         .map(|m| m["call_sites_total"].as_u64().unwrap_or(0))
         .sum();
-    assert_eq!(total, 2, "post-filter total must reflect only kept callers; got {total}");
+    assert_eq!(
+        total, 2,
+        "post-filter total must reflect only kept callers; got {total}"
+    );
 }
-
 
 #[test]
 fn regression_signatures_normalized_no_token_spam() {
@@ -1469,15 +1590,21 @@ fn regression_signatures_normalized_no_token_spam() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "snowflake", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let sig = json["functions"][0]["signature"].as_str().unwrap();
     assert!(!sig.contains(" < "), "ungly ` < ` leaked: {sig}");
     assert!(!sig.contains(" > "), "ungly ` > ` leaked: {sig}");
     assert!(!sig.contains("& str"), "ungly `& str` leaked: {sig}");
-    assert!(sig.contains("Option<&str>") || sig.contains("Option<& str>"), "expected collapsed Option<&str>: {sig}");
+    assert!(
+        sig.contains("Option<&str>") || sig.contains("Option<& str>"),
+        "expected collapsed Option<&str>: {sig}"
+    );
 }
-
 
 #[test]
 fn regression_tree_also_header_lists_sibling_crates() {
@@ -1488,7 +1615,11 @@ fn regression_tree_also_header_lists_sibling_crates() {
     let base = primary.path().to_string_lossy().to_string();
     let also = sibling.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "--also", &also, "tree"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("sibling crate"),
@@ -1496,7 +1627,6 @@ fn regression_tree_also_header_lists_sibling_crates() {
         stdout.lines().next().unwrap_or("")
     );
 }
-
 
 #[test]
 fn regression_paths_between_dedupes_multi_callsite_paths() {
@@ -1507,9 +1637,18 @@ fn regression_paths_between_dedupes_multi_callsite_paths() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "entry", "target", "--json",
+        "--path",
+        &base,
+        "paths-between",
+        "entry",
+        "target",
+        "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let paths = json["paths"].as_array().expect("paths array");
 
@@ -1521,7 +1660,6 @@ fn regression_paths_between_dedupes_multi_callsite_paths() {
     );
 }
 
-
 #[test]
 fn regression_call_graph_text_hides_external_by_default() {
     let fixture = tempdir().expect("tempdir");
@@ -1530,18 +1668,26 @@ fn regression_call_graph_text_hides_external_by_default() {
         "pub fn root_fn() { let v = vec![1, 2]; v.iter().map(|x| x + 1).collect::<Vec<_>>(); }\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out_default = run_rustgraph(&[
-        "--path", &base, "call-graph", "--root", "root_fn",
-    ]);
+    let out_default = run_rustgraph(&["--path", &base, "call-graph", "--root", "root_fn"]);
     let stdout = String::from_utf8_lossy(&out_default.stdout);
-    assert!(!stdout.contains("<external>"), "default should hide externals; got: {stdout}");
+    assert!(
+        !stdout.contains("<external>"),
+        "default should hide externals; got: {stdout}"
+    );
     let out_show = run_rustgraph(&[
-        "--path", &base, "call-graph", "--root", "root_fn", "--show-external",
+        "--path",
+        &base,
+        "call-graph",
+        "--root",
+        "root_fn",
+        "--show-external",
     ]);
     let stdout_show = String::from_utf8_lossy(&out_show.stdout);
-    assert!(stdout_show.contains("<external>"), "--show-external should expose them; got: {stdout_show}");
+    assert!(
+        stdout_show.contains("<external>"),
+        "--show-external should expose them; got: {stdout_show}"
+    );
 }
-
 
 #[test]
 fn regression_call_graph_text_no_cycle_spam() {
@@ -1553,14 +1699,14 @@ fn regression_call_graph_text_no_cycle_spam() {
          pub fn root_fn() { A::new(); B::new(); A::new(); B::new(); }\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path", &base, "call-graph", "--root", "root_fn",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "call-graph", "--root", "root_fn"]);
     let stdout = String::from_utf8_lossy(&out.stdout);
     let cycle_count = stdout.matches("[cycle]").count();
-    assert_eq!(cycle_count, 0, "no [cycle] lines should leak through; got {cycle_count}");
+    assert_eq!(
+        cycle_count, 0,
+        "no [cycle] lines should leak through; got {cycle_count}"
+    );
 }
-
 
 #[test]
 fn regression_refs_catches_enum_variant_qualified_uses() {
@@ -1577,7 +1723,11 @@ pub fn paint() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "refs", "Color", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let total = json["total_refs"].as_u64().unwrap_or(0);
     let kinds: Vec<String> = json["refs"]
@@ -1587,9 +1737,11 @@ pub fn paint() {
         .filter_map(|r| r["kind"].as_str().map(String::from))
         .collect();
     let variant_count = kinds.iter().filter(|k| k.as_str() == "variant").count();
-    assert!(variant_count >= 3, "expected 3+ variant refs (Color::Red, Color::Green, Color::Blue); got {variant_count} (total: {total}, kinds: {kinds:?})");
+    assert!(
+        variant_count >= 3,
+        "expected 3+ variant refs (Color::Red, Color::Green, Color::Blue); got {variant_count} (total: {total}, kinds: {kinds:?})"
+    );
 }
-
 
 #[test]
 fn regression_usages_emits_no_callers_stub_for_non_function() {
@@ -1600,7 +1752,11 @@ fn regression_usages_emits_no_callers_stub_for_non_function() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "usages", "MyStruct", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let labels: Vec<String> = json["sections"]
         .as_array()
@@ -1614,7 +1770,6 @@ fn regression_usages_emits_no_callers_stub_for_non_function() {
     );
 }
 
-
 #[test]
 fn regression_grep_json_uses_file_path_start_line_keys() {
     let fixture = tempdir().expect("tempdir");
@@ -1624,15 +1779,24 @@ fn regression_grep_json_uses_file_path_start_line_keys() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "grep", "fn ", "-j"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let m = &json["matches"][0];
-    assert!(m["file_path"].is_string(), "missing file_path key; got: {m}");
-    assert!(m["start_line"].is_number(), "missing start_line key; got: {m}");
+    assert!(
+        m["file_path"].is_string(),
+        "missing file_path key; got: {m}"
+    );
+    assert!(
+        m["start_line"].is_number(),
+        "missing start_line key; got: {m}"
+    );
     assert!(m["path"].is_null(), "old `path` key must be gone; got: {m}");
     assert!(m["line"].is_null(), "old `line` key must be gone; got: {m}");
 }
-
 
 #[test]
 fn regression_grep_json_truncation_exits_nonzero() {
@@ -1642,14 +1806,17 @@ fn regression_grep_json_truncation_exits_nonzero() {
         "fn a() {}\nfn b() {}\nfn c() {}\nfn d() {}\nfn e() {}\nfn f() {}\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path", &base, "grep", "fn ", "-j", "--max-results", "2",
-    ]);
-    assert!(!out.status.success(), "must exit non-zero on truncated -j; got success");
+    let out = run_rustgraph(&["--path", &base, "grep", "fn ", "-j", "--max-results", "2"]);
+    assert!(
+        !out.status.success(),
+        "must exit non-zero on truncated -j; got success"
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("truncated"), "must mention truncation; got: {stderr}");
+    assert!(
+        stderr.contains("truncated"),
+        "must mention truncation; got: {stderr}"
+    );
 }
-
 
 #[test]
 fn regression_find_exclude_tests_drops_test_functions() {
@@ -1668,9 +1835,18 @@ mod tests {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "find", "target", "--exclude-tests", "--json",
+        "--path",
+        &base,
+        "find",
+        "target",
+        "--exclude-tests",
+        "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let names: Vec<String> = json["functions"]
         .as_array()
@@ -1678,11 +1854,19 @@ mod tests {
         .iter()
         .map(|f| f["name"].as_str().unwrap().to_string())
         .collect();
-    assert!(names.contains(&"target_prod".to_string()), "prod fn dropped: {names:?}");
-    assert!(!names.contains(&"target_test".to_string()), "#[test] fn leaked: {names:?}");
-    assert!(!names.contains(&"target_helper".to_string()), "cfg(test) helper leaked: {names:?}");
+    assert!(
+        names.contains(&"target_prod".to_string()),
+        "prod fn dropped: {names:?}"
+    );
+    assert!(
+        !names.contains(&"target_test".to_string()),
+        "#[test] fn leaked: {names:?}"
+    );
+    assert!(
+        !names.contains(&"target_helper".to_string()),
+        "cfg(test) helper leaked: {names:?}"
+    );
 }
-
 
 #[test]
 fn regression_paths_between_resolves_qualified_call_chain() {
@@ -1704,7 +1888,11 @@ fn regression_paths_between_resolves_qualified_call_chain() {
         "target_fn",
         "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let paths = json["paths"].as_array().expect("paths array");
     assert!(!paths.is_empty(), "expected at least one path; got: {json}");
@@ -1712,7 +1900,6 @@ fn regression_paths_between_resolves_qualified_call_chain() {
     assert_eq!(first[0]["name"].as_str(), Some("main"));
     assert_eq!(first.last().unwrap()["name"].as_str(), Some("target_fn"));
 }
-
 
 #[test]
 fn regression_usages_combines_callers_and_refs() {
@@ -1723,14 +1910,21 @@ fn regression_usages_combines_callers_and_refs() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "usages", "target", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let sections = json["sections"].as_array().expect("sections");
     let labels: Vec<&str> = sections
         .iter()
         .map(|s| s["label"].as_str().unwrap())
         .collect();
-    assert!(labels.contains(&"callers"), "missing callers; got: {labels:?}");
+    assert!(
+        labels.contains(&"callers"),
+        "missing callers; got: {labels:?}"
+    );
 
     assert!(
         labels.iter().any(|l| l.starts_with("refs")),
@@ -1738,7 +1932,6 @@ fn regression_usages_combines_callers_and_refs() {
     );
     assert!(json["total"].as_u64().unwrap() >= 1);
 }
-
 
 #[test]
 fn regression_find_no_match_emits_did_you_mean() {
@@ -1749,14 +1942,12 @@ fn regression_find_no_match_emits_did_you_mean() {
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let out = run_rustgraph(&["--path", &base, "find", "loadirx"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
 
     let has_hint = stderr.contains("did you mean") || stderr.contains("relaxed to 0.7");
     assert!(has_hint, "missing hint: {stderr}");
 }
-
 
 #[test]
 fn regression_call_graph_text_mode_renders_tree() {
@@ -1766,10 +1957,12 @@ fn regression_call_graph_text_mode_renders_tree() {
         "pub fn root_fn() { mid_fn(); }\npub fn mid_fn() { leaf_fn(); }\npub fn leaf_fn() {}\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path", &base, "call-graph", "--root", "root_fn",
-    ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&["--path", &base, "call-graph", "--root", "root_fn"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(stdout.contains("root_fn"), "missing root: {stdout}");
     assert!(stdout.contains("mid_fn"), "missing mid: {stdout}");
@@ -1777,7 +1970,6 @@ fn regression_call_graph_text_mode_renders_tree() {
     assert!(stdout.contains("──"), "no tree connectors: {stdout}");
     assert!(!stdout.contains("digraph"), "should not be DOT: {stdout}");
 }
-
 
 #[test]
 fn regression_callers_in_alias_dropped_in_favor_of_target_in() {
@@ -1793,18 +1985,30 @@ fn regression_callers_in_alias_dropped_in_favor_of_target_in() {
     let base = fixture.path().to_string_lossy().to_string();
 
     let bad = run_rustgraph(&["--path", &base, "callers", "helper", "--in", "keep"]);
-    assert!(!bad.status.success(), "expected --in to no longer work on callers");
+    assert!(
+        !bad.status.success(),
+        "expected --in to no longer work on callers"
+    );
 
     let good = run_rustgraph(&[
-        "--path", &base, "callers", "helper", "--target-in", "keep", "--json",
+        "--path",
+        &base,
+        "callers",
+        "helper",
+        "--target-in",
+        "keep",
+        "--json",
     ]);
-    assert!(good.status.success(), "{}", String::from_utf8_lossy(&good.stderr));
+    assert!(
+        good.status.success(),
+        "{}",
+        String::from_utf8_lossy(&good.stderr)
+    );
     let json: Value = serde_json::from_slice(&good.stdout).expect("valid json");
     let m = json["matches"].as_array().unwrap();
     assert_eq!(m.len(), 1, "got: {}", json);
     assert!(m[0]["info"]["file_path"].as_str().unwrap().contains("keep"));
 }
-
 
 #[test]
 fn regression_grep_truncation_notice_on_stderr() {
@@ -1814,17 +2018,18 @@ fn regression_grep_truncation_notice_on_stderr() {
         "fn a() {}\nfn b() {}\nfn c() {}\nfn d() {}\nfn e() {}\nfn f() {}\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path", &base, "grep", "fn ", "--max-results", "2",
-    ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&["--path", &base, "grep", "fn ", "--max-results", "2"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("showing") && stderr.contains("--max-results"),
         "missing truncation notice in unified `(showing N of M; use --max-results to expand)` form: {stderr}"
     );
 }
-
 
 #[test]
 fn regression_callers_three_matches_pass_through() {
@@ -1847,11 +2052,13 @@ fn caller() { handle_a(); handle_b(); handle_c(); }
     );
 }
 
-
 #[test]
 fn regression_subcommand_short_help_hides_globals() {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
-    let out = Command::new(bin).args(["callers", "-h"]).output().expect("run");
+    let out = Command::new(bin)
+        .args(["callers", "-h"])
+        .output()
+        .expect("run");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         !stdout.contains("--path"),
@@ -1870,7 +2077,10 @@ fn regression_subcommand_short_help_hides_globals() {
 #[test]
 fn regression_subcommand_long_help_shows_globals() {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
-    let out = Command::new(bin).args(["callers", "--help"]).output().expect("run");
+    let out = Command::new(bin)
+        .args(["callers", "--help"])
+        .output()
+        .expect("run");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("--path"),
@@ -1881,7 +2091,6 @@ fn regression_subcommand_long_help_shows_globals() {
         "callers --help SHOULD show --search-threshold, got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_usage_error_dumps_contextual_help() {
@@ -1899,18 +2108,19 @@ fn regression_usage_error_dumps_contextual_help() {
     );
 }
 
-
 #[test]
 fn regression_refs_kind_help_lists_variant() {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
-    let out = Command::new(bin).args(["refs", "--help"]).output().expect("run");
+    let out = Command::new(bin)
+        .args(["refs", "--help"])
+        .output()
+        .expect("run");
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("variant"),
         "refs --help should list 'variant' kind, got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_usages_skips_call_kind_refs_when_target_is_fn() {
@@ -1921,7 +2131,11 @@ fn regression_usages_skips_call_kind_refs_when_target_is_fn() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "usages", "target", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let sections = json["sections"].as_array().expect("sections");
     let refs_section = sections
@@ -1934,7 +2148,6 @@ fn regression_usages_skips_call_kind_refs_when_target_is_fn() {
         "refs section should drop kind=call when target is a fn, got: {entries:?}"
     );
 }
-
 
 #[test]
 fn regression_callers_symbol_id_without_positional_query() {
@@ -1952,14 +2165,20 @@ fn regression_callers_symbol_id_without_positional_query() {
         .expect("symbol_id from find")
         .to_string();
 
-    let out = run_rustgraph(&["--path", &base, "callers", "--symbol-id", &symbol_id, "--json"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "callers",
+        "--symbol-id",
+        &symbol_id,
+        "--json",
+    ]);
     assert!(
         out.status.success(),
         "callers --symbol-id (no positional) must succeed, got stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
 }
-
 
 #[test]
 fn regression_paths_between_in_filter_scopes_resolution() {
@@ -1978,9 +2197,20 @@ fn regression_paths_between_in_filter_scopes_resolution() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "entry", "target", "--target-in", "keep", "--json",
+        "--path",
+        &base,
+        "paths-between",
+        "entry",
+        "target",
+        "--target-in",
+        "keep",
+        "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let paths = json["paths"].as_array().expect("paths array");
     assert!(!paths.is_empty(), "expected at least one path, got: {json}");
@@ -1994,7 +2224,6 @@ fn regression_paths_between_in_filter_scopes_resolution() {
     }
 }
 
-
 #[test]
 fn regression_paths_between_show_call_sites_annotates_hops() {
     let fixture = tempdir().expect("tempdir");
@@ -2004,9 +2233,19 @@ fn regression_paths_between_show_call_sites_annotates_hops() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "entry", "target", "--show-call-sites", "--json",
+        "--path",
+        &base,
+        "paths-between",
+        "entry",
+        "target",
+        "--show-call-sites",
+        "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let paths = json["paths"].as_array().expect("paths array");
     assert!(!paths.is_empty());
@@ -2028,7 +2267,11 @@ fn regression_find_does_not_double_fn_name() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "build_catalog", "--func"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         !stdout.contains("fn build_catalog fn build_catalog"),
@@ -2039,7 +2282,6 @@ fn regression_find_does_not_double_fn_name() {
         "expected the function name to render, got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_dead_code_in_filter_recomputes_summary() {
@@ -2057,19 +2299,23 @@ fn regression_dead_code_in_filter_recomputes_summary() {
         "pub mod keep; pub mod drop;\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path", &base, "dead-code", "--in", "keep", "--json",
-    ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&["--path", &base, "dead-code", "--in", "keep", "--json"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let dead_total = json["dead_functions_total"].as_u64().unwrap_or(0);
-    let dead_arr_len = json["dead_functions"].as_array().map(|a| a.len()).unwrap_or(0);
+    let dead_arr_len = json["dead_functions"]
+        .as_array()
+        .map(|a| a.len())
+        .unwrap_or(0);
     assert_eq!(
         dead_total as usize, dead_arr_len,
         "dead_functions_total ({dead_total}) must match the filtered dead_functions length ({dead_arr_len})"
     );
 }
-
 
 #[test]
 fn regression_refs_dedups_call_and_path_at_same_span() {
@@ -2080,7 +2326,11 @@ fn regression_refs_dedups_call_and_path_at_same_span() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "refs", "target", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let refs = json["refs"].as_array().expect("refs array");
 
@@ -2103,7 +2353,6 @@ fn regression_refs_dedups_call_and_path_at_same_span() {
     }
 }
 
-
 #[test]
 fn regression_usages_dedups_method_kind_against_callers() {
     let fixture = tempdir().expect("tempdir");
@@ -2113,7 +2362,11 @@ fn regression_usages_dedups_method_kind_against_callers() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "usages", "target", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let sections = json["sections"].as_array().expect("sections");
     let callers_lines: Vec<(String, u64)> = sections
@@ -2124,16 +2377,23 @@ fn regression_usages_dedups_method_kind_against_callers() {
                 .as_array()
                 .unwrap()
                 .iter()
-                .map(|e| (
-                    e["file_path"].as_str().unwrap().to_string(),
-                    e["line"].as_u64().unwrap(),
-                ))
+                .map(|e| {
+                    (
+                        e["file_path"].as_str().unwrap().to_string(),
+                        e["line"].as_u64().unwrap(),
+                    )
+                })
                 .collect()
         })
         .unwrap_or_default();
     let refs_section = sections
         .iter()
-        .find(|s| s["label"].as_str().map(|l| l.starts_with("refs")).unwrap_or(false))
+        .find(|s| {
+            s["label"]
+                .as_str()
+                .map(|l| l.starts_with("refs"))
+                .unwrap_or(false)
+        })
         .expect("refs section");
     for entry in refs_section["entries"].as_array().unwrap() {
         let key = (
@@ -2147,7 +2407,6 @@ fn regression_usages_dedups_method_kind_against_callers() {
     }
 }
 
-
 #[test]
 fn regression_search_threshold_filters_substring_matches() {
     let fixture = tempdir().expect("tempdir");
@@ -2157,17 +2416,30 @@ fn regression_search_threshold_filters_substring_matches() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "find", "Daemon", "--func", "--search-threshold", "0.99", "--json",
+        "--path",
+        &base,
+        "find",
+        "Daemon",
+        "--func",
+        "--search-threshold",
+        "0.99",
+        "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let funcs = json["functions"].as_array().unwrap();
 
-
-    assert_eq!(funcs.len(), 1, "expected only exact match at 0.99, got: {funcs:?}");
+    assert_eq!(
+        funcs.len(),
+        1,
+        "expected only exact match at 0.99, got: {funcs:?}"
+    );
     assert_eq!(funcs[0]["name"].as_str(), Some("Daemon"));
 }
-
 
 #[test]
 fn regression_callers_resolves_through_pub_use_alias() {
@@ -2182,17 +2454,26 @@ fn regression_callers_resolves_through_pub_use_alias() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "callers", "handle_get", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let matches = json["matches"].as_array().expect("matches");
-    assert_eq!(matches.len(), 1, "expected exactly one match for handle_get");
+    assert_eq!(
+        matches.len(),
+        1,
+        "expected exactly one match for handle_get"
+    );
     let callers = matches[0]["callers"].as_array().expect("callers");
     assert!(
-        callers.iter().any(|c| c["info"]["name"].as_str() == Some("router")),
+        callers
+            .iter()
+            .any(|c| c["info"]["name"].as_str() == Some("router")),
         "expected `router` in callers via alias resolution; got: {callers:?}"
     );
 }
-
 
 #[test]
 fn regression_paths_between_walks_framework_handler_refs() {
@@ -2212,9 +2493,18 @@ pub fn build_router() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "build_router", "target_handler", "--json",
+        "--path",
+        &base,
+        "paths-between",
+        "build_router",
+        "target_handler",
+        "--json",
     ]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let paths = json["paths"].as_array().expect("paths");
     assert!(
@@ -2222,7 +2512,6 @@ pub fn build_router() {
         "expected paths-between to walk through axum::get(handler::...) ref; got: {json}"
     );
 }
-
 
 #[test]
 fn regression_callers_on_struct_redirects_to_refs() {
@@ -2258,7 +2547,6 @@ fn regression_ensemble_on_enum_redirects_to_refs() {
     );
 }
 
-
 #[test]
 fn regression_callers_exclude_tests_drops_test_callers() {
     let fixture = tempdir().expect("tempdir");
@@ -2276,8 +2564,19 @@ mod tests {
 "#,
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "--exclude-tests", "callers", "target", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "--exclude-tests",
+        "callers",
+        "target",
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let callers: Vec<&str> = json["matches"][0]["callers"]
         .as_array()
@@ -2285,7 +2584,11 @@ mod tests {
         .iter()
         .map(|c| c["info"]["name"].as_str().unwrap())
         .collect();
-    assert_eq!(callers, vec!["prod_caller"], "test_caller leaked: {callers:?}");
+    assert_eq!(
+        callers,
+        vec!["prod_caller"],
+        "test_caller leaked: {callers:?}"
+    );
 }
 
 #[test]
@@ -2305,8 +2608,19 @@ mod tests {
 "#,
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "--exclude-tests", "usages", "target", "--json"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "--exclude-tests",
+        "usages",
+        "target",
+        "--json",
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
     let sections = json["sections"].as_array().expect("sections");
     let mut fnames: Vec<String> = Vec::new();
@@ -2317,9 +2631,11 @@ mod tests {
             }
         }
     }
-    assert!(!fnames.iter().any(|n| n == "test_caller"), "test fn leaked: {fnames:?}");
+    assert!(
+        !fnames.iter().any(|n| n == "test_caller"),
+        "test fn leaked: {fnames:?}"
+    );
 }
-
 
 #[test]
 fn regression_callers_ambiguity_cap_configurable() {
@@ -2342,13 +2658,18 @@ pub fn caller() { handle_a(); handle_b(); handle_c(); handle_d(); handle_e(); ha
     let base = fixture.path().to_string_lossy().to_string();
 
     let bail = run_rustgraph(&["--path", &base, "callers", "handle"]);
-    assert!(!bail.status.success(), "expected default cap=7 to bail on 9 matches");
+    assert!(
+        !bail.status.success(),
+        "expected default cap=7 to bail on 9 matches"
+    );
 
     let pass = run_rustgraph(&["--path", &base, "callers", "handle", "--ambiguity-cap", "9"]);
-    assert!(pass.status.success(), "cap=9 should let 9 matches pass: {}",
-        String::from_utf8_lossy(&pass.stderr));
+    assert!(
+        pass.status.success(),
+        "cap=9 should let 9 matches pass: {}",
+        String::from_utf8_lossy(&pass.stderr)
+    );
 }
-
 
 #[test]
 fn regression_call_graph_positional_acts_as_root() {
@@ -2359,11 +2680,17 @@ fn regression_call_graph_positional_acts_as_root() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "call-graph", "entry"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("entry") && stdout.contains("mid"), "tree missing nodes: {stdout}");
+    assert!(
+        stdout.contains("entry") && stdout.contains("mid"),
+        "tree missing nodes: {stdout}"
+    );
 }
-
 
 #[test]
 fn regression_grep_by_function_json_omits_matches_array() {
@@ -2373,14 +2700,30 @@ fn regression_grep_by_function_json_omits_matches_array() {
         "pub fn alpha() { let _ = 1.unwrap(); }\npub fn beta() { let _ = 2.unwrap(); }\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "grep", r"\.unwrap\(\)", "--by-function", "-j"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "grep",
+        r"\.unwrap\(\)",
+        "--by-function",
+        "-j",
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("json");
-    assert!(json.get("matches").is_none(), "matches[] should be omitted in --by-function: {json}");
-    assert!(json.get("summary_by_function").is_some(), "summary_by_function missing");
+    assert!(
+        json.get("matches").is_none(),
+        "matches[] should be omitted in --by-function: {json}"
+    );
+    assert!(
+        json.get("summary_by_function").is_some(),
+        "summary_by_function missing"
+    );
     assert_eq!(json["by_function"], serde_json::json!(true));
 }
-
 
 #[test]
 fn regression_refs_in_filter_reports_scoped_file_count() {
@@ -2395,7 +2738,11 @@ fn regression_refs_in_filter_reports_scoped_file_count() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "refs", "target", "--in", "keep"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
         stdout.contains("across 1 file(s)"),
@@ -2403,23 +2750,19 @@ fn regression_refs_in_filter_reports_scoped_file_count() {
     );
 }
 
-
 #[test]
 fn regression_tree_prefix_strips_parent_levels() {
     let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/inner/a.rs"),
-        "pub fn one() {}\n",
-    );
-    write_file(
-        &fixture.path().join("src/inner/b.rs"),
-        "pub fn two() {}\n",
-    );
+    write_file(&fixture.path().join("src/inner/a.rs"), "pub fn one() {}\n");
+    write_file(&fixture.path().join("src/inner/b.rs"), "pub fn two() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "tree", "src/inner"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(stdout.contains("a.rs"), "missing a.rs: {stdout}");
     assert!(stdout.contains("b.rs"), "missing b.rs: {stdout}");
@@ -2431,7 +2774,6 @@ fn regression_tree_prefix_strips_parent_levels() {
     );
 }
 
-
 #[test]
 fn regression_paths_between_hints_reverse_when_forward_empty() {
     let fixture = tempdir().expect("tempdir");
@@ -2442,14 +2784,17 @@ fn regression_paths_between_hints_reverse_when_forward_empty() {
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&["--path", &base, "paths-between", "b", "a"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
         stderr.contains("reverse direction has path") && stderr.contains("paths-between a b"),
         "missing reverse hint: {stderr}"
     );
 }
-
 
 #[test]
 fn regression_def_exact_match_returns_single_line() {
@@ -2461,14 +2806,23 @@ fn regression_def_exact_match_returns_single_line() {
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&["--path", &base, "def", "handle"]);
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("handle [fn]"), "missing single-line def: {stdout}");
+    assert!(
+        stdout.contains("handle [fn]"),
+        "missing single-line def: {stdout}"
+    );
 
     let nope = run_rustgraph(&["--path", &base, "def", "handl"]);
-    assert!(!nope.status.success(), "expected no exact match for 'handl'");
+    assert!(
+        !nope.status.success(),
+        "expected no exact match for 'handl'"
+    );
 }
-
 
 #[test]
 fn regression_version_flag_works() {

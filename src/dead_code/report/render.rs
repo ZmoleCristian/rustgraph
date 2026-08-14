@@ -8,14 +8,12 @@ pub fn print_dead_code_text(report: &DeadCodeReport) {
     print_dead_code_text_with_verbosity(report, true);
 }
 
-
 /// Print `report` to stdout, controlling summary detail via `verbose`.
 ///
 /// When `verbose` is `false` the skip-reason breakdown is omitted from the summary line.
 pub fn print_dead_code_text_with_verbosity(report: &DeadCodeReport, verbose: bool) {
     print_dead_code_text_with_verbosity_and_cap(report, verbose, 0)
 }
-
 
 /// Print `report` to stdout with verbosity control and an optional result cap.
 ///
@@ -40,7 +38,6 @@ pub fn print_dead_code_text_with_verbosity_and_cap(
     } else {
         max_results
     };
-
 
     let mut sorted: Vec<&DeadFunction> = report.dead_functions.iter().collect();
     sorted.sort_by(|a, b| {
@@ -89,7 +86,6 @@ pub fn print_dead_code_text_with_verbosity_and_cap(
     }
 
     println!("{}", summary_line);
-
 
     if verbose && !report.ambiguous_name_details.is_empty() {
         println!("Ambiguous unresolved call targets:");

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 const ASSOC_FIXTURE: &str = "\
 pub struct SessionDocument;
@@ -43,7 +43,6 @@ fn fix1_refs_leaf_assoc_call_suggests_qualifier() {
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), ASSOC_FIXTURE);
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["-p", &base, "refs", "load", "--kind", "assoc_call"]);
     assert!(
@@ -117,7 +116,6 @@ fn fix1_refs_leaf_variant_suggests_enum() {
     write_file(&fixture.path().join("src/lib.rs"), VARIANT_FIXTURE);
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let out = run_rustgraph(&["-p", &base, "refs", "Load", "--kind", "variant"]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
     let stderr = stderr_of(&out);
@@ -133,7 +131,6 @@ fn fix1_refs_leaf_variant_suggests_enum() {
 
 #[test]
 fn fix1_refs_no_matching_type_omits_hint() {
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -161,8 +158,6 @@ fn fix1_refs_no_matching_type_omits_hint() {
 
 #[test]
 fn fix1_refs_no_kind_filter_omits_hint() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), ASSOC_FIXTURE);
     let base = fixture.path().to_string_lossy().to_string();
@@ -179,7 +174,6 @@ fn fix1_refs_no_kind_filter_omits_hint() {
         "expected NO `Try one of:` block without --kind; got:\n{stderr}"
     );
 }
-
 
 fn pipe_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -216,7 +210,6 @@ fn fix2_grep_backslash_pipe_emits_loud_warning() {
 
 #[test]
 fn fix2_grep_fixed_string_suppresses_pipe_warning() {
-
     let fixture = pipe_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
@@ -235,8 +228,6 @@ fn fix2_grep_fixed_string_suppresses_pipe_warning() {
 
 #[test]
 fn fix2_grep_backslash_paren_emits_warning() {
-
-
     let fixture = pipe_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
@@ -287,8 +278,6 @@ fn fix2_grep_correct_pipe_pattern_no_warning() {
 
 #[test]
 fn fix2_grep_backslash_pipe_with_json_still_warns() {
-
-
     let fixture = pipe_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
@@ -312,8 +301,6 @@ fn fix2_grep_backslash_pipe_with_json_still_warns() {
 
 #[test]
 fn fix2_grep_backslash_pipe_with_by_function_still_warns() {
-
-
     let fixture = pipe_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 

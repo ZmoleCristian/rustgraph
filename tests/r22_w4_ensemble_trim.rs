@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -47,7 +48,6 @@ pub fn r22_caller_fn() {
     dir
 }
 
-
 #[test]
 fn r22_summary_default_starts_with_marker_block() {
     let fixture = small_fixture();
@@ -62,7 +62,6 @@ fn r22_summary_default_starts_with_marker_block() {
     );
     let stdout = stdout_of(&out);
 
-
     let first_nonempty = stdout
         .lines()
         .find(|l| !l.trim().is_empty())
@@ -73,7 +72,6 @@ fn r22_summary_default_starts_with_marker_block() {
         first_nonempty,
         stdout
     );
-
 
     let marker_pos = stdout
         .find("[summary view")
@@ -90,15 +88,12 @@ fn r22_summary_default_starts_with_marker_block() {
     );
 }
 
-
 #[test]
 fn r22_view_full_suppresses_marker_at_top() {
     let fixture = small_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "-p", &base, "ensemble", "r22_target_fn", "--view", "full",
-    ]);
+    let out = run_rustgraph(&["-p", &base, "ensemble", "r22_target_fn", "--view", "full"]);
     assert!(
         out.status.success(),
         "--view full ensemble failed: stdout={} stderr={}",
@@ -106,7 +101,6 @@ fn r22_view_full_suppresses_marker_at_top() {
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-
 
     assert!(
         !stdout.contains("[summary view"),
@@ -126,15 +120,18 @@ fn r22_view_full_suppresses_marker_at_top() {
     );
 }
 
-
 #[test]
 fn r22_section_override_uses_showing_hint_not_summary_marker() {
     let fixture = small_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "ensemble", "r22_target_fn",
-        "--section", "neighborhood",
+        "-p",
+        &base,
+        "ensemble",
+        "r22_target_fn",
+        "--section",
+        "neighborhood",
     ]);
     assert!(
         out.status.success(),
@@ -143,7 +140,6 @@ fn r22_section_override_uses_showing_hint_not_summary_marker() {
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-
 
     assert!(
         !stdout.contains("[summary view"),
@@ -168,7 +164,6 @@ fn r22_section_override_uses_showing_hint_not_summary_marker() {
     );
 }
 
-
 #[test]
 fn r22_marker_block_content_invariants_held() {
     let fixture = small_fixture();
@@ -182,7 +177,6 @@ fn r22_marker_block_content_invariants_held() {
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-
 
     let block_start = stdout
         .find("[summary view")
@@ -219,7 +213,6 @@ fn r22_marker_block_content_invariants_held() {
         block
     );
 }
-
 
 #[test]
 fn r22_summary_default_still_shows_navigable_triplet() {

@@ -9,8 +9,7 @@ use super::switchboard::write_string_output;
 use crate::api::CallGraphDetail;
 use crate::cli::Args;
 use crate::index::qualifier::{
-    candidate_matches_qualifier, qualifier_for_callee, resolve_callee_candidates,
-    ResolutionStats,
+    ResolutionStats, candidate_matches_qualifier, qualifier_for_callee, resolve_callee_candidates,
 };
 use crate::{CallSite, FunctionInfo, function_id, generate_call_graph};
 
@@ -26,48 +25,59 @@ pub fn run(
     detail: CallGraphDetail,
     config: CallGraphConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
-
     let strict_only = args.strict_resolution;
     let mut resolution_stats = ResolutionStats::default();
 
-    let (functions_view, call_map_view, call_sites_view, scope_note) =
-        if let Some(root_query) = config.root.as_deref() {
-            scope_to_root(project, root_query, config.depth, config.include_callers, strict_only, &mut resolution_stats)?
-        } else if let Some(search_terms) = args.search.as_deref() {
+    let (functions_view, call_map_view, call_sites_view, scope_note) = if let Some(root_query) =
+        config.root.as_deref()
+    {
+        scope_to_root(
+            project,
+            root_query,
+            config.depth,
+            config.include_callers,
+            strict_only,
+            &mut resolution_stats,
+        )?
+    } else if let Some(search_terms) = args.search.as_deref() {
+        scope_to_search(
+            project,
+            search_terms,
+            args.search_threshold,
+            args.match_signature,
+            config.depth,
+            config.include_callers,
+            strict_only,
+            &mut resolution_stats,
+        )?
+    } else {
+        let n = project.functions.len();
 
-
-            scope_to_search(project, search_terms, args.search_threshold, args.match_signature, config.depth, config.include_callers, strict_only, &mut resolution_stats)?
-        } else {
-            let n = project.functions.len();
-
-
-            if n > 50 && !config.all {
-                return Err(format!(
+        if n > 50 && !config.all {
+            return Err(format!(
                     "call-graph would render {} functions; pass --root <FN>, --search <Q>, or --all (no-cap dump) to proceed",
                     n
                 )
                 .into());
-            }
-            if !config.text && n > 50 && args.output.is_none() {
-                eprintln!(
-                    "warning: call-graph --dot --all will emit a {} -node DOT graph (likely unrenderable). \
+        }
+        if !config.text && n > 50 && args.output.is_none() {
+            eprintln!(
+                "warning: call-graph --dot --all will emit a {} -node DOT graph (likely unrenderable). \
                      Pass --root <fn> to focus, or `-o graph.dot` to dump silently.",
-                    n
-                );
-            }
-            (
-                project.functions.clone(),
-                project.call_map.clone(),
-                project.call_sites.clone(),
-                None,
-            )
-        };
+                n
+            );
+        }
+        (
+            project.functions.clone(),
+            project.call_map.clone(),
+            project.call_sites.clone(),
+            None,
+        )
+    };
 
     if let Some(note) = &scope_note {
         eprintln!("{}", note);
     }
-
 
     if args.json {
         let payload = render_json(
@@ -81,7 +91,6 @@ pub fn run(
             &mut resolution_stats,
         )?;
         write_string_output(args.output.as_deref(), &payload)?;
-
 
         resolution_stats.emit_stderr_note();
         return Ok(());
@@ -97,7 +106,6 @@ pub fn run(
             strict_only,
             &mut resolution_stats,
         );
-
 
         if all_external_hint {
             eprintln!(
@@ -127,12 +135,10 @@ pub fn run(
         println!("{}", payload);
     }
 
-
     resolution_stats.emit_stderr_note();
 
     Ok(())
 }
-
 
 #[derive(Serialize)]
 struct CallGraphJson<'a> {
@@ -143,9 +149,7 @@ struct CallGraphJson<'a> {
 
 #[derive(Serialize)]
 struct ScopeJson<'a> {
-
     root: Option<&'a str>,
-
 
     depth: i64,
     include_callers: bool,
@@ -167,7 +171,6 @@ struct FunctionJson<'a> {
 #[derive(Serialize)]
 struct EdgeJson<'a> {
     caller_id: &'a str,
-
 
     callee_id: Option<String>,
 
@@ -197,7 +200,6 @@ fn render_json(
         m
     };
 
-
     let mut caller_ids: Vec<&String> = call_map.keys().collect();
     caller_ids.sort();
 
@@ -206,19 +208,20 @@ fn render_json(
     let mut external_count = 0usize;
 
     for caller_id in caller_ids {
-
         if !by_id.contains_key(caller_id) {
             continue;
         }
-        let Some(callees) = call_map.get(caller_id) else { continue };
+        let Some(callees) = call_map.get(caller_id) else {
+            continue;
+        };
         for callee_name in callees {
             let bare = callee_name
                 .rsplit(|c: char| c == '.' || c == ':')
                 .next()
                 .unwrap_or(callee_name.as_str());
 
-
-            let (candidates, mode) = resolve_callee_candidates(callee_name, bare, &by_name, strict_only);
+            let (candidates, mode) =
+                resolve_callee_candidates(callee_name, bare, &by_name, strict_only);
             stats.record(mode);
             let resolved: Option<String> = candidates.iter().find_map(|m| {
                 let cid = function_id(m);
@@ -267,7 +270,6 @@ fn render_json(
         scope: ScopeJson {
             root: root_query,
 
-
             depth: if depth == 0 { -1 } else { depth as i64 },
             include_callers,
             show_external,
@@ -281,7 +283,6 @@ fn render_json(
 
     Ok(serde_json::to_string_pretty(&payload)?)
 }
-
 
 #[allow(clippy::too_many_arguments)]
 fn render_text(
@@ -302,7 +303,6 @@ fn render_text(
         }
         m
     };
-
 
     let (internal_edges, external_edges) =
         count_edges(call_map, &by_id, &by_name, strict_only, stats);
@@ -339,9 +339,7 @@ fn render_text(
             })
             .collect();
 
-
         if include_callers {
-
             let mut rev: HashMap<&str, Vec<&str>> = HashMap::new();
             for (caller_id, callees) in call_map {
                 for callee_name in callees {
@@ -361,14 +359,14 @@ fn render_text(
                     .map(|cids| {
                         cids.iter()
                             .filter_map(|cid| by_id.get(*cid).copied())
-
-
                             .filter(|f| caller_resolves(f, r, call_map))
                             .collect()
                     })
                     .unwrap_or_default();
                 callers.sort_by(|a, b| {
-                    a.file_path.cmp(&b.file_path).then(a.start_line.cmp(&b.start_line))
+                    a.file_path
+                        .cmp(&b.file_path)
+                        .then(a.start_line.cmp(&b.start_line))
                 });
                 callers.dedup_by(|a, b| function_id(a) == function_id(b));
                 let total_callers = callers.len();
@@ -381,7 +379,14 @@ fn render_text(
                     for (i, caller) in callers.iter().enumerate() {
                         let last = i + 1 == total_callers;
                         walk_text_callers(
-                            caller, &by_id, &rev, call_map, "", last, &mut up_visited, &mut out,
+                            caller,
+                            &by_id,
+                            &rev,
+                            call_map,
+                            "",
+                            last,
+                            &mut up_visited,
+                            &mut out,
                         );
                     }
                 }
@@ -391,10 +396,22 @@ fn render_text(
         for r in &roots {
             out.push('\n');
             let mut visited: HashSet<String> = HashSet::new();
-            walk_text(r, &by_id, &by_name, call_map, "", true, true, &mut visited, &mut out, show_external, strict_only, stats);
+            walk_text(
+                r,
+                &by_id,
+                &by_name,
+                call_map,
+                "",
+                true,
+                true,
+                &mut visited,
+                &mut out,
+                show_external,
+                strict_only,
+                stats,
+            );
         }
     } else {
-
         let mut per_file: HashMap<&str, Vec<&FunctionInfo>> = HashMap::new();
         for f in functions {
             per_file.entry(f.file_path.as_str()).or_default().push(f);
@@ -407,10 +424,7 @@ fn render_text(
             out.push_str(&format!("\n{}:\n", file));
             for f in fns {
                 let id = function_id(f);
-                let callees = call_map
-                    .get(&id)
-                    .map(|v| v.join(", "))
-                    .unwrap_or_default();
+                let callees = call_map.get(&id).map(|v| v.join(", ")).unwrap_or_default();
                 if callees.is_empty() {
                     continue;
                 }
@@ -424,7 +438,6 @@ fn render_text(
 
     (out, all_external_hint)
 }
-
 
 fn count_edges(
     call_map: &HashMap<String, Vec<String>>,
@@ -442,8 +455,8 @@ fn count_edges(
                 .next()
                 .unwrap_or(callee_name.as_str());
 
-
-            let (candidates, mode) = resolve_callee_candidates(callee_name, bare, by_name, strict_only);
+            let (candidates, mode) =
+                resolve_callee_candidates(callee_name, bare, by_name, strict_only);
             stats.record(mode);
             let resolves_internal = candidates
                 .iter()
@@ -457,7 +470,6 @@ fn count_edges(
     }
     (internal, external)
 }
-
 
 #[allow(clippy::too_many_arguments)]
 fn walk_text(
@@ -475,7 +487,6 @@ fn walk_text(
     stats: &mut ResolutionStats,
 ) {
     let id = function_id(node);
-
 
     if !visited.insert(id.clone()) {
         return;
@@ -508,7 +519,6 @@ fn walk_text(
             .next()
             .unwrap_or(callee_name.as_str());
 
-
         let (filtered, mode) = resolve_callee_candidates(callee_name, bare, by_name, strict_only);
         stats.record(mode);
         if !filtered.is_empty() {
@@ -526,7 +536,20 @@ fn walk_text(
     let total = child_fns.len() + if render_external { 1 } else { 0 };
     for (i, child) in child_fns.iter().enumerate() {
         let last = i + 1 == total;
-        walk_text(child, by_id, by_name, call_map, &next_prefix, last, false, visited, out, show_external, strict_only, stats);
+        walk_text(
+            child,
+            by_id,
+            by_name,
+            call_map,
+            &next_prefix,
+            last,
+            false,
+            visited,
+            out,
+            show_external,
+            strict_only,
+            stats,
+        );
     }
     if render_external {
         out.push_str(&format!(
@@ -537,14 +560,15 @@ fn walk_text(
     }
 }
 
-
 fn caller_resolves(
     caller: &FunctionInfo,
     target: &FunctionInfo,
     call_map: &HashMap<String, Vec<String>>,
 ) -> bool {
     let cid = function_id(caller);
-    let Some(callees) = call_map.get(&cid) else { return false };
+    let Some(callees) = call_map.get(&cid) else {
+        return false;
+    };
     for callee_name in callees {
         let bare = callee_name
             .rsplit(|c: char| c == '.' || c == ':')
@@ -560,7 +584,6 @@ fn caller_resolves(
     }
     false
 }
-
 
 fn walk_text_callers(
     node: &FunctionInfo,
@@ -592,7 +615,9 @@ fn walk_text_callers(
         })
         .unwrap_or_default();
     parents.sort_by(|a, b| {
-        a.file_path.cmp(&b.file_path).then(a.start_line.cmp(&b.start_line))
+        a.file_path
+            .cmp(&b.file_path)
+            .then(a.start_line.cmp(&b.start_line))
     });
     parents.dedup_by(|a, b| function_id(a) == function_id(b));
     let total = parents.len();
@@ -603,7 +628,6 @@ fn walk_text_callers(
 }
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-
 
 fn scope_to_search(
     project: &ProjectData,
@@ -643,12 +667,21 @@ fn scope_to_search(
     let seed_ids: Vec<String> = matched_fns.iter().map(function_id).collect();
     let note = format!(
         "rustgraph call-graph --search '{}' depth={} include_callers={}: {} seed fn(s)",
-        search_terms, depth, include_callers, seed_ids.len()
+        search_terms,
+        depth,
+        include_callers,
+        seed_ids.len()
     );
-    let (fns, cm, cs, _) = scope_from_seed_ids(project, &seed_ids, depth, include_callers, strict_only, stats);
+    let (fns, cm, cs, _) = scope_from_seed_ids(
+        project,
+        &seed_ids,
+        depth,
+        include_callers,
+        strict_only,
+        stats,
+    );
     Ok((fns, cm, cs, Some(note)))
 }
-
 
 fn scope_from_seed_ids(
     project: &ProjectData,
@@ -693,8 +726,8 @@ fn scope_from_seed_ids(
                     .next()
                     .unwrap_or(callee_name.as_str());
 
-
-                let (filtered, mode) = resolve_callee_candidates(callee_name, bare, &by_name, strict_only);
+                let (filtered, mode) =
+                    resolve_callee_candidates(callee_name, bare, &by_name, strict_only);
                 stats.record(mode);
                 for f in filtered {
                     let cid = function_id(f);
@@ -718,10 +751,14 @@ fn scope_from_seed_ids(
             if d >= max_depth {
                 continue;
             }
-            let Some(target) = by_id.get(&id) else { continue };
+            let Some(target) = by_id.get(&id) else {
+                continue;
+            };
             if let Some(sites) = callers_by_callee.get(target.name.as_str()) {
                 for s in sites {
-                    let Some(caller_id) = s.caller_id.as_ref() else { continue };
+                    let Some(caller_id) = s.caller_id.as_ref() else {
+                        continue;
+                    };
                     if keep.insert(caller_id.clone()) {
                         up.push_back((caller_id.clone(), d + 1));
                     }
@@ -792,7 +829,6 @@ fn scope_to_root(
         keep.insert(r.clone());
     }
 
-
     let by_name: HashMap<&str, Vec<&FunctionInfo>> = {
         let mut m: HashMap<&str, Vec<&FunctionInfo>> = HashMap::new();
         for f in &project.functions {
@@ -808,15 +844,13 @@ fn scope_to_root(
         }
         if let Some(callees) = project.call_map.get(&id) {
             for callee_name in callees {
-
-
                 let bare = callee_name
                     .rsplit(|c: char| c == '.' || c == ':')
                     .next()
                     .unwrap_or(callee_name.as_str());
 
-
-                let (filtered, mode) = resolve_callee_candidates(callee_name, bare, &by_name, strict_only);
+                let (filtered, mode) =
+                    resolve_callee_candidates(callee_name, bare, &by_name, strict_only);
                 stats.record(mode);
                 for f in filtered {
                     let cid = function_id(f);
@@ -829,8 +863,6 @@ fn scope_to_root(
     }
 
     if include_callers {
-
-
         let mut callers_by_callee: HashMap<&str, Vec<&CallSite>> = HashMap::new();
         for site in &project.call_sites {
             callers_by_callee
@@ -838,8 +870,7 @@ fn scope_to_root(
                 .or_default()
                 .push(site);
         }
-        let mut up: VecDeque<(String, usize)> =
-            root_ids.iter().map(|id| (id.clone(), 0)).collect();
+        let mut up: VecDeque<(String, usize)> = root_ids.iter().map(|id| (id.clone(), 0)).collect();
         while let Some((id, d)) = up.pop_front() {
             if d >= max_depth {
                 continue;
@@ -888,7 +919,11 @@ fn scope_to_root(
     let note = format!(
         "rustgraph call-graph --root '{}' depth={} include_callers={}: scoped to {} fn(s) (down from {})",
         root_query,
-        if depth == 0 { "∞".into() } else { depth.to_string() },
+        if depth == 0 {
+            "∞".into()
+        } else {
+            depth.to_string()
+        },
         include_callers,
         functions_view.len(),
         project.functions.len()
@@ -898,7 +933,6 @@ fn scope_to_root(
 }
 
 fn resolve_root(query: &str, project: &ProjectData) -> Vec<String> {
-
     let trimmed = query.trim();
     if let Some((path_part, line_part)) = trimmed.rsplit_once(':')
         && let Ok(line) = line_part.parse::<usize>()

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,9 +14,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 fn write_split_display_fixture() -> tempfile::TempDir {
     let fixture = tempdir().expect("tempdir");
@@ -37,20 +37,12 @@ fn write_split_display_fixture() -> tempfile::TempDir {
     fixture
 }
 
-
 #[test]
 fn regression_impls_in_filter_narrows_to_path_substring() {
     let fixture = write_split_display_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "impls",
-        "Display",
-        "--in",
-        "keep",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "impls", "Display", "--in", "keep"]);
     assert!(
         out.status.success(),
         "impls failed; stderr={}",
@@ -58,18 +50,20 @@ fn regression_impls_in_filter_narrows_to_path_substring() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
 
-
     assert!(
-        stdout.lines().any(|l| l.contains(" A ") && l.contains("[handwritten]")),
+        stdout
+            .lines()
+            .any(|l| l.contains(" A ") && l.contains("[handwritten]")),
         "expected `A` impl from src/keep/ to be present; got:\n{stdout}"
     );
 
     assert!(
-        !stdout.lines().any(|l| l.contains(" B ") && l.contains("[handwritten]")),
+        !stdout
+            .lines()
+            .any(|l| l.contains(" B ") && l.contains("[handwritten]")),
         "expected `B` impl from src/drop/ to be filtered out by --in keep; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_impls_in_filter_zero_match_hint() {
@@ -90,7 +84,6 @@ fn regression_impls_in_filter_zero_match_hint() {
         out.status,
         String::from_utf8_lossy(&out.stderr)
     );
-
 
     let combined = format!(
         "{}\n{}",

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -29,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 #[test]
 fn fix1_def_in_filters_same_kind_ambiguity_to_unique_match() {
@@ -64,7 +61,6 @@ fn fix1_def_in_filters_same_kind_ambiguity_to_unique_match() {
     );
 }
 
-
 #[test]
 fn fix1_def_in_filter_excludes_all_candidates_dedicated_message() {
     let fixture = tempdir().expect("tempdir");
@@ -94,24 +90,16 @@ fn fix1_def_in_filter_excludes_all_candidates_dedicated_message() {
     );
 }
 
-
 #[test]
 fn fix1_def_ambiguity_hint_mentions_in_flag_and_flag_actually_exists() {
     let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/a/mod.rs"),
-        "pub fn dup_fn() {}\n",
-    );
-    write_file(
-        &fixture.path().join("src/b/mod.rs"),
-        "pub fn dup_fn() {}\n",
-    );
+    write_file(&fixture.path().join("src/a/mod.rs"), "pub fn dup_fn() {}\n");
+    write_file(&fixture.path().join("src/b/mod.rs"), "pub fn dup_fn() {}\n");
     write_file(
         &fixture.path().join("src/lib.rs"),
         "pub mod a;\npub mod b;\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["--path", &base, "def", "dup_fn"]);
     let stderr = stderr_of(&out);
@@ -119,7 +107,6 @@ fn fix1_def_ambiguity_hint_mentions_in_flag_and_flag_actually_exists() {
         stderr.contains("--in <PATH_SUBSTR>"),
         "ambiguity hint must mention `--in <PATH_SUBSTR>`; got:\n{stderr}"
     );
-
 
     let out2 = run_rustgraph(&["--path", &base, "def", "dup_fn", "--in", "src/a"]);
     let stderr2 = stderr_of(&out2);
@@ -132,7 +119,6 @@ fn fix1_def_ambiguity_hint_mentions_in_flag_and_flag_actually_exists() {
         "`def dup_fn --in src/a` should resolve uniquely; got stderr:\n{stderr2}"
     );
 }
-
 
 #[test]
 fn fix2_def_on_struct_field_suggests_refs_with_count_and_classification() {
@@ -179,13 +165,11 @@ pub fn read_again(s: &Session) -> u32 {
         "hint should suggest `refs session_id`; got:\n{stderr}"
     );
 
-
     assert!(
         stderr.contains("ref(s) found"),
         "hint should report a ref count; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix2_def_on_enum_variant_suggests_refs_classified_as_variant() {
@@ -220,18 +204,12 @@ pub fn pick2() -> State { State::Active }
     );
 }
 
-
 #[test]
 fn fix2_def_unknown_name_no_refs_keeps_legacy_no_match_message() {
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), "pub fn alpha() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "def",
-        "totally_made_up_xyz_123",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "def", "totally_made_up_xyz_123"]);
     assert!(
         !out.status.success(),
         "def on an unknown name must fail; status={:?}",
@@ -247,7 +225,6 @@ fn fix2_def_unknown_name_no_refs_keeps_legacy_no_match_message() {
         "no-refs path must not lie about a ref count; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix3_def_struct_redirect_includes_read_impls_refs() {
@@ -288,7 +265,6 @@ fn fix3_def_struct_redirect_includes_read_impls_refs() {
     );
 }
 
-
 #[test]
 fn fix3_def_enum_redirect_includes_impls_and_refs() {
     let fixture = tempdir().expect("tempdir");
@@ -318,14 +294,10 @@ fn fix3_def_enum_redirect_includes_impls_and_refs() {
     );
 }
 
-
 #[test]
 fn fix3_def_fn_unique_match_stays_success_no_redirect() {
     let fixture = tempdir().expect("tempdir");
-    write_file(
-        &fixture.path().join("src/lib.rs"),
-        "pub fn my_fn() {}\n",
-    );
+    write_file(&fixture.path().join("src/lib.rs"), "pub fn my_fn() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "def", "my_fn"]);
     assert!(
@@ -344,7 +316,6 @@ fn fix3_def_fn_unique_match_stays_success_no_redirect() {
     );
 }
 
-
 #[test]
 fn fix3_def_struct_json_keeps_payload_no_redirect() {
     let fixture = tempdir().expect("tempdir");
@@ -360,12 +331,10 @@ fn fix3_def_struct_json_keeps_payload_no_redirect() {
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-    let v: serde_json::Value =
-        serde_json::from_str(&stdout).expect("def -j must emit valid JSON");
+    let v: serde_json::Value = serde_json::from_str(&stdout).expect("def -j must emit valid JSON");
     assert_eq!(v["name"].as_str(), Some("JsonStruct"));
     assert_eq!(v["kind"].as_str(), Some("struct"));
 }
-
 
 #[test]
 fn fix3_def_mixed_kind_ambiguity_with_struct_mentions_impls() {
@@ -395,7 +364,6 @@ fn fix3_def_mixed_kind_ambiguity_with_struct_mentions_impls() {
         "mixed-kind ambiguity should also mention refs; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix3_def_same_kind_struct_ambiguity_mentions_impls() {

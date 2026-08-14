@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::process::{Command, Output};
 use tempfile::tempdir;
@@ -18,12 +16,31 @@ fn run_with_home(home: &std::path::Path, args: &[&str]) -> Output {
 fn install_no_clients_present_succeeds_with_skipped_status() {
     let home = tempdir().unwrap();
     let out = run_with_home(home.path(), &["mcp", "install"]);
-    assert!(out.status.success(), "install should exit 0 when no clients found");
+    assert!(
+        out.status.success(),
+        "install should exit 0 when no clients found"
+    );
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("claude"), "report should list claude: {}", stdout);
-    assert!(stdout.contains("codex"), "report should list codex: {}", stdout);
-    assert!(stdout.contains("gemini"), "report should list gemini: {}", stdout);
-    assert!(stdout.contains("skipped"), "all should be skipped: {}", stdout);
+    assert!(
+        stdout.contains("claude"),
+        "report should list claude: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("codex"),
+        "report should list codex: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("gemini"),
+        "report should list gemini: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("skipped"),
+        "all should be skipped: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -77,7 +94,10 @@ fn install_is_idempotent_re_run_no_change() {
         stdout
     );
     let second = fs::read_to_string(&claude_path).unwrap();
-    assert_eq!(first, second, "config must be byte-identical on idempotent re-run");
+    assert_eq!(
+        first, second,
+        "config must be byte-identical on idempotent re-run"
+    );
 }
 
 #[test]
@@ -91,10 +111,26 @@ fn install_codex_writes_toml_entry() {
     assert!(out.status.success());
 
     let after = fs::read_to_string(&codex_path).unwrap();
-    assert!(after.contains("model = \"gpt-5.5\""), "preserved existing keys: {}", after);
-    assert!(after.contains("[mcp_servers.rustgraph]"), "added section: {}", after);
-    assert!(after.contains("command = \"rustgraph\""), "command line: {}", after);
-    assert!(after.contains("args = [\"mcp\", \"serve\"]"), "args line: {}", after);
+    assert!(
+        after.contains("model = \"gpt-5.5\""),
+        "preserved existing keys: {}",
+        after
+    );
+    assert!(
+        after.contains("[mcp_servers.rustgraph]"),
+        "added section: {}",
+        after
+    );
+    assert!(
+        after.contains("command = \"rustgraph\""),
+        "command line: {}",
+        after
+    );
+    assert!(
+        after.contains("args = [\"mcp\", \"serve\"]"),
+        "args line: {}",
+        after
+    );
 }
 
 #[test]
@@ -125,7 +161,11 @@ fn uninstall_removes_only_rustgraph_entry() {
             "other-server": {"command": "other", "args": []}
         }
     });
-    fs::write(&claude_path, serde_json::to_string_pretty(&initial).unwrap()).unwrap();
+    fs::write(
+        &claude_path,
+        serde_json::to_string_pretty(&initial).unwrap(),
+    )
+    .unwrap();
 
     let out = run_with_home(home.path(), &["mcp", "uninstall"]);
     assert!(out.status.success());
@@ -173,18 +213,28 @@ fn status_shows_per_client_state() {
     fs::create_dir_all(claude_path.parent().unwrap()).unwrap();
     fs::write(&claude_path, r#"{}"#).unwrap();
 
-
     let out = run_with_home(home.path(), &["mcp", "list"]);
     assert!(out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("entry not present"), "should report claude unregistered: {}", stdout);
-    assert!(stdout.contains("config not found"), "should report codex/gemini missing: {}", stdout);
-
+    assert!(
+        stdout.contains("entry not present"),
+        "should report claude unregistered: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("config not found"),
+        "should report codex/gemini missing: {}",
+        stdout
+    );
 
     let _ = run_with_home(home.path(), &["mcp", "install"]);
     let out2 = run_with_home(home.path(), &["mcp", "list"]);
     let stdout2 = String::from_utf8_lossy(&out2.stdout);
-    assert!(stdout2.contains("already registered"), "post-install status: {}", stdout2);
+    assert!(
+        stdout2.contains("already registered"),
+        "post-install status: {}",
+        stdout2
+    );
 }
 
 #[test]
@@ -218,7 +268,11 @@ fn malformed_claude_config_does_not_crash_other_clients() {
     let out = run_with_home(home.path(), &["mcp", "install"]);
 
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.contains("FAILED"), "claude should report FAILED: {}", stdout);
+    assert!(
+        stdout.contains("FAILED"),
+        "claude should report FAILED: {}",
+        stdout
+    );
     let after: serde_json::Value =
         serde_json::from_str(&fs::read_to_string(&gemini_path).unwrap()).unwrap();
     assert_eq!(after["mcpServers"]["rustgraph"]["command"], "rustgraph");

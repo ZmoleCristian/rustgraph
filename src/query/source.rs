@@ -26,7 +26,6 @@ pub fn file_slice_for_lines(
     let safe_start = start_line.max(1).min(line_count.max(1));
     let safe_end = end_line.max(safe_start).min(line_count.max(safe_start));
 
-
     let (byte_start, byte_end) = if line_count == 0 {
         (0usize, 0usize)
     } else {
@@ -34,7 +33,6 @@ pub fn file_slice_for_lines(
         let (_, end_off) = line_spans[safe_end - 1];
         (start_off, end_off)
     };
-
 
     let mut selected = String::new();
     for (idx, &(s, e)) in line_spans.iter().enumerate() {
@@ -69,14 +67,17 @@ fn compute_line_spans(content: &str) -> Vec<(usize, usize)> {
     let mut i = 0usize;
     while i < bytes.len() {
         if bytes[i] == b'\n' {
-            let content_end = if i > line_start && bytes[i - 1] == b'\r' { i - 1 } else { i };
+            let content_end = if i > line_start && bytes[i - 1] == b'\r' {
+                i - 1
+            } else {
+                i
+            };
             spans.push((line_start, content_end));
             line_start = i + 1;
         }
         i += 1;
     }
     if line_start < bytes.len() {
-
         spans.push((line_start, bytes.len()));
     }
     spans
@@ -101,8 +102,6 @@ pub fn source_slice_for_symbol(
     project: &ProjectData,
     symbol_id: &str,
 ) -> Result<SourceSlice, Box<dyn std::error::Error>> {
-
-
     if let Some(function) = project
         .functions
         .iter()
@@ -210,21 +209,20 @@ mod tests {
 
     #[test]
     fn file_slice_handles_crlf_byte_offsets_correctly() {
-
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("crlf.rs");
         write(&path, "alpha\r\nbeta\r\ngamma\r\n");
-
-
-
 
         let slice = file_slice_for_lines(&path, 2, 2).expect("slice");
         assert_eq!(slice.start_line, 2);
         assert_eq!(slice.end_line, 2);
         assert_eq!(slice.content, "beta");
-        assert_eq!(slice.byte_start, "alpha\r\n".len(), "byte_start must skip CRLF terminator");
+        assert_eq!(
+            slice.byte_start,
+            "alpha\r\n".len(),
+            "byte_start must skip CRLF terminator"
+        );
         assert_eq!(slice.byte_end, "alpha\r\n".len() + "beta".len());
-
 
         let slice2 = file_slice_for_lines(&path, 1, 2).expect("slice");
         assert_eq!(slice2.start_line, 1);
@@ -236,7 +234,6 @@ mod tests {
 
     #[test]
     fn file_slice_handles_mixed_lf_and_crlf() {
-
         let dir = tempdir().expect("tempdir");
         let path = dir.path().join("mixed.rs");
         write(&path, "one\ntwo\r\nthree\n");

@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,9 +15,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 #[test]
 fn regression_callers_in_filter_strip_all_message() {
@@ -33,7 +33,12 @@ fn regression_callers_in_filter_strip_all_message() {
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "--path", &base, "callers", "target", "--callers-in", "nonexistent_substr",
+        "--path",
+        &base,
+        "callers",
+        "target",
+        "--callers-in",
+        "nonexistent_substr",
     ]);
     assert!(
         out.status.success(),
@@ -41,19 +46,13 @@ fn regression_callers_in_filter_strip_all_message() {
         String::from_utf8_lossy(&out.stderr)
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        stderr
-    );
-
+    let combined = format!("{}\n{}", String::from_utf8_lossy(&out.stdout), stderr);
 
     assert!(
         stderr.contains("filtered out all") || stderr.contains("dropped all"),
         "expected --callers-in filter-strip-all hint in stderr; got combined output:\n{}",
         combined
     );
-
 
     assert!(
         stderr.contains("nonexistent_substr"),
@@ -62,7 +61,6 @@ fn regression_callers_in_filter_strip_all_message() {
     );
 }
 
-
 #[test]
 fn regression_callers_in_filters_transitive_callers() {
     let fixture = tempdir().expect("tempdir");
@@ -70,19 +68,13 @@ fn regression_callers_in_filters_transitive_callers() {
         &fixture.path().join("src/lib.rs"),
         "pub mod keep;\npub mod other;\n",
     );
-    write_file(
-        &fixture.path().join("src/keep.rs"),
-        "pub mod inner;\n",
-    );
+    write_file(&fixture.path().join("src/keep.rs"), "pub mod inner;\n");
     write_file(
         &fixture.path().join("src/keep/inner.rs"),
         "pub fn target() {}\n\
          pub fn lvl1_fn() { target(); }\n",
     );
-    write_file(
-        &fixture.path().join("src/other.rs"),
-        "pub mod outer;\n",
-    );
+    write_file(&fixture.path().join("src/other.rs"), "pub mod outer;\n");
     write_file(
         &fixture.path().join("src/other/outer.rs"),
         "pub fn lvl2_fn() { crate::keep::inner::lvl1_fn(); }\n",
@@ -90,9 +82,14 @@ fn regression_callers_in_filters_transitive_callers() {
 
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "callers", "target",
-        "--depth", "2",
-        "--callers-in", "keep",
+        "--path",
+        &base,
+        "callers",
+        "target",
+        "--depth",
+        "2",
+        "--callers-in",
+        "keep",
         "--json",
     ]);
     assert!(
@@ -104,7 +101,6 @@ fn regression_callers_in_filters_transitive_callers() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: Value = serde_json::from_str(&stdout).expect("valid json");
     let matches = json["matches"].as_array().expect("matches array");
-
 
     fn collect_names(node: &Value, out: &mut Vec<String>) {
         if let Some(name) = node["info"]["name"].as_str() {
@@ -129,16 +125,17 @@ fn regression_callers_in_filters_transitive_callers() {
     assert!(
         all_names.iter().any(|n| n == "lvl1_fn"),
         "expected lvl1_fn (inside `keep`) to appear in transitive callers; got names: {:?}\nfull json:\n{}",
-        all_names, stdout
+        all_names,
+        stdout
     );
     assert!(
         !all_names.iter().any(|n| n == "lvl2_fn"),
         "expected lvl2_fn (inside `other/`, OUTSIDE --callers-in keep) to be filtered \
          at every depth; got names: {:?}\nfull json:\n{}",
-        all_names, stdout
+        all_names,
+        stdout
     );
 }
-
 
 #[test]
 fn regression_paths_between_reverse_suggestion_in_json() {
@@ -149,9 +146,7 @@ fn regression_paths_between_reverse_suggestion_in_json() {
     );
 
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "b", "a", "-j",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "paths-between", "b", "a", "-j"]);
     assert!(
         out.status.success(),
         "paths-between exited non-zero. stderr:\n{}",
@@ -161,14 +156,12 @@ fn regression_paths_between_reverse_suggestion_in_json() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let json: Value = serde_json::from_str(&stdout).expect("valid paths-between json");
 
-
     let forward_paths = json["paths"].as_array().expect("paths array");
     assert!(
         forward_paths.is_empty(),
         "expected zero forward paths from b to a; got: {:?}",
         forward_paths
     );
-
 
     let suggestion = json
         .get("reverse_suggestion")
@@ -209,7 +202,6 @@ fn regression_paths_between_reverse_suggestion_in_json() {
     );
 }
 
-
 #[test]
 fn regression_paths_between_to_module_filter() {
     let fixture = tempdir().expect("tempdir");
@@ -218,20 +210,18 @@ fn regression_paths_between_to_module_filter() {
         "pub mod mod1;\npub mod mod2;\n\
          pub fn entry() { mod1::target1(); mod2::target2(); }\n",
     );
-    write_file(
-        &fixture.path().join("src/mod1.rs"),
-        "pub fn target1() {}\n",
-    );
-    write_file(
-        &fixture.path().join("src/mod2.rs"),
-        "pub fn target2() {}\n",
-    );
+    write_file(&fixture.path().join("src/mod1.rs"), "pub fn target1() {}\n");
+    write_file(&fixture.path().join("src/mod2.rs"), "pub fn target2() {}\n");
 
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between",
-        "entry", "XYZ_no_match",
-        "--to-module", "mod1",
+        "--path",
+        &base,
+        "paths-between",
+        "entry",
+        "XYZ_no_match",
+        "--to-module",
+        "mod1",
         "-j",
     ]);
     assert!(
@@ -277,7 +267,6 @@ fn regression_paths_between_to_module_filter() {
     );
 }
 
-
 #[test]
 fn regression_paths_between_to_module_without_to_arg() {
     let fixture = tempdir().expect("tempdir");
@@ -286,19 +275,17 @@ fn regression_paths_between_to_module_without_to_arg() {
         "pub mod mod1;\npub mod mod2;\n\
          pub fn entry() { mod1::target1(); mod2::target2(); }\n",
     );
-    write_file(
-        &fixture.path().join("src/mod1.rs"),
-        "pub fn target1() {}\n",
-    );
-    write_file(
-        &fixture.path().join("src/mod2.rs"),
-        "pub fn target2() {}\n",
-    );
+    write_file(&fixture.path().join("src/mod1.rs"), "pub fn target1() {}\n");
+    write_file(&fixture.path().join("src/mod2.rs"), "pub fn target2() {}\n");
 
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "entry",
-        "--to-module", "mod1",
+        "--path",
+        &base,
+        "paths-between",
+        "entry",
+        "--to-module",
+        "mod1",
         "-j",
     ]);
     assert!(
@@ -315,7 +302,6 @@ fn regression_paths_between_to_module_without_to_arg() {
         "expected at least one path entry → mod1::target1 (no TO positional); paths:\n{}",
         stdout
     );
-
 
     let reaches_target1 = paths.iter().any(|p| {
         p.as_array()

@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,9 +15,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 fn write_mixed_visibility_fixture() -> tempfile::TempDir {
     let fixture = tempdir().expect("tempdir");
@@ -32,7 +32,6 @@ fn write_mixed_visibility_fixture() -> tempfile::TempDir {
     );
     fixture
 }
-
 
 #[test]
 fn regression_public_only_filters_inventory_to_pub_items_only() {
@@ -71,12 +70,10 @@ fn regression_public_only_filters_inventory_to_pub_items_only() {
     );
 }
 
-
 #[test]
 fn regression_public_only_propagates_to_find() {
     let fixture = write_mixed_visibility_fixture();
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&[
         "--path",

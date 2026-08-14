@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 fn tests_only_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -53,7 +53,6 @@ mod tests {
     dir
 }
 
-
 fn mixed_prod_and_test_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
@@ -79,16 +78,11 @@ mod tests {
     dir
 }
 
-
 fn no_matches_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
-    write_file(
-        &dir.path().join("src/lib.rs"),
-        "pub fn ok() {}\n",
-    );
+    write_file(&dir.path().join("src/lib.rs"), "pub fn ok() {}\n");
     dir
 }
-
 
 fn jsonl_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -99,14 +93,18 @@ fn jsonl_fixture() -> tempfile::TempDir {
     dir
 }
 
-
 #[test]
 fn exclude_tests_note_when_filter_drops_all_matches() {
     let fixture = tests_only_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "--exclude-tests", "grep", "unwrap", "--by-function",
+        "-p",
+        &base,
+        "--exclude-tests",
+        "grep",
+        "unwrap",
+        "--by-function",
     ]);
     assert!(
         out.status.success(),
@@ -115,7 +113,6 @@ fn exclude_tests_note_when_filter_drops_all_matches() {
         stderr_of(&out)
     );
 
-
     let stdout = stdout_of(&out);
     assert!(
         stdout.contains("0 match") || stdout.contains("0 functions"),
@@ -123,10 +120,10 @@ fn exclude_tests_note_when_filter_drops_all_matches() {
         stdout
     );
 
-
     let stderr = stderr_of(&out);
     assert!(
-        stderr.contains("Note:") && stderr.contains("matches found")
+        stderr.contains("Note:")
+            && stderr.contains("matches found")
             && stderr.contains("--exclude-tests"),
         "expected --exclude-tests note on stderr; got:\n{}",
         stderr
@@ -149,14 +146,18 @@ fn exclude_tests_note_when_filter_drops_all_matches() {
     );
 }
 
-
 #[test]
 fn exclude_tests_no_note_when_filter_drops_partial() {
     let fixture = mixed_prod_and_test_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "--exclude-tests", "grep", "unwrap", "--by-function",
+        "-p",
+        &base,
+        "--exclude-tests",
+        "grep",
+        "unwrap",
+        "--by-function",
     ]);
     assert!(
         out.status.success(),
@@ -165,14 +166,12 @@ fn exclude_tests_no_note_when_filter_drops_partial() {
         stderr_of(&out)
     );
 
-
     let stdout = stdout_of(&out);
     assert!(
         stdout.contains("prod_a") || stdout.contains("prod_b"),
         "expected prod fns kept; got:\n{}",
         stdout
     );
-
 
     let stderr = stderr_of(&out);
     assert!(
@@ -182,14 +181,18 @@ fn exclude_tests_no_note_when_filter_drops_partial() {
     );
 }
 
-
 #[test]
 fn exclude_tests_no_note_when_genuinely_zero_matches() {
     let fixture = no_matches_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "--exclude-tests", "grep", "unwrap", "--by-function",
+        "-p",
+        &base,
+        "--exclude-tests",
+        "grep",
+        "unwrap",
+        "--by-function",
     ]);
     assert!(
         out.status.success(),
@@ -198,14 +201,12 @@ fn exclude_tests_no_note_when_genuinely_zero_matches() {
         stderr_of(&out)
     );
 
-
     let stdout = stdout_of(&out);
     assert!(
         stdout.contains("0 match"),
         "expected genuinely-zero result; got:\n{}",
         stdout
     );
-
 
     let stderr = stderr_of(&out);
     assert!(
@@ -219,7 +220,6 @@ fn exclude_tests_no_note_when_genuinely_zero_matches() {
         stderr
     );
 }
-
 
 #[test]
 fn pipe_hint_fires_up_front_for_jsonl_pattern() {
@@ -255,7 +255,6 @@ fn pipe_hint_fires_up_front_for_jsonl_pattern() {
     );
 }
 
-
 #[test]
 fn pipe_hint_fires_only_once() {
     let fixture = jsonl_fixture();
@@ -280,12 +279,10 @@ fn pipe_hint_fires_only_once() {
     );
 }
 
-
 #[test]
 fn pipe_hint_suppressed_with_fixed_string() {
     let fixture = jsonl_fixture();
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["-p", &base, "grep", "-F", r"JSONL\|jsonl"]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
@@ -298,10 +295,8 @@ fn pipe_hint_suppressed_with_fixed_string() {
     );
 }
 
-
 #[test]
 fn pipe_hint_fires_even_with_matches_present() {
-
     let dir = tempdir().expect("tempdir");
     write_file(
         &dir.path().join("src/lib.rs"),
@@ -311,7 +306,6 @@ fn pipe_hint_fires_even_with_matches_present() {
 
     let out = run_rustgraph(&["-p", &base, "grep", r"Foo\|Bar"]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
-
 
     let stdout = stdout_of(&out);
     assert!(
@@ -324,7 +318,6 @@ fn pipe_hint_fires_even_with_matches_present() {
         "expected non-zero matches; got stdout:\n{}",
         stdout
     );
-
 
     let stderr = stderr_of(&out);
     assert!(

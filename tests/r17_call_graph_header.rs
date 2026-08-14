@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,9 +14,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 fn parse_edge_count(stdout: &str) -> Option<usize> {
     for line in stdout.lines() {
@@ -35,7 +35,6 @@ fn parse_edge_count(stdout: &str) -> Option<usize> {
     None
 }
 
-
 fn count_rendered_children(stdout: &str) -> usize {
     stdout
         .lines()
@@ -49,7 +48,6 @@ const LEAF_FIXTURE: &str = "pub fn leaf_fn() {\n\
     println!(\"{}\", v.len());\n\
 }\n";
 
-
 #[test]
 fn regression_call_graph_header_count_matches_rendered_internal() {
     let fixture = tempdir().expect("tempdir");
@@ -61,9 +59,7 @@ fn regression_call_graph_header_count_matches_rendered_internal() {
     let stderr = String::from_utf8_lossy(&out.stderr);
 
     let header_count = parse_edge_count(&stdout).unwrap_or_else(|| {
-        panic!(
-            "could not parse rustgraph header from stdout: {stdout}\n----stderr----\n{stderr}"
-        )
+        panic!("could not parse rustgraph header from stdout: {stdout}\n----stderr----\n{stderr}")
     });
     let rendered_children = count_rendered_children(&stdout);
 
@@ -80,7 +76,6 @@ fn regression_call_graph_header_count_matches_rendered_internal() {
         header_count, stdout
     );
 }
-
 
 #[test]
 fn regression_call_graph_header_hints_at_all_external() {

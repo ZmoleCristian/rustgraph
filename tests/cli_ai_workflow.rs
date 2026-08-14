@@ -15,10 +15,12 @@ fn write_file(path: &Path, content: &str) {
 fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
 
-
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn dead_function_names(json: &Value) -> HashSet<String> {
@@ -1280,7 +1282,6 @@ pub fn entry() {
 
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let out = run_rustgraph(&[
         "--path",
         &base,
@@ -1512,7 +1513,6 @@ pub fn step(i: Item) -> Item {
     );
 
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&[
         "--path",
@@ -1761,7 +1761,14 @@ fn call_graph_resolves_ambiguous_local_function_calls() {
     );
 
     let base = fixture.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "call-graph", "--dot", "--detail", "internal"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "call-graph",
+        "--dot",
+        "--detail",
+        "internal",
+    ]);
     assert!(
         out.status.success(),
         "{}",

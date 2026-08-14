@@ -9,7 +9,6 @@ use crate::format_cfg_annotation;
 
 use super::switchboard::write_string_output;
 
-
 /// Run `rustgraph def <NAME> [--func|--struct|--enum] [--in <PATH>]`.
 ///
 /// Performs an exact, case-sensitive go-to-definition lookup for a top-level symbol.
@@ -24,7 +23,6 @@ pub fn run(
     let want_fns = !request.struct_only && !request.enum_only;
     let want_structs = !request.func_only && !request.enum_only;
     let want_enums = !request.func_only && !request.struct_only;
-
 
     let mut hits: Vec<(String, String, usize, Vec<String>)> = Vec::new();
     if want_fns {
@@ -64,7 +62,6 @@ pub fn run(
         }
     }
 
-
     if let Some(needle) = &request.in_path {
         let pre_filter = hits.len();
         hits.retain(|(_, file, _, _)| file.contains(needle.as_str()));
@@ -78,15 +75,12 @@ pub fn run(
     }
 
     if hits.is_empty() {
-
-
         let usage = scan_name_usage(project, &request.name);
         if usage.total > 0 {
             let mut msg = format!(
                 "no top-level symbol named '{}' (case-sensitive)\n",
                 request.name
             );
-
 
             let mut classifications: Vec<&'static str> = Vec::new();
             if usage.is_field {
@@ -121,8 +115,6 @@ pub fn run(
         .into());
     }
     if hits.len() > 1 {
-
-
         if cfg_distinguishes_all_hits(&hits) {
             let n = hits.len();
             eprintln!(
@@ -140,7 +132,9 @@ pub fn run(
                     } else {
                         let parts: Vec<String> = cfg_attrs
                             .iter()
-                            .map(|p| format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\"")))
+                            .map(|p| {
+                                format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\""))
+                            })
                             .collect();
                         format!("[{}]", parts.join(", "))
                     };
@@ -170,12 +164,9 @@ pub fn run(
             return Ok(());
         }
 
-
         let kinds: HashSet<&str> = hits.iter().map(|(k, _, _, _)| k.as_str()).collect();
         let single_kind = kinds.len() == 1;
         let mut msg = if single_kind {
-
-
             let kind_label = hits[0].0.as_str();
             format!(
                 "'{}' is ambiguous ({} {} candidates)\n",
@@ -204,12 +195,9 @@ pub fn run(
             }
         }
         if single_kind {
-
-
             msg.push_str(
                 "hint: use --in <PATH_SUBSTR> to disambiguate by file path, or --symbol-id <PATH:LINE:NAME>",
             );
-
 
             let same_kind_label = hits[0].0.as_str();
             if matches!(same_kind_label, "struct" | "enum") {
@@ -219,10 +207,7 @@ pub fn run(
                 ));
             }
         } else {
-
-
-            let mentions_struct_or_enum =
-                kinds.contains("struct") || kinds.contains("enum");
+            let mentions_struct_or_enum = kinds.contains("struct") || kinds.contains("enum");
             if mentions_struct_or_enum {
                 msg.push_str(&format!(
                     "related: `impls {}` for trait implementations, `refs {}` for all uses\n",
@@ -234,7 +219,6 @@ pub fn run(
     }
 
     let (kind, file, line, cfg_attrs) = &hits[0];
-
 
     if !args.json && (kind == "struct" || kind == "enum") {
         let kind_article = if kind == "struct" { "a" } else { "an" };
@@ -264,12 +248,14 @@ pub fn run(
         let cfg_suffix = format_cfg_annotation(cfg_attrs)
             .map(|s| format!(" {}", s))
             .unwrap_or_default();
-        let payload = format!("{}:{}:{} [{}]{}", file, line, request.name, kind, cfg_suffix);
+        let payload = format!(
+            "{}:{}:{} [{}]{}",
+            file, line, request.name, kind, cfg_suffix
+        );
         write_string_output(args.output.as_deref(), &payload)?;
     }
     Ok(())
 }
-
 
 fn cfg_distinguishes_all_hits(hits: &[(String, String, usize, Vec<String>)]) -> bool {
     if hits.len() < 2 {
@@ -294,7 +280,6 @@ fn cfg_distinguishes_all_hits(hits: &[(String, String, usize, Vec<String>)]) -> 
     true
 }
 
-
 struct NameUsage {
     total: usize,
     is_field: bool,
@@ -302,21 +287,24 @@ struct NameUsage {
 }
 
 fn scan_name_usage(project: &ProjectData, name: &str) -> NameUsage {
-    let is_field = project.structs.iter().any(|s| {
-        s.fields
-            .iter()
-            .any(|f| field_name_matches(f, name))
-    });
-    let is_variant = project.enums.iter().any(|e| {
-        e.variants.iter().any(|v| v.name == name)
-    });
+    let is_field = project
+        .structs
+        .iter()
+        .any(|s| s.fields.iter().any(|f| field_name_matches(f, name)));
+    let is_variant = project
+        .enums
+        .iter()
+        .any(|e| e.variants.iter().any(|v| v.name == name));
 
     let mut total: usize = 0;
     for file in &project.rust_files {
         let Some(syntax) = project.parsed_file(file) else {
             continue;
         };
-        let mut counter = NameCounter { ident: name, count: 0 };
+        let mut counter = NameCounter {
+            ident: name,
+            count: 0,
+        };
         counter.visit_file(syntax);
         total = total.saturating_add(counter.count);
     }
@@ -328,7 +316,6 @@ fn scan_name_usage(project: &ProjectData, name: &str) -> NameUsage {
     }
 }
 
-
 fn field_name_matches(field: &str, name: &str) -> bool {
     if let Some((head, _)) = field.split_once(':') {
         head.trim() == name
@@ -336,7 +323,6 @@ fn field_name_matches(field: &str, name: &str) -> bool {
         field.trim() == name
     }
 }
-
 
 struct NameCounter<'a> {
     ident: &'a str,

@@ -12,7 +12,6 @@ use crate::{
 
 use super::switchboard::{READ_TOOL_HINT, write_string_output};
 
-
 fn suggestion_pool(
     project: &ProjectData,
     selection: AnalyzeSelection,
@@ -58,7 +57,6 @@ fn collect_suggestions(
     score_suggestions(query, project, selection, limit, Some(eff))
 }
 
-
 /// Score `query` against every symbol name and return the top `limit` by similarity.
 ///
 /// `below` excludes scores at or above the given threshold (the no-match path
@@ -97,7 +95,6 @@ pub fn run(
     request: FindRequest,
     changed: Option<&ChangedRanges>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
     // Identifiers never contain whitespace; a spaced query means the caller is
     // treating find like a phrase/keyword search. Scoring the whole phrase
     // through the fuzzy matcher only produces garbage suggestions, so refuse
@@ -133,15 +130,23 @@ pub fn run(
     }
 
     let (functions, structs, enums, consts, type_decls, short_query_fallback) = if request.exact {
-        let (fns, structs_out, enums_out, consts_out, type_decls_out) = search_items_exact_with_kinds(
-            &project.functions,
-            &project.structs,
-            &project.enums,
-            &project.consts,
-            &project.type_decls,
-            &request.query,
-        );
-        (fns, structs_out, enums_out, consts_out, type_decls_out, false)
+        let (fns, structs_out, enums_out, consts_out, type_decls_out) =
+            search_items_exact_with_kinds(
+                &project.functions,
+                &project.structs,
+                &project.enums,
+                &project.consts,
+                &project.type_decls,
+                &request.query,
+            );
+        (
+            fns,
+            structs_out,
+            enums_out,
+            consts_out,
+            type_decls_out,
+            false,
+        )
     } else {
         search_items_with_kinds_and_fallback(
             &project.functions,
@@ -160,7 +165,6 @@ pub fn run(
         if args.exclude_tests {
             funcs.retain(|(f, _)| !f.is_test);
         }
-
 
         if args.public_only {
             funcs.retain(|(f, _)| f.is_pub);
@@ -208,19 +212,32 @@ pub fn run(
         })
         .collect();
 
-
     let (functions, structs, enums, consts, type_decls) = if let Some(needle) = &request.in_path {
         (
-            functions.into_iter().filter(|(f, _)| f.file_path.contains(needle.as_str())).collect::<Vec<_>>(),
-            structs.into_iter().filter(|(s, _)| s.file_path.contains(needle.as_str())).collect::<Vec<_>>(),
-            enums.into_iter().filter(|(e, _)| e.file_path.contains(needle.as_str())).collect::<Vec<_>>(),
-            consts.into_iter().filter(|(c, _)| c.file_path.contains(needle.as_str())).collect::<Vec<_>>(),
-            type_decls.into_iter().filter(|(t, _)| t.file_path.contains(needle.as_str())).collect::<Vec<_>>(),
+            functions
+                .into_iter()
+                .filter(|(f, _)| f.file_path.contains(needle.as_str()))
+                .collect::<Vec<_>>(),
+            structs
+                .into_iter()
+                .filter(|(s, _)| s.file_path.contains(needle.as_str()))
+                .collect::<Vec<_>>(),
+            enums
+                .into_iter()
+                .filter(|(e, _)| e.file_path.contains(needle.as_str()))
+                .collect::<Vec<_>>(),
+            consts
+                .into_iter()
+                .filter(|(c, _)| c.file_path.contains(needle.as_str()))
+                .collect::<Vec<_>>(),
+            type_decls
+                .into_iter()
+                .filter(|(t, _)| t.file_path.contains(needle.as_str()))
+                .collect::<Vec<_>>(),
         )
     } else {
         (functions, structs, enums, consts, type_decls)
     };
-
 
     let (functions, structs, enums, consts, type_decls) = if let Some(ranges) = changed {
         (
@@ -252,14 +269,12 @@ pub fn run(
     let total_hits =
         functions.len() + structs.len() + enums.len() + consts.len() + type_decls.len();
 
-
     if short_query_fallback && total_hits > 0 {
         eprintln!(
             "note: no exact match for '{}' (≤3-char strict tier); falling back to substring/prefix at threshold {:.2}",
             request.query, request.threshold
         );
     }
-
 
     if args.match_signature && total_hits > 0 {
         let name_hits = functions
@@ -284,22 +299,17 @@ pub fn run(
                 .count();
         let sig_path_hits = total_hits - name_hits;
         if name_hits == 0 {
-
             eprintln!(
                 "note: 0 name matches; showing {} signature/path matches (--match-signature)",
                 sig_path_hits
             );
         } else if sig_path_hits > 0 {
-
-
             eprintln!(
                 "note: {} name + {} sig/path matches (--match-signature)",
                 name_hits, sig_path_hits
             );
         }
-
     }
-
 
     if total_hits == 0
         && !request.exact
@@ -307,39 +317,63 @@ pub fn run(
         && request.threshold == 0.85
         && request.query.chars().count() >= 4
     {
-        let (relaxed_fns_raw, relaxed_structs_raw, relaxed_enums_raw, relaxed_consts_raw, relaxed_types_raw, _) =
-            search_items_with_kinds_and_fallback(
-                &project.functions,
-                &project.structs,
-                &project.enums,
-                &project.consts,
-                &project.type_decls,
-                &request.query,
-                0.7,
-                args.match_signature,
-            );
+        let (
+            relaxed_fns_raw,
+            relaxed_structs_raw,
+            relaxed_enums_raw,
+            relaxed_consts_raw,
+            relaxed_types_raw,
+            _,
+        ) = search_items_with_kinds_and_fallback(
+            &project.functions,
+            &project.structs,
+            &project.enums,
+            &project.consts,
+            &project.type_decls,
+            &request.query,
+            0.7,
+            args.match_signature,
+        );
 
         let relaxed_fns: Vec<_> = if request.selection.show_functions() {
             let mut v = relaxed_fns_raw;
-            if args.exclude_tests { v.retain(|(f, _)| !f.is_test); }
-            if args.public_only { v.retain(|(f, _)| f.is_pub); }
+            if args.exclude_tests {
+                v.retain(|(f, _)| !f.is_test);
+            }
+            if args.public_only {
+                v.retain(|(f, _)| f.is_pub);
+            }
             v
-        } else { Vec::new() };
+        } else {
+            Vec::new()
+        };
         let relaxed_structs: Vec<_> = if request.selection.show_structs() {
             let mut v = relaxed_structs_raw;
-            if args.public_only { v.retain(|(s, _)| s.is_pub); }
+            if args.public_only {
+                v.retain(|(s, _)| s.is_pub);
+            }
             v
-        } else { Vec::new() };
+        } else {
+            Vec::new()
+        };
         let relaxed_enums: Vec<_> = if request.selection.show_enums() {
             let mut v = relaxed_enums_raw;
-            if args.public_only { v.retain(|(e, _)| e.is_pub); }
+            if args.public_only {
+                v.retain(|(e, _)| e.is_pub);
+            }
             v
-        } else { Vec::new() };
+        } else {
+            Vec::new()
+        };
         let relaxed_consts: Vec<_> = if request.selection.show_consts() {
             let mut v = relaxed_consts_raw;
-            if args.public_only { v.retain(|(c, _)| c.is_pub); }
+            if args.public_only {
+                v.retain(|(c, _)| c.is_pub);
+            }
             v
-        } else { Vec::new() };
+        } else {
+            Vec::new()
+        };
         let relaxed_types: Vec<_> = relaxed_types_raw
             .into_iter()
             .filter(|(t, _)| {
@@ -358,7 +392,6 @@ pub fn run(
             + relaxed_consts.len()
             + relaxed_types.len();
         if relaxed_total > 0 {
-
             let cap = 5usize;
             let (disp_fns, disp_structs, disp_enums, disp_consts, disp_types) = truncate_in_order(
                 relaxed_fns,
@@ -375,7 +408,8 @@ pub fn run(
                 + disp_types.len();
             let note = format!(
                 "note: 0 hits at threshold 0.85; relaxed to 0.7 and found {} candidate(s) (top {} shown). Pass --threshold X to control.",
-                relaxed_total, shown.min(relaxed_total)
+                relaxed_total,
+                shown.min(relaxed_total)
             );
 
             eprintln!("{}", note);
@@ -385,10 +419,30 @@ pub fn run(
                 relaxed_out.push_str(&note);
                 relaxed_out.push('\n');
                 render_fn_lines(&disp_fns, request.show_ids, Some(&terms), &mut relaxed_out);
-                render_struct_lines(&disp_structs, request.show_ids, Some(&terms), &mut relaxed_out);
-                render_enum_lines(&disp_enums, request.show_ids, Some(&terms), &mut relaxed_out);
-                render_const_lines(&disp_consts, request.show_ids, Some(&terms), &mut relaxed_out);
-                render_type_decl_lines(&disp_types, request.show_ids, Some(&terms), &mut relaxed_out);
+                render_struct_lines(
+                    &disp_structs,
+                    request.show_ids,
+                    Some(&terms),
+                    &mut relaxed_out,
+                );
+                render_enum_lines(
+                    &disp_enums,
+                    request.show_ids,
+                    Some(&terms),
+                    &mut relaxed_out,
+                );
+                render_const_lines(
+                    &disp_consts,
+                    request.show_ids,
+                    Some(&terms),
+                    &mut relaxed_out,
+                );
+                render_type_decl_lines(
+                    &disp_types,
+                    request.show_ids,
+                    Some(&terms),
+                    &mut relaxed_out,
+                );
                 relaxed_out.push_str(&format!("\n{}\n", READ_TOOL_HINT));
                 write_string_output(args.output.as_deref(), relaxed_out.trim_end_matches('\n'))?;
             } else {
@@ -453,8 +507,6 @@ pub fn run(
     }
 
     if total_hits == 0 {
-
-
         if changed.is_some() {
             if args.json {
                 #[derive(Serialize)]
@@ -487,7 +539,6 @@ pub fn run(
             return Ok(());
         }
 
-
         let mut msg = if request.exact {
             format!(
                 "no match for query '{}' (exact mode); check spelling or drop --exact for fuzzy matching",
@@ -518,7 +569,6 @@ pub fn run(
         return Err(msg.into());
     }
 
-
     let max_results = request.max_results;
     let truncated = max_results != 0 && total_hits > max_results;
     let (display_functions, display_structs, display_enums, display_consts, display_types) =
@@ -540,7 +590,6 @@ pub fn run(
                 type_decls.clone(),
             )
         };
-
 
     let query_terms = exact_terms(&request.query);
     let (fn_exact, fn_fuzzy) =
@@ -565,8 +614,6 @@ pub fn run(
         || !type_fuzzy.is_empty();
 
     if args.json {
-
-
         #[derive(Serialize)]
         struct FindOutput {
             query: String,
@@ -592,7 +639,9 @@ pub fn run(
         }
 
         let score_of = |name: &str| best_name_score(name, &query_terms);
-        let wrap_fns = |hits: Vec<(FunctionInfo, MatchKind)>, fuzzy: bool| -> Vec<TaggedHit<WithSymbolId<FunctionInfo>>> {
+        let wrap_fns = |hits: Vec<(FunctionInfo, MatchKind)>,
+                        fuzzy: bool|
+         -> Vec<TaggedHit<WithSymbolId<FunctionInfo>>> {
             hits.into_iter()
                 .map(|(f, k)| {
                     let score = fuzzy.then(|| score_of(&f.name));
@@ -600,7 +649,9 @@ pub fn run(
                 })
                 .collect()
         };
-        let wrap_structs = |hits: Vec<(StructInfo, MatchKind)>, fuzzy: bool| -> Vec<TaggedHit<WithSymbolId<StructInfo>>> {
+        let wrap_structs = |hits: Vec<(StructInfo, MatchKind)>,
+                            fuzzy: bool|
+         -> Vec<TaggedHit<WithSymbolId<StructInfo>>> {
             hits.into_iter()
                 .map(|(s, k)| {
                     let score = fuzzy.then(|| score_of(&s.name));
@@ -608,7 +659,9 @@ pub fn run(
                 })
                 .collect()
         };
-        let wrap_enums = |hits: Vec<(EnumInfo, MatchKind)>, fuzzy: bool| -> Vec<TaggedHit<WithSymbolId<EnumInfo>>> {
+        let wrap_enums = |hits: Vec<(EnumInfo, MatchKind)>,
+                          fuzzy: bool|
+         -> Vec<TaggedHit<WithSymbolId<EnumInfo>>> {
             hits.into_iter()
                 .map(|(e, k)| {
                     let score = fuzzy.then(|| score_of(&e.name));
@@ -616,7 +669,9 @@ pub fn run(
                 })
                 .collect()
         };
-        let wrap_consts = |hits: Vec<(ConstInfo, MatchKind)>, fuzzy: bool| -> Vec<TaggedHit<WithSymbolId<ConstInfo>>> {
+        let wrap_consts = |hits: Vec<(ConstInfo, MatchKind)>,
+                           fuzzy: bool|
+         -> Vec<TaggedHit<WithSymbolId<ConstInfo>>> {
             hits.into_iter()
                 .map(|(c, k)| {
                     let score = fuzzy.then(|| score_of(&c.name));
@@ -624,7 +679,9 @@ pub fn run(
                 })
                 .collect()
         };
-        let wrap_types = |hits: Vec<(TypeDeclInfo, MatchKind)>, fuzzy: bool| -> Vec<TaggedHit<WithSymbolId<TypeDeclInfo>>> {
+        let wrap_types = |hits: Vec<(TypeDeclInfo, MatchKind)>,
+                          fuzzy: bool|
+         -> Vec<TaggedHit<WithSymbolId<TypeDeclInfo>>> {
             hits.into_iter()
                 .map(|(t, k)| {
                     let score = fuzzy.then(|| score_of(&t.name));
@@ -670,8 +727,6 @@ pub fn run(
         })?;
         write_string_output(args.output.as_deref(), &payload)?;
     } else {
-
-
         let header_mode = if request.exact {
             "(exact mode)".to_string()
         } else {
@@ -691,7 +746,6 @@ pub fn run(
             alias_count
         );
         let mut out = String::new();
-
 
         // A fuzzy hit must never wear an exact hit's clothes: when only fuzzy
         // matches exist, say so up front and tag each line with its score.
@@ -713,7 +767,12 @@ pub fn run(
             out.push_str("\n== Fuzzy matches ==\n");
         }
         render_fn_lines(&fn_fuzzy, request.show_ids, Some(&query_terms), &mut out);
-        render_struct_lines(&struct_fuzzy, request.show_ids, Some(&query_terms), &mut out);
+        render_struct_lines(
+            &struct_fuzzy,
+            request.show_ids,
+            Some(&query_terms),
+            &mut out,
+        );
         render_enum_lines(&enum_fuzzy, request.show_ids, Some(&query_terms), &mut out);
         render_const_lines(&const_fuzzy, request.show_ids, Some(&query_terms), &mut out);
         render_type_decl_lines(&type_fuzzy, request.show_ids, Some(&query_terms), &mut out);
@@ -729,7 +788,6 @@ pub fn run(
         write_string_output(args.output.as_deref(), out.trim_end_matches('\n'))?;
     }
 
-
     if !request.exact && total_hits > 10 && request.threshold < 0.95 {
         let suggested = if total_hits > 25 { 0.99 } else { 0.95 };
         eprintln!(
@@ -741,7 +799,6 @@ pub fn run(
     Ok(())
 }
 
-
 fn exact_terms(query: &str) -> Vec<String> {
     query
         .split('|')
@@ -749,7 +806,6 @@ fn exact_terms(query: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .collect()
 }
-
 
 fn partition_by_exact_name<T: Clone>(
     items: Vec<(T, MatchKind)>,
@@ -769,14 +825,12 @@ fn partition_by_exact_name<T: Clone>(
     (exact, fuzzy)
 }
 
-
 fn best_name_score(name: &str, terms: &[String]) -> f64 {
     terms
         .iter()
         .filter_map(|t| crate::name_score(t, name, 0.0))
         .fold(0.0, f64::max)
 }
-
 
 /// Render the match-kind tag, appending the fuzzy similarity score when the
 /// hit is a non-exact name match (`[name ~0.89]`). Sig/path tags pass through.
@@ -796,14 +850,11 @@ fn render_fn_lines(
     out: &mut String,
 ) {
     for (f, kind) in hits {
-
-
         let id_suffix = if show_ids {
             format!(" [id: {}]", crate::function_id(f))
         } else {
             String::new()
         };
-
 
         let cfg_suffix = format_cfg_annotation(&f.cfg_attrs)
             .map(|s| format!(" {}", s))
@@ -933,7 +984,6 @@ fn render_const_lines(
     }
 }
 
-
 fn truncate_in_order(
     fns: Vec<(FunctionInfo, MatchKind)>,
     structs: Vec<(StructInfo, MatchKind)>,
@@ -966,7 +1016,6 @@ fn truncate_in_order(
         type_decls.into_iter().take(take_types).collect(),
     )
 }
-
 
 /// JSON envelope that pairs a search hit with its `match_kind` discriminant (`"name"`,
 /// `"signature"`, or `"path"`) and, for fuzzy name hits, the similarity score.
@@ -1089,17 +1138,19 @@ mod tests {
     #[test]
     fn find_whitespace_query_errors_with_steering() {
         let dir = tempdir().unwrap();
-        fs::write(
-            dir.path().join("lib.rs"),
-            "pub const KIND_META: u8 = 1;\n",
-        )
-        .unwrap();
+        fs::write(dir.path().join("lib.rs"), "pub const KIND_META: u8 = 1;\n").unwrap();
         let err = run_find(dir.path(), request("KIND_META static"))
             .err()
             .expect("whitespace query must error");
         let msg = err.to_string();
         assert!(msg.contains("contains whitespace"), "got: {msg}");
-        assert!(msg.contains("KIND_META [const]"), "tripwire must surface the exact symbol: {msg}");
-        assert!(!msg.contains("--search-threshold"), "no dead-end flag hints: {msg}");
+        assert!(
+            msg.contains("KIND_META [const]"),
+            "tripwire must surface the exact symbol: {msg}"
+        );
+        assert!(
+            !msg.contains("--search-threshold"),
+            "no dead-end flag hints: {msg}"
+        );
     }
 }

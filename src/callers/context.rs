@@ -66,7 +66,6 @@ pub(super) fn context_lines_for_call(
         .collect()
 }
 
-
 fn resolve_for_read(file_path: &str, primary: Option<&Path>, also: &[PathBuf]) -> PathBuf {
     let p = Path::new(file_path);
     if p.is_absolute() && p.exists() {
@@ -89,7 +88,6 @@ fn resolve_for_read(file_path: &str, primary: Option<&Path>, also: &[PathBuf]) -
             }
         }
     }
-
 
     if let Some(root) = crate::index::resolve_root_hint() {
         let direct = root.join(p);

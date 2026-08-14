@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,9 +15,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 fn fn_names_from_json(stdout: &[u8]) -> Vec<String> {
     let v: Value = serde_json::from_slice(stdout).expect("valid json");
@@ -36,8 +36,6 @@ fn fn_names_from_json(stdout: &[u8]) -> Vec<String> {
 
 #[test]
 fn regression_find_and_global_search_return_consistent_results() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -78,8 +76,6 @@ pub fn preload() {}
 
 #[test]
 fn regression_global_search_honors_short_query_precision() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -109,8 +105,6 @@ pub fn new_session() {}
 
 #[test]
 fn regression_callers_depth_2_with_context_either_honors_or_warns() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -132,9 +126,7 @@ pub fn a() {
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "callers", "c", "--depth", "2", "-C", "2", "-p", &base,
-    ]);
+    let out = run_rustgraph(&["callers", "c", "--depth", "2", "-C", "2", "-p", &base]);
     assert!(
         out.status.success(),
         "callers failed: stderr={}",
@@ -143,14 +135,12 @@ pub fn a() {
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
 
-
     let context_honored = stdout.contains("marker_above_call_in_b")
         || stdout.contains("marker_below_call_in_b")
         || stdout.contains("marker_above_call_in_a")
         || stdout.contains("marker_below_call_in_a")
         || stdout.contains("c();")
         || stdout.contains("b();");
-
 
     let stderr_lc = stderr.to_lowercase();
     let warned = (stderr_lc.contains("ignored")
@@ -172,8 +162,6 @@ pub fn a() {
 
 #[test]
 fn regression_callers_depth_2_json_documents_context_or_omits() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -195,9 +183,7 @@ pub fn a() {
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "callers", "c", "--depth", "2", "-C", "2", "-p", &base, "-j",
-    ]);
+    let out = run_rustgraph(&["callers", "c", "--depth", "2", "-C", "2", "-p", &base, "-j"]);
     assert!(
         out.status.success(),
         "callers -j failed: stderr={}",
@@ -206,7 +192,6 @@ pub fn a() {
 
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     let v: Value = serde_json::from_str(&stdout).expect("valid json");
-
 
     fn has_context_field(value: &Value) -> bool {
         match value {

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 #[test]
 fn regression_ensemble_summary_default_is_navigable() {
@@ -57,7 +57,6 @@ pub fn navigable_caller_fn() {
     );
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("navigable_target_fn"),
         "expected target fn name in output, got:\n{}",
@@ -83,7 +82,6 @@ pub fn navigable_caller_fn() {
         stdout
     );
 
-
     assert!(
         lower.contains("flow"),
         "expected 'flow' keyword in truncation marker; got:\n{}",
@@ -100,7 +98,6 @@ pub fn navigable_caller_fn() {
         stdout
     );
 }
-
 
 #[test]
 fn regression_ensemble_summary_shows_truncation_markers() {
@@ -143,16 +140,14 @@ pub fn caller_five() { let _ = target_fan(5); }
         stdout
     );
 
-    let any_upgrade = lower.contains("flow")
-        || lower.contains("full")
-        || lower.contains("--section");
+    let any_upgrade =
+        lower.contains("flow") || lower.contains("full") || lower.contains("--section");
     assert!(
         any_upgrade,
         "expected at least one of 'flow', 'full', '--section' in marker; got:\n{}",
         stdout
     );
 }
-
 
 #[test]
 fn regression_ensemble_full_view_does_not_show_markers() {
@@ -187,7 +182,6 @@ pub fn full_caller() { full_target(); }
     );
 }
 
-
 #[test]
 fn regression_ensemble_default_view_is_summary_not_full() {
     let fixture = tempdir().expect("tempdir");
@@ -205,7 +199,6 @@ pub fn caller_keeps_summary_alive() { body_of_summary(); }
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let default_out = run_rustgraph(&["-p", &base, "ensemble", "body_of_summary"]);
     assert!(
         default_out.status.success(),
@@ -219,10 +212,7 @@ pub fn caller_keeps_summary_alive() { body_of_summary(); }
         default_stdout
     );
 
-
-    let full_out = run_rustgraph(&[
-        "-p", &base, "ensemble", "body_of_summary", "--view", "full",
-    ]);
+    let full_out = run_rustgraph(&["-p", &base, "ensemble", "body_of_summary", "--view", "full"]);
     assert!(
         full_out.status.success(),
         "ensemble --view full failed: {}",
@@ -235,7 +225,6 @@ pub fn caller_keeps_summary_alive() { body_of_summary(); }
         full_stdout
     );
 }
-
 
 #[test]
 fn regression_call_graph_text_hides_external_callees_in_tree() {
@@ -254,7 +243,6 @@ pub fn internal_fn_keep() {}
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let out = run_rustgraph(&["-p", &base, "call-graph", "--root", "root_fn_for_test"]);
     assert!(
         out.status.success(),
@@ -267,7 +255,6 @@ pub fn internal_fn_keep() {}
         "expected internal callee in default tree; got:\n{}",
         stdout
     );
-
 
     assert!(
         !stdout.contains("HashMap"),
@@ -285,9 +272,13 @@ pub fn internal_fn_keep() {}
         stdout
     );
 
-
     let out_ext = run_rustgraph(&[
-        "-p", &base, "call-graph", "--root", "root_fn_for_test", "--show-external",
+        "-p",
+        &base,
+        "call-graph",
+        "--root",
+        "root_fn_for_test",
+        "--show-external",
     ]);
     assert!(
         out_ext.status.success(),
@@ -307,7 +298,6 @@ pub fn internal_fn_keep() {}
         stdout_ext
     );
 }
-
 
 #[test]
 fn regression_callers_depth_2_shows_call_site_line_per_node() {
@@ -330,7 +320,6 @@ fn lvl2_for_d2() { lvl1_for_d2(); }
     );
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("[d=1, 1 site(s)]"),
         "expected '[d=1, 1 site(s)]' summary; got:\n{}",
@@ -342,7 +331,6 @@ fn lvl2_for_d2() { lvl1_for_d2(); }
         "expected '[d=2, 1 site(s)]' summary; got:\n{}",
         stdout
     );
-
 
     let saw_lvl1_callsite = stdout
         .lines()
@@ -361,7 +349,6 @@ fn lvl2_for_d2() { lvl1_for_d2(); }
         "expected a call-site line showing `lvl1_for_d2()` text under d=2 node; got:\n{}",
         stdout
     );
-
 
     let saw_line_3 = stdout
         .lines()

@@ -85,7 +85,6 @@ pub fn run(
         })
         .collect();
 
-
     let total_filtered = filtered.len();
     let cap = if request.max_results == 0 {
         usize::MAX
@@ -100,17 +99,22 @@ pub fn run(
             .iter()
             .map(|h| {
                 let mut obj = serde_json::Map::new();
-                obj.insert("type".into(), serde_json::Value::String(h.type_name.clone()));
+                obj.insert(
+                    "type".into(),
+                    serde_json::Value::String(h.type_name.clone()),
+                );
                 obj.insert(
                     "file_path".into(),
                     serde_json::Value::String(relative_path(&h.file_path, &args.path)),
                 );
                 obj.insert("line".into(), serde_json::Value::Number(h.line.into()));
 
-
                 obj.insert(
                     "symbol_id".into(),
-                    serde_json::Value::String(format!("struct:{}:{}:{}", h.file_path, h.line, h.type_name)),
+                    serde_json::Value::String(format!(
+                        "struct:{}:{}:{}",
+                        h.file_path, h.line, h.type_name
+                    )),
                 );
                 obj.insert(
                     "kind".into(),
@@ -133,7 +137,10 @@ pub fn run(
             "trait_last_segment".into(),
             serde_json::Value::String(target_last.clone()),
         );
-        payload.insert("derived_count".into(), serde_json::Value::Number(derived_count.into()));
+        payload.insert(
+            "derived_count".into(),
+            serde_json::Value::Number(derived_count.into()),
+        );
         payload.insert(
             "handwritten_count".into(),
             serde_json::Value::Number(handwritten_count.into()),
@@ -169,8 +176,6 @@ pub fn run(
         }
         if filtered.is_empty() {
             if hits.is_empty() {
-
-
                 if let Some(needle) = &request.in_path {
                     out.push_str(&format!(
                         "(no implementors of {} found in files matching --in '{}'; widen the substring or drop --in)\n",
@@ -194,7 +199,11 @@ pub fn run(
                 };
                 out.push_str(&format!(
                     "(filter --{}-only dropped all {} {} match(es); drop the filter to see them)\n",
-                    if request.derived_only { "derived" } else { "handwritten" },
+                    if request.derived_only {
+                        "derived"
+                    } else {
+                        "handwritten"
+                    },
                     hits.len(),
                     dropped_kind
                 ));
@@ -333,13 +342,12 @@ fn path_to_string(path: &syn::Path) -> String {
 
 fn self_type_head(ty: &syn::Type) -> String {
     match ty {
-        syn::Type::Path(tp) => {
-            tp.path
-                .segments
-                .last()
-                .map(|s| s.ident.to_string())
-                .unwrap_or_else(|| "<unknown>".into())
-        }
+        syn::Type::Path(tp) => tp
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_else(|| "<unknown>".into()),
         syn::Type::Reference(r) => self_type_head(&r.elem),
         _ => format!("{}", quote::quote! { #ty }),
     }
@@ -355,10 +363,8 @@ fn relative_path(file_path: &str, project_root: &Path) -> String {
 }
 
 fn module_path_from(file_path: &str, project_root: &Path) -> String {
-
     let rel = relative_path(file_path, project_root);
     let trimmed = rel.trim_start_matches("./");
-
 
     let after_src = if let Some(idx) = trimmed.rfind("/src/") {
         &trimmed[idx + 5..]
@@ -378,7 +384,6 @@ fn module_path_from(file_path: &str, project_root: &Path) -> String {
         format!("crate::{}", parts.join("::"))
     }
 }
-
 
 fn trait_referenced_anywhere(project: &super::super::project::ProjectData, name: &str) -> bool {
     if name.is_empty() {
@@ -415,10 +420,7 @@ mod tests {
     use std::io::Write;
     use tempfile::tempdir;
 
-    fn run_impls(
-        path: &Path,
-        request: ImplsRequest,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    fn run_impls(path: &Path, request: ImplsRequest) -> Result<String, Box<dyn std::error::Error>> {
         use crate::cli::Args;
         use clap::Parser;
         let path_arg = path.to_string_lossy().to_string();
@@ -514,7 +516,11 @@ mod tests {
         r.derived_only = true;
         let out = run_impls(dir.path(), r).unwrap();
         assert!(out.contains("A"), "got: {}", out);
-        assert!(!out.contains(" B "), "should hide handwritten; got: {}", out);
+        assert!(
+            !out.contains(" B "),
+            "should hide handwritten; got: {}",
+            out
+        );
     }
 
     #[test]

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn run_rustgraph_in(cwd: &Path, args: &[&str]) -> Output {
@@ -61,7 +62,6 @@ fn commit_all(path: &Path, msg: &str) {
     git(path, &["commit", "-q", "-m", msg, "--no-verify"]);
 }
 
-
 #[test]
 fn regression_in_zeroes_out_emits_loud_note() {
     let fixture = tempdir().expect("tempdir");
@@ -71,13 +71,7 @@ fn regression_in_zeroes_out_emits_loud_note() {
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "dead-code",
-        "--in",
-        "nonexistent_subdir",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "dead-code", "--in", "nonexistent_subdir"]);
     assert!(
         out.status.success(),
         "dead-code --in failed; stderr={}",
@@ -85,13 +79,10 @@ fn regression_in_zeroes_out_emits_loud_note() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
 
-
     assert!(
-        stderr.contains("--in 'nonexistent_subdir' filter:")
-            && stderr.contains("2 → 0 dead fn(s)"),
+        stderr.contains("--in 'nonexistent_subdir' filter:") && stderr.contains("2 → 0 dead fn(s)"),
         "expected existing concise prefix line; stderr={stderr}"
     );
-
 
     assert!(
         stderr.contains("NOTE:"),
@@ -106,7 +97,6 @@ fn regression_in_zeroes_out_emits_loud_note() {
         "expected hint mentioning re-run without --in; stderr={stderr}"
     );
 }
-
 
 #[test]
 fn regression_in_partial_reduction_no_loud_note() {
@@ -133,19 +123,16 @@ fn regression_in_partial_reduction_no_loud_note() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
 
-
     assert!(
         stderr.contains("--in 'keep' filter:") && stderr.contains("→ 3 dead fn(s)"),
         "expected concise prefix line showing 5 → 3 partial reduction; stderr={stderr}"
     );
-
 
     assert!(
         !stderr.contains("NOTE:"),
         "did NOT expect loud NOTE: line on partial reduction; stderr={stderr}"
     );
 }
-
 
 #[test]
 fn regression_in_on_empty_dead_set_no_loud_note() {
@@ -164,19 +151,16 @@ fn regression_in_on_empty_dead_set_no_loud_note() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
 
-
     assert!(
         stderr.contains("--in 'src/lib.rs' filter:") && stderr.contains("0 → 0 dead fn(s)"),
         "expected concise prefix line for empty-set filter; stderr={stderr}"
     );
-
 
     assert!(
         !stderr.contains("NOTE:"),
         "did NOT expect loud NOTE: when dead set was already empty; stderr={stderr}"
     );
 }
-
 
 #[test]
 fn regression_exclude_tests_zeroes_out_emits_loud_note() {
@@ -186,7 +170,6 @@ fn regression_exclude_tests_zeroes_out_emits_loud_note() {
         "#[test]\npub fn dead_test_pub() { assert!(true); }\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let baseline = run_rustgraph(&["--path", &base, "dead-code"]);
     assert!(
@@ -208,12 +191,10 @@ fn regression_exclude_tests_zeroes_out_emits_loud_note() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
 
-
     assert!(
         stderr.contains("--exclude-tests filter:") && stderr.contains("→ 0 dead fn(s)"),
         "expected concise --exclude-tests prefix line; stderr={stderr}"
     );
-
 
     assert!(
         stderr.contains("NOTE:") && stderr.contains("--exclude-tests filtered all"),
@@ -225,7 +206,6 @@ fn regression_exclude_tests_zeroes_out_emits_loud_note() {
     );
 }
 
-
 #[test]
 fn regression_changed_zeroes_out_emits_loud_note() {
     let fixture = tempdir().expect("tempdir");
@@ -236,7 +216,6 @@ fn regression_changed_zeroes_out_emits_loud_note() {
         "pub fn used() {}\npub fn dead_pre_existing() {}\nfn caller_v1() { used(); }\n",
     );
     commit_all(root, "initial");
-
 
     write_file(
         &root.join("src/lib.rs"),
@@ -263,12 +242,10 @@ fn regression_changed_zeroes_out_emits_loud_note() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
 
-
     assert!(
         stderr.contains("--changed filter:") && stderr.contains("→ 0 dead fn(s)"),
         "expected concise --changed prefix line; stderr={stderr}"
     );
-
 
     assert!(
         stderr.contains("NOTE:") && stderr.contains("--changed filtered all"),

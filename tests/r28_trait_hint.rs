@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stderr_of(out: &Output) -> String {
@@ -116,8 +117,6 @@ fn refs_does_not_redirect_when_kind_filter_set() {
 
 #[test]
 fn refs_zero_result_hint_dual_emits_to_stdout_text_mode() {
-
-
     let dir = tempdir().unwrap();
     let root = write_derive_fixture(&dir);
     let out = run_rustgraph(&["-p", &root, "refs", "Serialize"]);
@@ -127,17 +126,11 @@ fn refs_zero_result_hint_dual_emits_to_stdout_text_mode() {
         "trait redirect must be ON STDOUT (text mode), got stdout: {}",
         stdout
     );
-    assert!(
-        stdout.contains("impls Serialize"),
-        "stdout: {}",
-        stdout
-    );
+    assert!(stdout.contains("impls Serialize"), "stdout: {}", stdout);
 }
 
 #[test]
 fn refs_zero_result_hint_skips_stdout_in_json_mode() {
-
-
     let dir = tempdir().unwrap();
     let root = write_derive_fixture(&dir);
     let out = run_rustgraph(&["-p", &root, "-j", "refs", "Serialize"]);
@@ -162,8 +155,6 @@ fn refs_zero_result_hint_skips_stdout_in_json_mode() {
 
 #[test]
 fn refs_kind_field_hint_dual_emits_to_stdout() {
-
-
     let dir = tempdir().unwrap();
     write_file(
         &dir.path().join("src/lib.rs"),

@@ -7,14 +7,22 @@ use syn::{ImplItemConst, ItemConst, ItemEnum, ItemStatic, ItemStruct, ItemTrait,
 
 pub fn visit_item_struct(visitor: &mut CodeVisitor, item_struct: &ItemStruct) {
     let name = item_struct.ident.to_string();
-    let signature = crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #item_struct }));
+    let signature = crate::index::visitor::metadata::normalize_signature(&format!(
+        "{}",
+        quote::quote! { #item_struct }
+    ));
     let is_pub = is_public(&item_struct.vis);
 
     let generics = item_struct
         .generics
         .params
         .iter()
-        .map(|param| crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #param })))
+        .map(|param| {
+            crate::index::visitor::metadata::normalize_signature(&format!(
+                "{}",
+                quote::quote! { #param }
+            ))
+        })
         .collect();
 
     let fields = match &item_struct.fields {
@@ -28,7 +36,10 @@ pub fn visit_item_struct(visitor: &mut CodeVisitor, item_struct: &ItemStruct) {
                     .map(|i| i.to_string())
                     .unwrap_or_else(|| "_".to_string());
                 let ty = &field.ty;
-                let ty_str = crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #ty }));
+                let ty_str = crate::index::visitor::metadata::normalize_signature(&format!(
+                    "{}",
+                    quote::quote! { #ty }
+                ));
                 format!("{}: {}", name, ty_str)
             })
             .collect(),
@@ -38,7 +49,10 @@ pub fn visit_item_struct(visitor: &mut CodeVisitor, item_struct: &ItemStruct) {
             .enumerate()
             .map(|(i, field)| {
                 let ty = &field.ty;
-                let ty_str = crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #ty }));
+                let ty_str = crate::index::visitor::metadata::normalize_signature(&format!(
+                    "{}",
+                    quote::quote! { #ty }
+                ));
                 format!("{}: {}", i, ty_str)
             })
             .collect(),
@@ -68,14 +82,22 @@ pub fn visit_item_struct(visitor: &mut CodeVisitor, item_struct: &ItemStruct) {
 
 pub fn visit_item_enum(visitor: &mut CodeVisitor, item_enum: &ItemEnum) {
     let name = item_enum.ident.to_string();
-    let signature = crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #item_enum }));
+    let signature = crate::index::visitor::metadata::normalize_signature(&format!(
+        "{}",
+        quote::quote! { #item_enum }
+    ));
     let is_pub = is_public(&item_enum.vis);
 
     let generics = item_enum
         .generics
         .params
         .iter()
-        .map(|param| crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #param })))
+        .map(|param| {
+            crate::index::visitor::metadata::normalize_signature(&format!(
+                "{}",
+                quote::quote! { #param }
+            ))
+        })
         .collect();
 
     let variants = item_enum
@@ -93,7 +115,9 @@ pub fn visit_item_enum(visitor: &mut CodeVisitor, item_enum: &ItemEnum) {
                             .map(|i| i.to_string())
                             .unwrap_or_else(|| "_".to_string());
                         let ty = &field.ty;
-                        let ty_str = crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #ty }));
+                        let ty_str = crate::index::visitor::metadata::normalize_signature(
+                            &format!("{}", quote::quote! { #ty }),
+                        );
                         format!("{}: {}", name, ty_str)
                     })
                     .collect(),
@@ -103,16 +127,20 @@ pub fn visit_item_enum(visitor: &mut CodeVisitor, item_enum: &ItemEnum) {
                     .enumerate()
                     .map(|(i, field)| {
                         let ty = &field.ty;
-                        let ty_str = crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #ty }));
+                        let ty_str = crate::index::visitor::metadata::normalize_signature(
+                            &format!("{}", quote::quote! { #ty }),
+                        );
                         format!("{}: {}", i, ty_str)
                     })
                     .collect(),
                 syn::Fields::Unit => Vec::new(),
             };
-            let discriminant = variant
-                .discriminant
-                .as_ref()
-                .map(|(_, expr)| crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #expr })));
+            let discriminant = variant.discriminant.as_ref().map(|(_, expr)| {
+                crate::index::visitor::metadata::normalize_signature(&format!(
+                    "{}",
+                    quote::quote! { #expr }
+                ))
+            });
             EnumVariantInfo {
                 name: variant.ident.to_string(),
                 fields,
@@ -152,9 +180,14 @@ fn push_const(
     attrs: &[syn::Attribute],
 ) {
     // quote! renders array types as `[T ; N]`; tighten to `[T; N]` for display.
-    let ty_str = crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #ty }))
-        .replace(" ; ", "; ");
-    let keyword = if kind.starts_with("static") { kind.clone() } else { "const".to_string() };
+    let ty_str =
+        crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #ty }))
+            .replace(" ; ", "; ");
+    let keyword = if kind.starts_with("static") {
+        kind.clone()
+    } else {
+        "const".to_string()
+    };
     let signature = format!(
         "{}{} {}: {}",
         if is_pub { "pub " } else { "" },
@@ -232,7 +265,12 @@ fn render_generics(generics: &syn::Generics) -> String {
     let parts: Vec<String> = generics
         .params
         .iter()
-        .map(|p| crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #p })))
+        .map(|p| {
+            crate::index::visitor::metadata::normalize_signature(&format!(
+                "{}",
+                quote::quote! { #p }
+            ))
+        })
         .collect();
     format!("<{}>", parts.join(", "))
 }
@@ -241,8 +279,9 @@ pub fn visit_item_type(visitor: &mut CodeVisitor, item: &ItemType) {
     let name = item.ident.to_string();
     let is_pub = is_public(&item.vis);
     let ty = &item.ty;
-    let rhs = crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #ty }))
-        .replace(" ; ", "; ");
+    let rhs =
+        crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #ty }))
+            .replace(" ; ", "; ");
     let signature = format!(
         "{}type {}{} = {}",
         if is_pub { "pub " } else { "" },
@@ -279,7 +318,12 @@ pub fn record_item_trait(visitor: &mut CodeVisitor, item: &ItemTrait) {
         let bounds: Vec<String> = item
             .supertraits
             .iter()
-            .map(|b| crate::index::visitor::metadata::normalize_signature(&format!("{}", quote::quote! { #b })))
+            .map(|b| {
+                crate::index::visitor::metadata::normalize_signature(&format!(
+                    "{}",
+                    quote::quote! { #b }
+                ))
+            })
             .collect();
         format!(": {}", bounds.join(" + "))
     };
@@ -458,7 +502,11 @@ mod tests {
         assert_eq!(t.name, "ChangedRanges");
         assert_eq!(t.kind, "alias");
         assert!(t.is_pub);
-        assert!(t.signature.starts_with("pub type ChangedRanges = HashMap"), "{}", t.signature);
+        assert!(
+            t.signature.starts_with("pub type ChangedRanges = HashMap"),
+            "{}",
+            t.signature
+        );
         assert!(t.rhs.as_deref().unwrap().starts_with("HashMap"));
     }
 

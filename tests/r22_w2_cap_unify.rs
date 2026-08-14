@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn write_needle_fixture(fixture: &tempfile::TempDir, count: usize) -> String {
@@ -26,7 +27,6 @@ fn write_needle_fixture(fixture: &tempfile::TempDir, count: usize) -> String {
     write_file(&fixture.path().join("src/lib.rs"), &body);
     fixture.path().to_string_lossy().to_string()
 }
-
 
 #[test]
 fn r22_grep_max_results_caps_output() {
@@ -41,7 +41,6 @@ fn r22_grep_max_results_caps_output() {
     );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
 
-
     assert!(
         stdout.contains("10 match(es)"),
         "expected '10 match(es)' (true total) in header; got:\n{stdout}"
@@ -52,7 +51,6 @@ fn r22_grep_max_results_caps_output() {
         "expected '(showing 5 of 10; use --max-results to expand)' footer; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn r22_grep_max_matches_is_gone() {
@@ -72,9 +70,7 @@ fn r22_grep_max_matches_is_gone() {
     );
 }
 
-
 fn write_usages_firehose_fixture(fixture: &tempfile::TempDir) -> String {
-
     let mut src = String::from("pub fn target_fn() {}\n");
     src.push_str("pub fn caller() {\n");
     for _ in 0..130 {
@@ -90,7 +86,14 @@ fn r22_usages_accepts_max_results_flag() {
     let fixture = tempdir().expect("tempdir");
     let base = write_usages_firehose_fixture(&fixture);
 
-    let out = run_rustgraph(&["--path", &base, "usages", "target_fn", "--max-results", "10"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "usages",
+        "target_fn",
+        "--max-results",
+        "10",
+    ]);
     assert!(
         out.status.success(),
         "usages --max-results 10 failed: stderr={}",
@@ -122,7 +125,6 @@ fn r22_usages_default_cap_doesnt_dump_unbounded() {
         "default usages cap (100) should kick in on a 130-hit firehose; got:\n{stdout}"
     );
 
-
     let entry_lines: Vec<&str> = stdout
         .lines()
         .filter(|l| l.trim_start().starts_with("call ") || l.trim_start().starts_with("method "))
@@ -134,7 +136,6 @@ fn r22_usages_default_cap_doesnt_dump_unbounded() {
         stdout
     );
 }
-
 
 fn write_chain_fixture(fixture: &tempfile::TempDir) -> String {
     write_file(
@@ -155,7 +156,14 @@ fn r22_paths_between_depth_works() {
     let base = write_chain_fixture(&fixture);
 
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "alpha", "delta", "--depth", "5", "--json",
+        "--path",
+        &base,
+        "paths-between",
+        "alpha",
+        "delta",
+        "--depth",
+        "5",
+        "--json",
     ]);
     assert!(
         out.status.success(),
@@ -169,14 +177,19 @@ fn r22_paths_between_depth_works() {
     );
 }
 
-
 #[test]
 fn r22_paths_between_max_depth_is_gone() {
     let fixture = tempdir().expect("tempdir");
     let base = write_chain_fixture(&fixture);
 
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "alpha", "delta", "--max-depth", "5",
+        "--path",
+        &base,
+        "paths-between",
+        "alpha",
+        "delta",
+        "--max-depth",
+        "5",
     ]);
     assert!(
         !out.status.success(),
@@ -190,7 +203,6 @@ fn r22_paths_between_max_depth_is_gone() {
     );
 }
 
-
 #[test]
 fn r22_find_n_short_alias_works() {
     let fixture = tempdir().expect("tempdir");
@@ -202,7 +214,14 @@ fn r22_find_n_short_alias_works() {
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "--path", &base, "find", "widget", "--search-threshold", "0.6", "-n", "5",
+        "--path",
+        &base,
+        "find",
+        "widget",
+        "--search-threshold",
+        "0.6",
+        "-n",
+        "5",
     ]);
     assert!(
         out.status.success(),
@@ -226,14 +245,19 @@ fn r22_find_n_short_alias_works() {
     );
 }
 
-
 #[test]
 fn r22_call_graph_depth_still_works() {
     let fixture = tempdir().expect("tempdir");
     let base = write_chain_fixture(&fixture);
 
     let out = run_rustgraph(&[
-        "--path", &base, "call-graph", "--root", "alpha", "--depth", "2",
+        "--path",
+        &base,
+        "call-graph",
+        "--root",
+        "alpha",
+        "--depth",
+        "2",
     ]);
     assert!(
         out.status.success(),
@@ -242,10 +266,8 @@ fn r22_call_graph_depth_still_works() {
     );
 }
 
-
 #[test]
 fn r22_truncation_format_consistent_find_and_refs() {
-
     let fixture = tempdir().expect("tempdir");
     let mut src = String::new();
     for i in 0..60 {
@@ -255,9 +277,20 @@ fn r22_truncation_format_consistent_find_and_refs() {
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "--path", &base, "find", "widget", "--search-threshold", "0.6", "--max-results", "5",
+        "--path",
+        &base,
+        "find",
+        "widget",
+        "--search-threshold",
+        "0.6",
+        "--max-results",
+        "5",
     ]);
-    assert!(out.status.success(), "find failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
 
     let footer_line = stdout
@@ -273,7 +306,6 @@ fn r22_truncation_format_consistent_find_and_refs() {
          got: `{footer_line}`"
     );
 
-
     let fixture2 = tempdir().expect("tempdir");
     let mut src2 = String::from("pub fn widget_target() {}\npub fn driver() {\n");
     for _ in 0..60 {
@@ -284,9 +316,18 @@ fn r22_truncation_format_consistent_find_and_refs() {
     let base2 = fixture2.path().to_string_lossy().to_string();
 
     let out2 = run_rustgraph(&[
-        "--path", &base2, "refs", "widget_target", "--max-results", "5",
+        "--path",
+        &base2,
+        "refs",
+        "widget_target",
+        "--max-results",
+        "5",
     ]);
-    assert!(out2.status.success(), "refs failed: stderr={}", String::from_utf8_lossy(&out2.stderr));
+    assert!(
+        out2.status.success(),
+        "refs failed: stderr={}",
+        String::from_utf8_lossy(&out2.stderr)
+    );
     let stdout2 = String::from_utf8_lossy(&out2.stdout).to_string();
     let footer_line2 = stdout2
         .lines()

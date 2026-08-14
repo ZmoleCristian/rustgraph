@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 fn run_substring_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -42,7 +42,6 @@ pub fn unrelated_helper() {}
     dir
 }
 
-
 fn no_foo_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
@@ -51,7 +50,6 @@ fn no_foo_fixture() -> tempfile::TempDir {
     );
     dir
 }
-
 
 #[test]
 fn fix1_find_run_returns_substring_hits_via_fallback() {
@@ -74,14 +72,12 @@ fn fix1_find_run_returns_substring_hits_via_fallback() {
         );
     }
 
-
     let stderr = stderr_of(&out);
     assert!(
         stderr.contains("3 fn"),
         "expected `3 fn` in stderr headline; got stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix1_find_run_stderr_contains_fallback_note() {
@@ -106,7 +102,6 @@ fn fix1_find_run_stderr_contains_fallback_note() {
     );
 }
 
-
 #[test]
 fn fix1_find_foo_no_false_rescue_when_no_substring() {
     let fixture = no_foo_fixture();
@@ -130,7 +125,6 @@ fn fix1_find_foo_no_false_rescue_when_no_substring() {
         "rescue note must NOT fire when fallback returns 0 (genuine no-match); got stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix1_find_foo_exact_preserves_strict_contract() {
@@ -157,7 +151,6 @@ fn fix1_find_foo_exact_preserves_strict_contract() {
     );
 }
 
-
 #[test]
 fn fix1_find_exact_no_fallback_even_when_substring_exists() {
     let fixture = run_substring_fixture();
@@ -181,7 +174,6 @@ fn fix1_find_exact_no_fallback_even_when_substring_exists() {
     );
 }
 
-
 #[test]
 fn fix1_find_run_rescue_no_contradiction_with_suggestions() {
     let fixture = run_substring_fixture();
@@ -196,7 +188,6 @@ fn fix1_find_run_rescue_no_contradiction_with_suggestions() {
         "did-you-mean block must NOT fire when fallback rescues (no-match path skipped); got stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix1_find_new_exact_match_still_suppresses_substring_noise() {
@@ -218,7 +209,6 @@ pub fn preload_new() {}
     let stdout = stdout_of(&out);
     let stderr = stderr_of(&out);
 
-
     assert!(
         stderr.contains("1 fn"),
         "expected exactly 1 fn in stderr headline (R15 exact-name fast path); got stderr:\n{stderr}\nstdout:\n{stdout}"
@@ -236,7 +226,6 @@ pub fn preload_new() {}
     );
 }
 
-
 #[test]
 fn fix1_multi_term_or_unaffected_by_fallback() {
     let fixture = tempdir().expect("tempdir");
@@ -250,9 +239,14 @@ fn fix1_multi_term_or_unaffected_by_fallback() {
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
 
     let stdout = stdout_of(&out);
-    assert!(stdout.contains("cut"), "expected cut; got stdout:\n{stdout}");
-    assert!(stdout.contains("pick"), "expected pick; got stdout:\n{stdout}");
-
+    assert!(
+        stdout.contains("cut"),
+        "expected cut; got stdout:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("pick"),
+        "expected pick; got stdout:\n{stdout}"
+    );
 
     let stderr = stderr_of(&out);
     assert!(
@@ -260,7 +254,6 @@ fn fix1_multi_term_or_unaffected_by_fallback() {
         "rescue note must NOT fire on multi-term OR (effective == requested threshold); got stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix1_long_query_no_fallback_note() {
@@ -282,7 +275,6 @@ fn fix1_long_query_no_fallback_note() {
         "5-char query must not trigger short-query rescue note; got stderr:\n{stderr}"
     );
 }
-
 
 fn serialize_split_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -315,7 +307,6 @@ pub struct IndexTypeTwo;
     dir
 }
 
-
 #[test]
 fn fix2_impls_in_filter_header_matches_body() {
     let fixture = serialize_split_fixture();
@@ -329,16 +320,12 @@ fn fix2_impls_in_filter_header_matches_body() {
     );
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("3 derived, 0 hand-written, 3 total"),
         "expected header `3 derived, 0 hand-written, 3 total` post-filter; got:\n{stdout}"
     );
 
-    let derive_lines = stdout
-        .lines()
-        .filter(|l| l.contains("[derive]"))
-        .count();
+    let derive_lines = stdout.lines().filter(|l| l.contains("[derive]")).count();
     assert_eq!(
         derive_lines, 3,
         "body derive count must match header derived count; got stdout:\n{stdout}"
@@ -352,13 +339,19 @@ fn fix2_impls_in_filter_header_matches_body() {
     }
 }
 
-
 #[test]
 fn fix2_impls_in_nonexistent_zero_header() {
     let fixture = serialize_split_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&["--path", &base, "impls", "Serialize", "--in", "nonexistent_xyz"]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "impls",
+        "Serialize",
+        "--in",
+        "nonexistent_xyz",
+    ]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
     let stdout = stdout_of(&out);
     assert!(
@@ -370,9 +363,11 @@ fn fix2_impls_in_nonexistent_zero_header() {
         .lines()
         .filter(|l| l.contains("[derive]") || l.contains("[handwritten]"))
         .count();
-    assert_eq!(body_lines, 0, "no body lines expected; got stdout:\n{stdout}");
+    assert_eq!(
+        body_lines, 0,
+        "no body lines expected; got stdout:\n{stdout}"
+    );
 }
-
 
 #[test]
 fn fix2_impls_unfiltered_header_matches_body() {
@@ -391,9 +386,11 @@ fn fix2_impls_unfiltered_header_matches_body() {
         .lines()
         .filter(|l| l.contains("[derive]") || l.contains("[handwritten]"))
         .count();
-    assert_eq!(body_lines, 5, "body line count must match header total; got stdout:\n{stdout}");
+    assert_eq!(
+        body_lines, 5,
+        "body line count must match header total; got stdout:\n{stdout}"
+    );
 }
-
 
 #[test]
 fn fix2_impls_mixed_kinds_breakdown_consistent() {
@@ -421,7 +418,6 @@ impl Serialize for HandwrittenOne {
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("2 derived, 1 hand-written, 3 total"),
         "expected `2 derived, 1 hand-written, 3 total`; got stdout:\n{stdout}"
@@ -431,13 +427,15 @@ impl Serialize for HandwrittenOne {
         .lines()
         .filter(|l| l.contains("[handwritten]"))
         .count();
-    assert_eq!(derive_lines, 2, "derive body lines must match header `2 derived`; got stdout:\n{stdout}");
+    assert_eq!(
+        derive_lines, 2,
+        "derive body lines must match header `2 derived`; got stdout:\n{stdout}"
+    );
     assert_eq!(
         handwritten_lines, 1,
         "handwritten body lines must match header `1 hand-written`; got stdout:\n{stdout}"
     );
 }
-
 
 #[test]
 fn fix2_impls_derived_only_keeps_full_breakdown_header() {
@@ -463,7 +461,6 @@ impl Serialize for HandwrittenOne {
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("1 derived, 1 hand-written, 2 total"),
         "expected full breakdown header even with --derived-only; got stdout:\n{stdout}"
@@ -474,7 +471,10 @@ impl Serialize for HandwrittenOne {
         .lines()
         .filter(|l| l.contains("[handwritten]"))
         .count();
-    assert_eq!(derive_lines, 1, "expected 1 derived body line; got stdout:\n{stdout}");
+    assert_eq!(
+        derive_lines, 1,
+        "expected 1 derived body line; got stdout:\n{stdout}"
+    );
     assert_eq!(
         handwritten_lines, 0,
         "--derived-only must filter out handwritten body; got stdout:\n{stdout}"
