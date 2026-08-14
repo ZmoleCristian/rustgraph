@@ -21,10 +21,7 @@ pub const REFS_KIND_VALUES: &[&str] = &[
     "macro",
 ];
 
-
-const GLOBALS_FOOTER_SHORT: &str =
-    "Globals: -p / --also / -o / -j / --search / --exclude-tests / --color … (run `rustgraph --help` for the full Globals reference)";
-
+const GLOBALS_FOOTER_SHORT: &str = "Globals: -p / --also / -o / -j / --search / --exclude-tests / --color … (run `rustgraph --help` for the full Globals reference)";
 
 const GLOBALS_FOOTER_LONG: &str = "\
 Globals (run `rustgraph --help` for full descriptions):
@@ -160,7 +157,6 @@ Shell quoting trap (most-common cause of cryptic regex errors):\n  \
     )]
     Def(DefCommand),
 
-
     #[command(
         about = "List every access site for each field of <Type>. Closes the chronic gap where `refs <Type> --kind field` returns 0 (since --kind field filters on the field NAME, not the OWNER type). For each field, emits `instance.field` access sites grouped by field. Use `refs <Type>` for type uses, or `refs <field_name> --kind field` for one specific field — `members <Type>` is the per-Type rollup.",
         after_help = GLOBALS_FOOTER_SHORT,
@@ -231,9 +227,7 @@ pub enum McpAction {
         #[arg(long)]
         quiet: bool,
     },
-    #[command(
-        about = "Remove the rustgraph MCP entry from every detected AI client config."
-    )]
+    #[command(about = "Remove the rustgraph MCP entry from every detected AI client config.")]
     Uninstall {
         #[arg(long)]
         quiet: bool,
@@ -247,7 +241,6 @@ pub enum McpAction {
     )]
     Serve,
 }
-
 
 /// Arguments for the `paths-between` subcommand (DFS call-graph reachability).
 #[derive(clap::Args, Debug, Clone)]
@@ -313,7 +306,6 @@ pub struct DefCommand {
     #[arg(long = "enum", help = "Restrict to enums only")]
     pub enum_only: bool,
 
-
     #[arg(
         long = "in",
         value_name = "PATH_SUBSTR",
@@ -350,7 +342,9 @@ pub struct MembersCommand {
 /// identifier).
 #[derive(clap::Args, Debug, Clone)]
 pub struct UsagesCommand {
-    #[arg(help = "Identifier to look up (matches fn names, type names, field names by exact match)")]
+    #[arg(
+        help = "Identifier to look up (matches fn names, type names, field names by exact match)"
+    )]
     pub name: String,
 
     #[arg(
@@ -590,7 +584,9 @@ pub struct EnsembleCommand {
     pub preset: Option<EnsemblePreset>,
 
     #[arg(long, value_enum)]
-    #[arg(help = "High-level ensemble output view: summary (DEFAULT — structs/call-sites/neighborhood/dataflow with abbreviated neighborhood), usage (call-sites + neighborhood), flow (neighborhood + lifecycle + dataflow + boundaries), or full (every section — often 300+ lines).")]
+    #[arg(
+        help = "High-level ensemble output view: summary (DEFAULT — structs/call-sites/neighborhood/dataflow with abbreviated neighborhood), usage (call-sites + neighborhood), flow (neighborhood + lifecycle + dataflow + boundaries), or full (every section — often 300+ lines)."
+    )]
     pub view: Option<EnsembleView>,
 
     #[arg(long)]
@@ -669,8 +665,6 @@ pub struct DeadCodeCommand {
 /// project call graph as text tree or DOT).
 #[derive(clap::Args, Debug, Clone)]
 pub struct CallGraphCommand {
-
-
     #[arg(help = "Anchor function (positional shortcut for --root). Same as --root NAME.")]
     pub root_positional: Option<String>,
 
@@ -736,9 +730,12 @@ pub struct GrepCommand {
     #[arg(short = 'i', long, help = "Case-insensitive match")]
     pub ignore_case: bool,
 
-    #[arg(short = 'F', long, help = "Treat pattern as a literal string (not regex)")]
+    #[arg(
+        short = 'F',
+        long,
+        help = "Treat pattern as a literal string (not regex)"
+    )]
     pub fixed_string: bool,
-
 
     #[arg(
         short = 'C',
@@ -789,7 +786,6 @@ pub struct GrepCommand {
     )]
     pub by_function: bool,
 
-
     #[arg(
         long = "by-file",
         conflicts_with = "by_function",
@@ -835,10 +831,7 @@ pub struct ImplsCommand {
     )]
     pub derived_only: bool,
 
-    #[arg(
-        long,
-        help = "Only show hand-written impls (skip `#[derive(...)]`)"
-    )]
+    #[arg(long, help = "Only show hand-written impls (skip `#[derive(...)]`)")]
     pub handwritten_only: bool,
 
     #[arg(
@@ -861,7 +854,9 @@ pub struct ImplsCommand {
 #[derive(Parser)]
 #[command(name = "rustgraph")]
 #[command(version)]
-#[command(after_help = "See `man rustgraph` for the full reference. Run `rustgraph <subcommand> --help` for per-command flags.")]
+#[command(
+    after_help = "See `man rustgraph` for the full reference. Run `rustgraph <subcommand> --help` for per-command flags."
+)]
 #[command(about = "AST-aware Rust codebase navigation.\n\n\
 MCP (Claude / Codex / Gemini integration):\n  \
   rustgraph mcp install\n  \
@@ -869,128 +864,232 @@ MCP (Claude / Codex / Gemini integration):\n  \
   rustgraph mcp uninstall\n  \
   rustgraph mcp                      # serve stdio (spawned by client)")]
 pub struct Args {
-
-
     #[arg(
-        short, long,
+        short,
+        long,
         default_value = ".",
-        global = true, hide_short_help = true, hide_long_help = true,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
         help_heading = "Resolution",
         help = "Crate root path"
     )]
     pub path: PathBuf,
 
     #[arg(
-        long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Resolution",
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Resolution",
         help = "Disable Cargo.toml auto-discovery; use -p verbatim"
     )]
     pub no_auto_path: bool,
 
     #[arg(
-        long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Resolution",
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Resolution",
         help = "Emit absolute file paths (default: relative to -p)"
     )]
     pub absolute_paths: bool,
 
     #[arg(
-        long = "also", value_name = "PATH",
-        global = true, hide_short_help = true, hide_long_help = true, help_heading = "Resolution",
+        long = "also",
+        value_name = "PATH",
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Resolution",
         help = "Extra crate root(s) to merge (cross-crate; repeat for multiple)"
     )]
     pub also: Vec<PathBuf>,
 
     #[arg(
-        short, long,
-        global = true, hide_short_help = true, hide_long_help = true, help_heading = "Output",
+        short,
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Output",
         help = "Write to FILE instead of stdout"
     )]
     pub output: Option<PathBuf>,
 
     #[arg(
-        short, long,
-        global = true, hide_short_help = true, hide_long_help = true, help_heading = "Output",
+        short,
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Output",
         help = "Emit JSON (stable schema, pipes to jq)"
     )]
     pub json: bool,
 
     #[arg(
-        long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Output",
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Output",
         help = "Include .gitignore'd files (target/, build/)"
     )]
     pub include_ignored: bool,
 
-    #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Output", help = "Enable colored output")]
+    #[arg(
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Output",
+        help = "Enable colored output"
+    )]
     pub color: bool,
 
-    #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Output", conflicts_with = "color", help = "Disable colored output (default)")]
+    #[arg(
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Output",
+        conflicts_with = "color",
+        help = "Disable colored output (default)"
+    )]
     pub no_color: bool,
 
-    #[arg(long, value_enum, help_heading = "Inventory mode",
+    #[arg(
+        long,
+        value_enum,
+        help_heading = "Inventory mode",
         help = "Inventory filter [default: both]. Inventory mode only — for lookup use `find`"
     )]
     pub analyze: Option<AnalyzeMode>,
 
-    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: functions only")]
+    #[arg(
+        long,
+        help_heading = "Inventory mode",
+        help = "Inventory shortcut: functions only"
+    )]
     pub func: bool,
 
-    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: structs only")]
+    #[arg(
+        long,
+        help_heading = "Inventory mode",
+        help = "Inventory shortcut: structs only"
+    )]
     pub r#struct: bool,
 
-    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: enums only")]
+    #[arg(
+        long,
+        help_heading = "Inventory mode",
+        help = "Inventory shortcut: enums only"
+    )]
     pub r#enum: bool,
 
-    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: consts/statics only")]
+    #[arg(
+        long,
+        help_heading = "Inventory mode",
+        help = "Inventory shortcut: consts/statics only"
+    )]
     pub r#const: bool,
 
-    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: trait declarations only")]
+    #[arg(
+        long,
+        help_heading = "Inventory mode",
+        help = "Inventory shortcut: trait declarations only"
+    )]
     pub r#trait: bool,
 
-    #[arg(long, help_heading = "Inventory mode", help = "Inventory shortcut: type aliases only")]
+    #[arg(
+        long,
+        help_heading = "Inventory mode",
+        help = "Inventory shortcut: type aliases only"
+    )]
     pub alias: bool,
 
-    #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Search",
+    #[arg(
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Search",
         help = "Fuzzy search across fns/structs/enums (use '|' for OR)"
     )]
     pub search: Option<String>,
 
-    #[arg(long, default_value = "0.85", global = true, hide_short_help = true, hide_long_help = true, help_heading = "Search",
+    #[arg(
+        long,
+        default_value = "0.85",
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Search",
         help = "Fuzzy match threshold (default 0.85; raise toward 1.0 for strict)"
     )]
     pub search_threshold: f64,
 
-    #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Search",
+    #[arg(
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Search",
         help = "ADDITIVE — union name-tier hits with hits whose signature (params/return) or file_path fuzzy-matches the query (deduped; name wins on collision). `find State --match-signature` returns every fn named *State* PLUS every fn whose params/return mention `State`. Stderr summary: `note: X name + Y sig/path matches`."
     )]
     pub match_signature: bool,
 
-    #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Search",
+    #[arg(
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Search",
         help = "Drop matches whose enclosing fn is_test (grep/refs/find/dead-code/callers/ensemble/usages)"
     )]
     pub exclude_tests: bool,
 
-    #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Search",
+    #[arg(
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Search",
         help = "Filter to public items only (skip pub(crate)/private). Applies to inventory + find."
     )]
     pub public_only: bool,
 
-
-    #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Resolution",
+    #[arg(
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Resolution",
         help = "Drop call edges where type-strict matching returned 0 candidates instead of falling back to bare-name match (callers/call-graph/paths-between).",
         long_help = "When set, drop call edges that the strict resolver filters out instead of falling back to bare-name match. \
 Reduces false-positive edges at the cost of hiding some legit ones; see stderr for dropped count."
     )]
     pub strict_resolution: bool,
 
-
     #[arg(
-        long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Diff",
+        long,
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Diff",
         help = "Filter results to changes since --since (default HEAD~1). Granularity varies: find applies span-level filtering to fn/struct/enum; callers/refs/dead-code apply span-level filtering to fns; grep/impls/tree filter at file-level. Requires git."
     )]
     pub changed: bool,
 
     #[arg(
-        long, value_name = "GIT_REF",
-        global = true, hide_short_help = true, hide_long_help = true, help_heading = "Diff",
+        long,
+        value_name = "GIT_REF",
+        global = true,
+        hide_short_help = true,
+        hide_long_help = true,
+        help_heading = "Diff",
         help = "Diff base for --changed (default HEAD~1 when --changed is set without --since). Any git ref accepted (branch, tag, sha)."
     )]
     pub since: Option<String>,
@@ -1102,8 +1201,8 @@ mod tests {
 
     #[test]
     fn args_recognises_callers_subcommand_with_context_flags() {
-        let parsed = Args::try_parse_from(["rustgraph", "callers", "-C", "3", "target"])
-            .expect("parse");
+        let parsed =
+            Args::try_parse_from(["rustgraph", "callers", "-C", "3", "target"]).expect("parse");
         match parsed.command.unwrap() {
             ModeCommand::Callers(c) => {
                 assert_eq!(c.query.as_deref(), Some("target"));

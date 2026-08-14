@@ -88,8 +88,16 @@ mod tests {
         let mut visitor = CodeVisitor::new("file.rs".to_string());
         visitor.visit_file(&file);
 
-        let new_fn = visitor.functions.iter().find(|f| f.name == "new").expect("new");
-        let run_fn = visitor.functions.iter().find(|f| f.name == "run").expect("run");
+        let new_fn = visitor
+            .functions
+            .iter()
+            .find(|f| f.name == "new")
+            .expect("new");
+        let run_fn = visitor
+            .functions
+            .iter()
+            .find(|f| f.name == "run")
+            .expect("run");
         assert_eq!(new_fn.kind, "method(Foo)");
         assert_eq!(run_fn.kind, "method(Foo)");
     }
@@ -123,8 +131,16 @@ mod tests {
         let file = syn::parse_file(content).expect("parse");
         let mut visitor = CodeVisitor::new("file.rs".to_string());
         visitor.visit_file(&file);
-        let it_works = visitor.functions.iter().find(|f| f.name == "it_works").expect("it_works");
-        let not_a_test = visitor.functions.iter().find(|f| f.name == "not_a_test").expect("not_a_test");
+        let it_works = visitor
+            .functions
+            .iter()
+            .find(|f| f.name == "it_works")
+            .expect("it_works");
+        let not_a_test = visitor
+            .functions
+            .iter()
+            .find(|f| f.name == "not_a_test")
+            .expect("not_a_test");
         assert!(it_works.is_test);
         assert!(!not_a_test.is_test);
     }
@@ -140,7 +156,11 @@ mod tests {
         let file = syn::parse_file(content).expect("parse");
         let mut visitor = CodeVisitor::new("file.rs".to_string());
         visitor.visit_file(&file);
-        let helper = visitor.functions.iter().find(|f| f.name == "helper").expect("helper");
+        let helper = visitor
+            .functions
+            .iter()
+            .find(|f| f.name == "helper")
+            .expect("helper");
         assert!(helper.is_test);
     }
 
@@ -155,7 +175,11 @@ mod tests {
         let file = syn::parse_file(content).expect("parse");
         let mut visitor = CodeVisitor::new("file.rs".to_string());
         visitor.visit_file(&file);
-        let wire_up = visitor.functions.iter().find(|f| f.name == "wire_up").expect("wire_up");
+        let wire_up = visitor
+            .functions
+            .iter()
+            .find(|f| f.name == "wire_up")
+            .expect("wire_up");
         assert!(!wire_up.is_test);
     }
 }

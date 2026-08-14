@@ -1,6 +1,8 @@
 //! File-tree scanner: walks a project directory and aggregates per-file parse results.
 
-use super::{CallSite, ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo, parse_rust_file};
+use super::{
+    CallSite, ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo, parse_rust_file,
+};
 use ignore::WalkBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -131,7 +133,11 @@ mod tests {
         let mut files = find_rust_files(dir.path(), false);
         files.sort();
         assert_eq!(files.len(), 2);
-        assert!(files.iter().all(|p| p.extension().and_then(|e| e.to_str()) == Some("rs")));
+        assert!(
+            files
+                .iter()
+                .all(|p| p.extension().and_then(|e| e.to_str()) == Some("rs"))
+        );
     }
 
     #[test]

@@ -15,9 +15,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 #[test]
 fn regression_help_text_does_not_apologize_for_in_flag() {
@@ -51,7 +53,6 @@ fn regression_help_text_does_not_apologize_for_in_flag() {
     }
 }
 
-
 #[test]
 fn regression_in_flag_means_files_filter_consistently() {
     let fixture = tempdir().expect("tempdir");
@@ -64,7 +65,6 @@ fn regression_in_flag_means_files_filter_consistently() {
         "pub fn target() {}\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let grep_out = run_rustgraph(&["grep", "target", "--in", "keep", "-p", &base, "-j"]);
     assert!(
@@ -96,7 +96,6 @@ fn regression_in_flag_means_files_filter_consistently() {
         path
     );
 
-
     let callers_out = run_rustgraph(&["callers", "target", "--in", "keep", "-p", &base]);
     assert!(
         !callers_out.status.success(),
@@ -107,12 +106,12 @@ fn regression_in_flag_means_files_filter_consistently() {
     );
     let stderr = String::from_utf8_lossy(&callers_out.stderr);
     assert!(
-        stderr.contains("unexpected argument '--in'") || stderr.contains("unexpected argument \"--in\""),
+        stderr.contains("unexpected argument '--in'")
+            || stderr.contains("unexpected argument \"--in\""),
         "expected stderr to mention `unexpected argument '--in'` (current asymmetric state); got: {}",
         stderr
     );
 }
-
 
 #[test]
 fn regression_find_o_flag_writes_only_to_file_not_stdout() {
@@ -122,20 +121,12 @@ fn regression_find_o_flag_writes_only_to_file_not_stdout() {
     let out_file = fixture.path().join("find_out.txt");
     let out_file_str = out_file.to_string_lossy().to_string();
 
-    let res = run_rustgraph(&[
-        "find",
-        "target",
-        "-p",
-        &base,
-        "-o",
-        &out_file_str,
-    ]);
+    let res = run_rustgraph(&["find", "target", "-p", &base, "-o", &out_file_str]);
     assert!(
         res.status.success(),
         "find -o failed: stderr={}",
         String::from_utf8_lossy(&res.stderr)
     );
-
 
     assert!(
         out_file.exists(),
@@ -149,7 +140,6 @@ fn regression_find_o_flag_writes_only_to_file_not_stdout() {
         written
     );
 
-
     let stdout = String::from_utf8_lossy(&res.stdout);
     assert!(
         stdout.trim().is_empty(),
@@ -157,7 +147,6 @@ fn regression_find_o_flag_writes_only_to_file_not_stdout() {
         stdout
     );
 }
-
 
 #[test]
 fn regression_callers_and_refs_o_flag_writes_only_to_file() {
@@ -167,7 +156,6 @@ fn regression_callers_and_refs_o_flag_writes_only_to_file() {
         "pub fn target() {}\nfn caller_of_target() { target(); }\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let callers_out_file = fixture.path().join("callers_out.txt");
     let callers_out_file_str = callers_out_file.to_string_lossy().to_string();
@@ -201,17 +189,9 @@ fn regression_callers_and_refs_o_flag_writes_only_to_file() {
         callers_stdout
     );
 
-
     let refs_out_file = fixture.path().join("refs_out.txt");
     let refs_out_file_str = refs_out_file.to_string_lossy().to_string();
-    let refs_res = run_rustgraph(&[
-        "refs",
-        "target",
-        "-p",
-        &base,
-        "-o",
-        &refs_out_file_str,
-    ]);
+    let refs_res = run_rustgraph(&["refs", "target", "-p", &base, "-o", &refs_out_file_str]);
     assert!(
         refs_res.status.success(),
         "refs -o failed: stderr={}",

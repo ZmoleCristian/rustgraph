@@ -1,5 +1,3 @@
-
-
 use std::collections::HashMap;
 use std::fs;
 
@@ -21,11 +19,7 @@ pub fn run(
     project: &ProjectData,
     request: MembersRequest,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
-
-    if let Some(struct_info) =
-        project.structs.iter().find(|s| s.name == request.type_name)
-    {
+    if let Some(struct_info) = project.structs.iter().find(|s| s.name == request.type_name) {
         let field_names = extract_field_names(&struct_info.fields);
         if field_names.is_empty() {
             return Err(format!(
@@ -34,7 +28,6 @@ pub fn run(
             )
             .into());
         }
-
 
         let mut hits_by_field: HashMap<String, Vec<FieldHit>> = HashMap::new();
         for fname in &field_names {
@@ -48,7 +41,6 @@ pub fn run(
             } else {
                 super::super::relativize_for_display(&abs, &args.path, &args.also)
             };
-
 
             if let Some(needle) = &request.in_path {
                 if !file_str.contains(needle) {
@@ -72,7 +64,6 @@ pub fn run(
             v.visit_file(syntax);
         }
 
-
         for hits in hits_by_field.values_mut() {
             hits.sort_by(|a, b| {
                 a.file_path
@@ -84,18 +75,21 @@ pub fn run(
             hits.dedup_by(|a, b| a.file_path == b.file_path && a.line == b.line && a.col == b.col);
         }
 
-
         let cap = if request.max_results == 0 {
             usize::MAX
         } else {
             request.max_results
         };
 
-
         let ordered_fields: Vec<String> = field_names.clone();
         let fields_with_accesses: Vec<&String> = ordered_fields
             .iter()
-            .filter(|f| hits_by_field.get(*f).map(|v| !v.is_empty()).unwrap_or(false))
+            .filter(|f| {
+                hits_by_field
+                    .get(*f)
+                    .map(|v| !v.is_empty())
+                    .unwrap_or(false)
+            })
             .collect();
 
         if args.json {
@@ -109,7 +103,10 @@ pub fn run(
             let fields_out: Vec<FieldOut> = ordered_fields
                 .iter()
                 .map(|fname| {
-                    let hits = hits_by_field.get(fname).map(|v| v.as_slice()).unwrap_or(&[]);
+                    let hits = hits_by_field
+                        .get(fname)
+                        .map(|v| v.as_slice())
+                        .unwrap_or(&[]);
                     let total = hits.len();
                     let display: Vec<&FieldHit> = hits.iter().take(cap).collect();
                     FieldOut {
@@ -143,11 +140,12 @@ pub fn run(
                 ordered_fields.len()
             );
             for fname in &ordered_fields {
-                let hits = hits_by_field.get(fname).map(|v| v.as_slice()).unwrap_or(&[]);
+                let hits = hits_by_field
+                    .get(fname)
+                    .map(|v| v.as_slice())
+                    .unwrap_or(&[]);
                 let total = hits.len();
                 if total == 0 {
-
-
                     continue;
                 }
                 out.push_str(&format!("\n  {}: {} access(es)\n", fname, total));
@@ -173,7 +171,6 @@ pub fn run(
         return Ok(());
     }
 
-
     if let Some(enum_info) = project.enums.iter().find(|e| e.name == request.type_name) {
         let _ = enum_info;
         return Err(format!(
@@ -182,7 +179,6 @@ pub fn run(
         )
         .into());
     }
-
 
     let mut suggestions: Vec<(String, f64)> = project
         .structs
@@ -213,7 +209,6 @@ pub fn run(
     }
     Err(msg.into())
 }
-
 
 fn extract_field_names(fields: &[String]) -> Vec<String> {
     let mut names = Vec::new();
@@ -246,8 +241,6 @@ struct MemberVisitor<'a> {
 
 impl<'ast> Visit<'ast> for MemberVisitor<'_> {
     fn visit_expr_field(&mut self, node: &'ast syn::ExprField) {
-
-
         if let syn::Member::Named(name) = &node.member {
             let name_str = name.to_string();
             if let Some(matched) = self.fields.iter().find(|f| **f == name_str) {

@@ -22,7 +22,6 @@ pub fn run(
     mut request: GrepRequest,
     changed: Option<&ChangedRanges>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
     if request.by_function {
         request.enclosing_function = true;
     }
@@ -31,14 +30,12 @@ pub fn run(
         request.enclosing_function = true;
     }
 
-
-    let paren_warning_pending =
-        !request.fixed_string && (request.pattern.contains(r"\(") || request.pattern.contains(r"\)"));
+    let paren_warning_pending = !request.fixed_string
+        && (request.pattern.contains(r"\(") || request.pattern.contains(r"\)"));
     if !request.fixed_string && request.pattern.contains(r"\|") {
         let suggested = request.pattern.replace(r"\|", "|");
         let bar = "\u{2501}".repeat(78);
         eprintln!("{}", bar);
-
 
         eprintln!(
             "warning: pattern contains `\\|` — Rust regex uses `|` (no escape) for OR. `\\|` matches a literal pipe — did you mean `{}`?",
@@ -56,21 +53,16 @@ pub fn run(
         request.pattern.clone()
     };
 
-
     let regex = match RegexBuilder::new(&pattern_str)
         .case_insensitive(request.ignore_case)
         .build()
     {
         Ok(r) => r,
         Err(e) => {
-
-
             if paren_warning_pending {
                 emit_paren_warning(&request.pattern);
             }
             let msg = if request.fixed_string {
-
-
                 format!("invalid regex: {}", e)
             } else {
                 format!(
@@ -81,7 +73,6 @@ pub fn run(
             return Err(msg.into());
         }
     };
-
 
     let mut files: Vec<(String, String)> = if !project.rust_files.is_empty() {
         project
@@ -115,7 +106,6 @@ pub fn run(
         }
     }
 
-
     if let Some(ranges) = changed {
         let before = files.len();
         files.retain(|(_, key)| file_was_changed(key, ranges));
@@ -126,7 +116,6 @@ pub fn run(
             );
         }
     }
-
 
     let by_file: HashMap<String, Vec<&FunctionInfo>> = if request.enclosing_function {
         let mut map: HashMap<String, Vec<&FunctionInfo>> = HashMap::new();
@@ -149,7 +138,6 @@ pub fn run(
         request.max_results
     };
 
-
     let before_context = request.before_context;
     let after_context = request.after_context;
     let context_total = before_context + after_context;
@@ -162,13 +150,10 @@ pub fn run(
     let mut summary: HashMap<String, FnSummary> = HashMap::new();
     let mut orphan_count = 0usize;
 
-
     let mut by_file_counts: HashMap<String, usize> = HashMap::new();
-
 
     let mut raw_match_count = 0usize;
     let mut excluded_examples: Vec<String> = Vec::new();
-
 
     let mut total_post_filter = 0usize;
 
@@ -186,7 +171,6 @@ pub fn run(
                 continue;
             }
 
-
             raw_match_count += 1;
             let line_no = idx + 1;
             let enclosing = if request.enclosing_function {
@@ -195,14 +179,12 @@ pub fn run(
                 None
             };
 
-
             if args.exclude_tests && enclosing.is_some_and(|f| f.is_test) {
                 if excluded_examples.len() < 3 {
                     excluded_examples.push(format!("{}:{}", rel, line_no));
                 }
                 continue;
             }
-
 
             total_post_filter += 1;
             if total_matches >= cap {
@@ -227,30 +209,35 @@ pub fn run(
                 }
             }
 
-
             *by_file_counts.entry(rel.clone()).or_insert(0) += 1;
 
             if request.by_function || request.by_file {
-
             } else if args.json {
                 json_matches.push(MatchRow {
                     path: rel.clone(),
                     line: line_no,
                     text: line.to_string(),
                     enclosing_function: enclosing.map(|f| f.name.clone()),
-                    enclosing_function_file: enclosing.map(|f| relative_path(&f.file_path, &args.path)),
+                    enclosing_function_file: enclosing
+                        .map(|f| relative_path(&f.file_path, &args.path)),
                     enclosing_function_start: enclosing.map(|f| f.start_line),
                     enclosing_function_end: enclosing.map(|f| f.end_line),
                     is_test: enclosing.map(|f| f.is_test),
                 });
             } else if context_total == 0 {
                 let suffix = enclosing
-                    .map(|f| format!("    [fn: {} @ {}:{}-{}]", f.name, relative_path(&f.file_path, &args.path), f.start_line, f.end_line))
+                    .map(|f| {
+                        format!(
+                            "    [fn: {} @ {}:{}-{}]",
+                            f.name,
+                            relative_path(&f.file_path, &args.path),
+                            f.start_line,
+                            f.end_line
+                        )
+                    })
                     .unwrap_or_default();
                 buf.push_str(&format!("{}:{}:{}{}\n", rel, line_no, line, suffix));
             } else {
-
-
                 let lo = idx.saturating_sub(before_context);
                 let hi = (idx + after_context + 1).min(lines.len());
                 let header = if let Some(f) = enclosing {
@@ -283,14 +270,16 @@ pub fn run(
         files.len(),
         total_post_filter,
         if truncated {
-            format!(" (showing {} of {}; use --max-results to expand)", total_matches, total_post_filter)
+            format!(
+                " (showing {} of {}; use --max-results to expand)",
+                total_matches, total_post_filter
+            )
         } else {
             String::new()
         },
         if request.by_function {
             "  [--by-function: per-line dump suppressed, summary only]"
         } else if request.by_file {
-
             "  [--by-file: per-line dump suppressed, file rollup only]"
         } else {
             ""
@@ -299,77 +288,80 @@ pub fn run(
 
     if args.json {
         let mut payload = serde_json::Map::new();
-        payload.insert("pattern".into(), serde_json::Value::String(request.pattern.clone()));
+        payload.insert(
+            "pattern".into(),
+            serde_json::Value::String(request.pattern.clone()),
+        );
 
-
-        payload.insert("total_matches".into(), serde_json::Value::Number(total_post_filter.into()));
+        payload.insert(
+            "total_matches".into(),
+            serde_json::Value::Number(total_post_filter.into()),
+        );
         payload.insert("truncated".into(), serde_json::Value::Bool(truncated));
 
-
         if request.by_function {
-            payload.insert(
-                "by_function".into(),
-                serde_json::Value::Bool(true),
-            );
+            payload.insert("by_function".into(), serde_json::Value::Bool(true));
         }
         if request.by_file {
             payload.insert("by_file_mode".into(), serde_json::Value::Bool(true));
         }
         if !request.by_function && !request.by_file {
             payload.insert(
-            "matches".into(),
-            serde_json::Value::Array(
-                json_matches
-                    .into_iter()
-                    .map(|m| {
-                        let mut obj = serde_json::Map::new();
+                "matches".into(),
+                serde_json::Value::Array(
+                    json_matches
+                        .into_iter()
+                        .map(|m| {
+                            let mut obj = serde_json::Map::new();
 
-
-                        obj.insert("file_path".into(), serde_json::Value::String(m.path));
-                        obj.insert("start_line".into(), serde_json::Value::Number(m.line.into()));
-                        obj.insert("text".into(), serde_json::Value::String(m.text));
-                        if request.enclosing_function {
+                            obj.insert("file_path".into(), serde_json::Value::String(m.path));
                             obj.insert(
-                                "enclosing_function".into(),
-                                m.enclosing_function
-                                    .map(serde_json::Value::String)
-                                    .unwrap_or(serde_json::Value::Null),
+                                "start_line".into(),
+                                serde_json::Value::Number(m.line.into()),
                             );
-                            obj.insert(
-                                "enclosing_function_file".into(),
-                                m.enclosing_function_file
-                                    .map(serde_json::Value::String)
-                                    .unwrap_or(serde_json::Value::Null),
-                            );
-                            obj.insert(
-                                "enclosing_function_start".into(),
-                                m.enclosing_function_start
-                                    .map(|n| serde_json::Value::Number(n.into()))
-                                    .unwrap_or(serde_json::Value::Null),
-                            );
-                            obj.insert(
-                                "enclosing_function_end".into(),
-                                m.enclosing_function_end
-                                    .map(|n| serde_json::Value::Number(n.into()))
-                                    .unwrap_or(serde_json::Value::Null),
-                            );
-                            obj.insert(
-                                "is_test".into(),
-                                m.is_test
-                                    .map(serde_json::Value::Bool)
-                                    .unwrap_or(serde_json::Value::Null),
-                            );
-                        }
-                        serde_json::Value::Object(obj)
-                    })
-                    .collect(),
-            ),
-        );
+                            obj.insert("text".into(), serde_json::Value::String(m.text));
+                            if request.enclosing_function {
+                                obj.insert(
+                                    "enclosing_function".into(),
+                                    m.enclosing_function
+                                        .map(serde_json::Value::String)
+                                        .unwrap_or(serde_json::Value::Null),
+                                );
+                                obj.insert(
+                                    "enclosing_function_file".into(),
+                                    m.enclosing_function_file
+                                        .map(serde_json::Value::String)
+                                        .unwrap_or(serde_json::Value::Null),
+                                );
+                                obj.insert(
+                                    "enclosing_function_start".into(),
+                                    m.enclosing_function_start
+                                        .map(|n| serde_json::Value::Number(n.into()))
+                                        .unwrap_or(serde_json::Value::Null),
+                                );
+                                obj.insert(
+                                    "enclosing_function_end".into(),
+                                    m.enclosing_function_end
+                                        .map(|n| serde_json::Value::Number(n.into()))
+                                        .unwrap_or(serde_json::Value::Null),
+                                );
+                                obj.insert(
+                                    "is_test".into(),
+                                    m.is_test
+                                        .map(serde_json::Value::Bool)
+                                        .unwrap_or(serde_json::Value::Null),
+                                );
+                            }
+                            serde_json::Value::Object(obj)
+                        })
+                        .collect(),
+                ),
+            );
         }
 
-
         if request.by_file {
-            let mut rows: Vec<(String, usize)> = by_file_counts.iter()
+            let mut rows: Vec<(String, usize)> = by_file_counts
+                .iter()
                 .map(|(p, c)| (p.clone(), *c))
                 .collect();
             rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
@@ -389,7 +381,11 @@ pub fn run(
         }
         if request.enclosing_function {
             let mut sums: Vec<&FnSummary> = summary.values().collect();
-            sums.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.file_path.cmp(&b.file_path)));
+            sums.sort_by(|a, b| {
+                b.count
+                    .cmp(&a.count)
+                    .then_with(|| a.file_path.cmp(&b.file_path))
+            });
             payload.insert(
                 "summary_by_function".into(),
                 serde_json::Value::Array(
@@ -397,9 +393,18 @@ pub fn run(
                         .map(|s| {
                             let mut obj = serde_json::Map::new();
                             obj.insert("name".into(), serde_json::Value::String(s.name.clone()));
-                            obj.insert("file_path".into(), serde_json::Value::String(s.file_path.clone()));
-                            obj.insert("start_line".into(), serde_json::Value::Number(s.start_line.into()));
-                            obj.insert("end_line".into(), serde_json::Value::Number(s.end_line.into()));
+                            obj.insert(
+                                "file_path".into(),
+                                serde_json::Value::String(s.file_path.clone()),
+                            );
+                            obj.insert(
+                                "start_line".into(),
+                                serde_json::Value::Number(s.start_line.into()),
+                            );
+                            obj.insert(
+                                "end_line".into(),
+                                serde_json::Value::Number(s.end_line.into()),
+                            );
                             obj.insert("is_test".into(), serde_json::Value::Bool(s.is_test));
                             obj.insert("count".into(), serde_json::Value::Number(s.count.into()));
                             serde_json::Value::Object(obj)
@@ -415,8 +420,6 @@ pub fn run(
         let serialized = serde_json::to_string_pretty(&serde_json::Value::Object(payload))?;
         super::switchboard::write_string_output(args.output.as_deref(), &serialized)?;
         if truncated {
-
-
             return Err(format!(
                 "grep -j truncated: showing {} of {} matches; use --max-results to expand. JSON body has `truncated: true` for inspection (re-run with --max-results 0 for unlimited).",
                 total_matches, total_post_filter
@@ -427,9 +430,9 @@ pub fn run(
         let mut out = header;
         out.push_str(&buf);
 
-
         if request.by_file {
-            let mut rows: Vec<(String, usize)> = by_file_counts.iter()
+            let mut rows: Vec<(String, usize)> = by_file_counts
+                .iter()
                 .map(|(p, c)| (p.clone(), *c))
                 .collect();
             rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
@@ -442,14 +445,20 @@ pub fn run(
             let plural_files = if rows.len() == 1 { "file" } else { "files" };
             out.push_str(&format!(
                 "total: {} {} across {} {}\n",
-                total, plural_total, rows.len(), plural_files
+                total,
+                plural_total,
+                rows.len(),
+                plural_files
             ));
         }
 
-
         if request.enclosing_function && !request.by_file {
             let mut sums: Vec<&FnSummary> = summary.values().collect();
-            sums.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.file_path.cmp(&b.file_path)));
+            sums.sort_by(|a, b| {
+                b.count
+                    .cmp(&a.count)
+                    .then_with(|| a.file_path.cmp(&b.file_path))
+            });
             out.push_str(&format!(
                 "\n=== summary by enclosing function ({} functions, {} matches; {} orphan) ===\n",
                 sums.len(),
@@ -464,7 +473,10 @@ pub fn run(
                 ));
             }
             if orphan_count > 0 {
-                out.push_str(&format!("<orphan, no enclosing fn> — {} match(es)\n", orphan_count));
+                out.push_str(&format!(
+                    "<orphan, no enclosing fn> — {} match(es)\n",
+                    orphan_count
+                ));
             }
         }
         super::switchboard::write_string_output(args.output.as_deref(), out.trim_end())?;
@@ -476,19 +488,20 @@ pub fn run(
         }
     }
 
-
     if args.exclude_tests && total_matches == 0 && raw_match_count > 0 {
         let examples = if excluded_examples.is_empty() {
             String::new()
         } else {
-            format!("\nHint: drop --exclude-tests to see them, or check {}", excluded_examples.join(", "))
+            format!(
+                "\nHint: drop --exclude-tests to see them, or check {}",
+                excluded_examples.join(", ")
+            )
         };
         eprintln!(
             "Note: {} matches found but all dropped by --exclude-tests (in test fns).{}",
             raw_match_count, examples
         );
     }
-
 
     if paren_warning_pending && total_matches == 0 {
         emit_paren_warning(&request.pattern);
@@ -497,12 +510,10 @@ pub fn run(
     Ok(())
 }
 
-
 fn emit_paren_warning(pattern: &str) {
     let suggested = pattern.replace(r"\(", "(").replace(r"\)", ")");
     let bar = "\u{2501}".repeat(78);
     eprintln!("{}", bar);
-
 
     eprintln!(
         "note: pattern contains `\\(` or `\\)` — Rust regex uses bare `(...)` for grouping (PCRE-style `\\(...\\)` matches literal parens). Try: '{}'",
@@ -564,12 +575,7 @@ fn walk_rust_files(root: &Path, include_ignored: bool) -> Vec<String> {
     walk.build()
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.file_type().is_some_and(|ft| ft.is_file()))
-        .filter(|entry| {
-            entry
-                .path()
-                .extension()
-                .is_some_and(|ext| ext == "rs")
-        })
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "rs"))
         .map(|entry| entry.path().to_string_lossy().to_string())
         .collect()
 }
@@ -580,10 +586,7 @@ mod tests {
     use std::io::Write;
     use tempfile::tempdir;
 
-    fn run_grep(
-        path: &Path,
-        request: GrepRequest,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    fn run_grep(path: &Path, request: GrepRequest) -> Result<String, Box<dyn std::error::Error>> {
         use crate::cli::Args;
         use clap::Parser;
         let path_arg = path.to_string_lossy().to_string();
@@ -623,11 +626,7 @@ mod tests {
     #[test]
     fn grep_finds_literal_matches_in_comments() {
         let dir = tempdir().unwrap();
-        write(
-            dir.path(),
-            "src/lib.rs",
-            "// TODO: fix later\nfn ok() {}\n",
-        );
+        write(dir.path(), "src/lib.rs", "// TODO: fix later\nfn ok() {}\n");
         let out = run_grep(dir.path(), req("TODO")).unwrap();
         assert!(out.contains("TODO: fix later"), "got: {}", out);
         assert!(out.contains("src/lib.rs:1:"));
@@ -694,7 +693,11 @@ mod tests {
         assert!(out.contains("[fn: alpha"), "got: {}", out);
         assert!(out.contains("[fn: beta"), "got: {}", out);
 
-        assert!(out.contains("summary by enclosing function (2 functions"), "got: {}", out);
+        assert!(
+            out.contains("summary by enclosing function (2 functions"),
+            "got: {}",
+            out
+        );
 
         assert!(out.contains("beta — 2 match"), "got: {}", out);
         assert!(out.contains("alpha — 1 match"), "got: {}", out);
@@ -712,13 +715,25 @@ mod tests {
         r.by_function = true;
         let out = run_grep(dir.path(), r).unwrap();
 
-        assert!(!out.contains("[fn: alpha @"), "per-line dump should be suppressed; got: {}", out);
+        assert!(
+            !out.contains("[fn: alpha @"),
+            "per-line dump should be suppressed; got: {}",
+            out
+        );
 
-        assert!(out.contains("summary by enclosing function (2 functions"), "got: {}", out);
+        assert!(
+            out.contains("summary by enclosing function (2 functions"),
+            "got: {}",
+            out
+        );
         assert!(out.contains("alpha — 2 match"), "got: {}", out);
         assert!(out.contains("beta — 1 match"), "got: {}", out);
 
-        assert!(out.contains("--by-function"), "header should mention mode; got: {}", out);
+        assert!(
+            out.contains("--by-function"),
+            "header should mention mode; got: {}",
+            out
+        );
     }
 
     #[test]
@@ -748,6 +763,10 @@ mod tests {
         let mut r = req("unwrap");
         r.enclosing_function = true;
         let out = run_grep(dir.path(), r).unwrap();
-        assert!(out.contains("[fn: inner"), "expected innermost; got: {}", out);
+        assert!(
+            out.contains("[fn: inner"),
+            "expected innermost; got: {}",
+            out
+        );
     }
 }

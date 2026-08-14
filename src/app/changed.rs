@@ -17,7 +17,6 @@ pub fn build_changed_ranges(
     project_root: &Path,
     git_ref: &str,
 ) -> Result<ChangedRanges, Box<dyn std::error::Error>> {
-
     // `--end-of-options` prevents user-supplied refs (which may legitimately
     // start with `-`) from being parsed as flags. A bare `--` is not accepted
     // by `git rev-parse --verify`, so we must use `--end-of-options` here.
@@ -27,8 +26,9 @@ pub fn build_changed_ranges(
         .output()
         .map_err(|e| format!("failed to invoke `git` (is it installed?): {}", e))?;
     if !rev_parse.status.success() {
-        let stderr = String::from_utf8_lossy(&rev_parse.stderr).trim().to_string();
-
+        let stderr = String::from_utf8_lossy(&rev_parse.stderr)
+            .trim()
+            .to_string();
 
         if stderr.contains("not a git repository") {
             return Err(format!(
@@ -43,7 +43,6 @@ pub fn build_changed_ranges(
         )
         .into());
     }
-
 
     // `--end-of-options` blocks flag interpretation of the rev expression.
     // We cannot use a bare `--` separator here because `git diff` reserves
@@ -87,7 +86,6 @@ pub fn build_changed_ranges(
             .output()
             .map_err(|e| format!("failed to run `git diff` for {}: {}", file, e))?;
         if !diff.status.success() {
-
             continue;
         }
         let diff_text = String::from_utf8_lossy(&diff.stdout);
@@ -100,14 +98,12 @@ pub fn build_changed_ranges(
     Ok(map)
 }
 
-
 fn parse_hunk_ranges(diff_text: &str) -> Vec<(usize, usize)> {
     let mut ranges: Vec<(usize, usize)> = Vec::new();
     for line in diff_text.lines() {
         if !line.starts_with("@@") {
             continue;
         }
-
 
         let plus_idx = match line.find('+') {
             Some(i) => i,
@@ -127,8 +123,6 @@ fn parse_hunk_ranges(diff_text: &str) -> Vec<(usize, usize)> {
         };
         let count: usize = count_str.parse().unwrap_or(1);
         if count == 0 {
-
-
             ranges.push((start, start));
         } else {
             ranges.push((start, start + count - 1));
@@ -136,7 +130,6 @@ fn parse_hunk_ranges(diff_text: &str) -> Vec<(usize, usize)> {
     }
     ranges
 }
-
 
 /// Returns `true` if the function spanning `[start_line, end_line]` in `file_path`
 /// overlaps any changed range in `changed`. Performs suffix-based path matching to
@@ -147,11 +140,11 @@ pub fn fn_was_changed(
     end_line: usize,
     changed: &ChangedRanges,
 ) -> bool {
-
     if let Some(ranges) = changed.get(file_path) {
-        return ranges.iter().any(|(s, e)| ranges_overlap(*s, *e, start_line, end_line));
+        return ranges
+            .iter()
+            .any(|(s, e)| ranges_overlap(*s, *e, start_line, end_line));
     }
-
 
     for (key, ranges) in changed {
         if file_path.ends_with(key)
@@ -159,14 +152,16 @@ pub fn fn_was_changed(
             || file_path.ends_with(&format!("/{}", key))
             || key.ends_with(&format!("/{}", file_path))
         {
-            if ranges.iter().any(|(s, e)| ranges_overlap(*s, *e, start_line, end_line)) {
+            if ranges
+                .iter()
+                .any(|(s, e)| ranges_overlap(*s, *e, start_line, end_line))
+            {
                 return true;
             }
         }
     }
     false
 }
-
 
 /// Returns `true` if `file_path` appears anywhere in `changed`, using suffix-based
 /// path matching to tolerate relative vs. absolute path differences.
@@ -189,7 +184,6 @@ pub fn file_was_changed(file_path: &str, changed: &ChangedRanges) -> bool {
 fn ranges_overlap(a_start: usize, a_end: usize, b_start: usize, b_end: usize) -> bool {
     a_start <= b_end && b_start <= a_end
 }
-
 
 /// Default git ref used when `--since` is not provided; compares against the previous commit.
 pub const DEFAULT_SINCE: &str = "HEAD~1";

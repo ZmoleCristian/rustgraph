@@ -111,10 +111,10 @@ impl ProjectData {
             }
         }
 
-
         {
             let mut file_cache: HashMap<String, Vec<String>> = HashMap::new();
-            let framework_refs = crate::index::collect_framework_handler_refs(&call_sites, &mut file_cache);
+            let framework_refs =
+                crate::index::collect_framework_handler_refs(&call_sites, &mut file_cache);
             for fr in &framework_refs {
                 if let Some(cid) = &fr.caller_id {
                     call_map
@@ -125,10 +125,12 @@ impl ProjectData {
             }
         }
 
-
         let mut alias_map: HashMap<String, Vec<String>> = HashMap::new();
         for (alias, target) in &aliases {
-            alias_map.entry(alias.clone()).or_default().push(target.clone());
+            alias_map
+                .entry(alias.clone())
+                .or_default()
+                .push(target.clone());
         }
         let mut extra_sites: Vec<CallSite> = Vec::new();
         for site in &call_sites {
@@ -477,7 +479,10 @@ mod tests {
         // address) — proves the AST is stored in place rather than re-parsed.
         let a = project.parsed_file(&lib).expect("first lookup");
         let b = project.parsed_file(&lib).expect("second lookup");
-        assert!(std::ptr::eq(a, b), "parsed_file must return cached reference");
+        assert!(
+            std::ptr::eq(a, b),
+            "parsed_file must return cached reference"
+        );
         assert!(std::ptr::eq(by_path, by_str));
 
         // Sanity-check the cached AST round-trips back to the original tokens.
@@ -486,7 +491,11 @@ mod tests {
         assert!(dumped.contains("struct S"));
 
         // Files outside the loaded project return None.
-        assert!(project.parsed_file(std::path::Path::new("/no/such.rs")).is_none());
+        assert!(
+            project
+                .parsed_file(std::path::Path::new("/no/such.rs"))
+                .is_none()
+        );
     }
 
     #[test]
@@ -505,6 +514,9 @@ mod tests {
         assert!(merged.contains(&"a".to_string()));
         assert!(merged.contains(&"b".to_string()));
         assert!(merged.contains(&"c".to_string()));
-        assert_eq!(target.get("other").map(|v| v.as_slice()), Some(&["d".to_string()][..]));
+        assert_eq!(
+            target.get("other").map(|v| v.as_slice()),
+            Some(&["d".to_string()][..])
+        );
     }
 }

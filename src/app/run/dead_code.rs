@@ -28,7 +28,6 @@ pub fn run(
         Some(project),
     )?;
 
-
     if let Some(needle) = &in_path {
         let before = report.dead_functions.len();
         report
@@ -44,11 +43,8 @@ pub fn run(
                 "NOTE: --in '{}' filtered all {} dead fn(s) out. Globally there are {} dead fns; none match the path filter.",
                 needle, before, before
             );
-            eprintln!(
-                "Hint: re-run without --in to see them, or widen the path substring."
-            );
+            eprintln!("Hint: re-run without --in to see them, or widen the path substring.");
         }
-
 
         report.dead_functions_total = after;
     }
@@ -66,18 +62,20 @@ pub fn run(
                 "NOTE: --exclude-tests filtered all {} dead fn(s) out. All dead fns were #[test]/#[cfg(test)] items.",
                 before
             );
-            eprintln!(
-                "Hint: re-run without --exclude-tests to see them."
-            );
+            eprintln!("Hint: re-run without --exclude-tests to see them.");
         }
         report.dead_functions_total = after;
     }
 
-
     if let Some(ranges) = changed {
         let before = report.dead_functions.len();
         report.dead_functions.retain(|f| {
-            fn_was_changed(&f.info.file_path, f.info.start_line, f.info.end_line, ranges)
+            fn_was_changed(
+                &f.info.file_path,
+                f.info.start_line,
+                f.info.end_line,
+                ranges,
+            )
         });
         let after = report.dead_functions.len();
         eprintln!(
@@ -89,9 +87,7 @@ pub fn run(
                 "NOTE: --changed filtered all {} dead fn(s) out. None of the dead fns overlap a changed hunk.",
                 before
             );
-            eprintln!(
-                "Hint: re-run without --changed to see all dead fns project-wide."
-            );
+            eprintln!("Hint: re-run without --changed to see all dead fns project-wide.");
         }
         report.dead_functions_total = after;
     }
@@ -100,8 +96,6 @@ pub fn run(
         let payload = serde_json::to_string_pretty(&report)?;
         write_string_output(args.output.as_deref(), &payload)?;
     } else {
-
-
         dead_code::print_dead_code_text_with_verbosity_and_cap(&report, verbose, max_results);
     }
 

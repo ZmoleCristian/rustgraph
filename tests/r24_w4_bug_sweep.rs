@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 fn ensemble_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -47,7 +47,6 @@ pub fn r24_caller() {
     );
     dir
 }
-
 
 #[test]
 fn fix1_ensemble_default_no_view_still_shows_marker() {
@@ -78,7 +77,6 @@ fn fix1_ensemble_default_no_view_still_shows_marker() {
     );
 }
 
-
 #[test]
 fn fix1_ensemble_explicit_view_summary_suppresses_marker() {
     let fixture = ensemble_fixture();
@@ -104,7 +102,6 @@ fn fix1_ensemble_explicit_view_summary_suppresses_marker() {
     );
 }
 
-
 #[test]
 fn fix1_ensemble_view_full_suppresses_marker() {
     let fixture = ensemble_fixture();
@@ -124,14 +121,17 @@ fn fix1_ensemble_view_full_suppresses_marker() {
     );
 }
 
-
 #[test]
 fn fix1_ensemble_section_override_uses_showing_hint() {
     let fixture = ensemble_fixture();
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "-p", &base, "ensemble", "r24_target",
-        "--section", "neighborhood",
+        "-p",
+        &base,
+        "ensemble",
+        "r24_target",
+        "--section",
+        "neighborhood",
     ]);
     assert!(
         out.status.success(),
@@ -162,10 +162,12 @@ fn fix1_ensemble_section_override_uses_showing_hint() {
     );
 }
 
-
 fn paths_between_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
-    write_file(&dir.path().join("src/lib.rs"), "pub mod api;\npub mod session;\n");
+    write_file(
+        &dir.path().join("src/lib.rs"),
+        "pub mod api;\npub mod session;\n",
+    );
     write_file(
         &dir.path().join("src/api/mod.rs"),
         r#"
@@ -176,7 +178,10 @@ pub fn handle_request() {
 }
 "#,
     );
-    write_file(&dir.path().join("src/session/mod.rs"), "pub mod commands;\n");
+    write_file(
+        &dir.path().join("src/session/mod.rs"),
+        "pub mod commands;\n",
+    );
     write_file(
         &dir.path().join("src/session/commands/mod.rs"),
         r#"
@@ -188,15 +193,17 @@ pub fn execute_cut() {
     dir
 }
 
-
 #[test]
 fn fix2_paths_between_to_module_full_path_prefix() {
     let fixture = paths_between_fixture();
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "-p", &base,
-        "paths-between", "handle_request",
-        "--to-module", "src/session/commands",
+        "-p",
+        &base,
+        "paths-between",
+        "handle_request",
+        "--to-module",
+        "src/session/commands",
     ]);
     assert!(
         out.status.success(),
@@ -217,15 +224,17 @@ fn fix2_paths_between_to_module_full_path_prefix() {
     );
 }
 
-
 #[test]
 fn fix2_paths_between_to_module_no_src_prefix() {
     let fixture = paths_between_fixture();
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "-p", &base,
-        "paths-between", "handle_request",
-        "--to-module", "session/commands",
+        "-p",
+        &base,
+        "paths-between",
+        "handle_request",
+        "--to-module",
+        "session/commands",
     ]);
     assert!(
         out.status.success(),
@@ -246,15 +255,17 @@ fn fix2_paths_between_to_module_no_src_prefix() {
     );
 }
 
-
 #[test]
 fn fix2_paths_between_to_module_single_segment() {
     let fixture = paths_between_fixture();
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "-p", &base,
-        "paths-between", "handle_request",
-        "--to-module", "commands",
+        "-p",
+        &base,
+        "paths-between",
+        "handle_request",
+        "--to-module",
+        "commands",
     ]);
     assert!(
         out.status.success(),
@@ -270,15 +281,17 @@ fn fix2_paths_between_to_module_single_segment() {
     );
 }
 
-
 #[test]
 fn fix2_paths_between_to_module_no_match_errors_clearly() {
     let fixture = paths_between_fixture();
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "-p", &base,
-        "paths-between", "handle_request",
-        "--to-module", "no_such_module_xyz",
+        "-p",
+        &base,
+        "paths-between",
+        "handle_request",
+        "--to-module",
+        "no_such_module_xyz",
     ]);
     assert!(
         !out.status.success(),
@@ -293,13 +306,10 @@ fn fix2_paths_between_to_module_no_match_errors_clearly() {
     );
 }
 
-
 fn or_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
         &dir.path().join("src/lib.rs"),
-
-
         r#"
 pub fn parse(_input: &str) -> u32 { 0 }
 
@@ -312,7 +322,6 @@ pub fn unrelated_fn() {}
     );
     dir
 }
-
 
 #[test]
 fn fix3_find_or_unions_hits_across_alternatives() {
@@ -346,7 +355,6 @@ fn fix3_find_or_unions_hits_across_alternatives() {
     );
 }
 
-
 #[test]
 fn fix3_find_or_unions_with_func_selector() {
     let fixture = or_fixture();
@@ -365,7 +373,6 @@ fn fix3_find_or_unions_with_func_selector() {
     assert!(stdout.contains("analyze_three"), "got:\n{}", stdout);
 }
 
-
 #[test]
 fn fix3_find_or_with_exact_returns_both_alts() {
     let fixture = tempdir().expect("tempdir");
@@ -382,15 +389,22 @@ fn fix3_find_or_with_exact_returns_both_alts() {
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-    assert!(stdout.contains("fn cut"), "expected `cut`; got:\n{}", stdout);
-    assert!(stdout.contains("fn delete"), "expected `delete`; got:\n{}", stdout);
+    assert!(
+        stdout.contains("fn cut"),
+        "expected `cut`; got:\n{}",
+        stdout
+    );
+    assert!(
+        stdout.contains("fn delete"),
+        "expected `delete`; got:\n{}",
+        stdout
+    );
     assert!(
         !stdout.contains("unrelated"),
         "`unrelated` must NOT appear in --exact mode; got:\n{}",
         stdout
     );
 }
-
 
 #[test]
 fn fix3_find_single_term_keeps_exact_name_fast_path() {
@@ -412,7 +426,11 @@ pub fn preload() {}
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-    assert!(stdout.contains("fn load"), "expected exact `load`; got:\n{}", stdout);
+    assert!(
+        stdout.contains("fn load"),
+        "expected exact `load`; got:\n{}",
+        stdout
+    );
     assert!(
         !stdout.contains("load_jsonl"),
         "single-term fast path MUST suppress `load_jsonl`; got:\n{}",

@@ -115,7 +115,10 @@ pub fn print_inventory_text(
     }
 
     if selection.show_traits() {
-        let n = shown_type_decls.iter().filter(|t| t.kind == "trait").count();
+        let n = shown_type_decls
+            .iter()
+            .filter(|t| t.kind == "trait")
+            .count();
         let summary = if use_color {
             format!("{} {}", "Traits:".bold(), n.to_string().bright_blue())
         } else {
@@ -125,7 +128,10 @@ pub fn print_inventory_text(
     }
 
     if selection.show_aliases() {
-        let n = shown_type_decls.iter().filter(|t| t.kind == "alias").count();
+        let n = shown_type_decls
+            .iter()
+            .filter(|t| t.kind == "alias")
+            .count();
         let summary = if use_color {
             format!("{} {}", "Aliases:".bold(), n.to_string().bright_cyan())
         } else {
@@ -193,7 +199,6 @@ mod tests {
         }
     }
 
-
     fn const_info() -> ConstInfo {
         ConstInfo {
             name: "MAX".to_string(),
@@ -244,7 +249,15 @@ mod tests {
             AnalyzeSelection::from_flags(true, true, false, false, false, false),
             AnalyzeSelection::ALL,
         ] {
-            print_inventory_text(&funcs, &structs, &enums, &consts, &type_decls, selection, false);
+            print_inventory_text(
+                &funcs,
+                &structs,
+                &enums,
+                &consts,
+                &type_decls,
+                selection,
+                false,
+            );
         }
     }
 }

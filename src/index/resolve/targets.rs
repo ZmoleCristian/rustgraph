@@ -40,22 +40,25 @@ pub fn resolve_call_targets(
             continue;
         }
 
-        let resolved_internal_id = name_to_ids.get(&call_site.callee_base).and_then(|candidate_ids| {
-            resolve_owner_qualified_method_target(
-                call_site,
-                candidate_ids,
-                &function_by_id,
-                &module_lookup,
-            )
-            .or_else(|| {
-                resolve_ambiguous_call_target(
-                    call_site,
-                    candidate_ids,
-                    &function_by_id,
-                    &module_lookup,
-                )
-            })
-        });
+        let resolved_internal_id =
+            name_to_ids
+                .get(&call_site.callee_base)
+                .and_then(|candidate_ids| {
+                    resolve_owner_qualified_method_target(
+                        call_site,
+                        candidate_ids,
+                        &function_by_id,
+                        &module_lookup,
+                    )
+                    .or_else(|| {
+                        resolve_ambiguous_call_target(
+                            call_site,
+                            candidate_ids,
+                            &function_by_id,
+                            &module_lookup,
+                        )
+                    })
+                });
 
         resolved.push(ResolvedCallTarget {
             caller_id: caller_id.clone(),
@@ -93,7 +96,8 @@ fn resolve_owner_qualified_method_target(
         .caller_id
         .as_ref()
         .and_then(|id| module_lookup.get(id).cloned());
-    let normalized_owner_prefix = normalize_callee_prefix(raw_owner_prefix, caller_module.as_deref());
+    let normalized_owner_prefix =
+        normalize_callee_prefix(raw_owner_prefix, caller_module.as_deref());
 
     let mut matched = Vec::new();
     for id in candidate_ids {
@@ -103,7 +107,11 @@ fn resolve_owner_qualified_method_target(
         let Some(owner_segments) = method_owner_segments(function) else {
             continue;
         };
-        if owner_path_matches(&owner_segments, raw_owner_prefix, normalized_owner_prefix.as_deref()) {
+        if owner_path_matches(
+            &owner_segments,
+            raw_owner_prefix,
+            normalized_owner_prefix.as_deref(),
+        ) {
             matched.push(id.clone());
         }
     }
@@ -116,15 +124,16 @@ fn resolve_owner_qualified_method_target(
 }
 
 fn method_owner_segments(function: &FunctionInfo) -> Option<Vec<String>> {
-    let kind = function.kind.strip_prefix("method(")?.strip_suffix(')')?.trim();
+    let kind = function
+        .kind
+        .strip_prefix("method(")?
+        .strip_suffix(')')?
+        .trim();
     if kind.is_empty() {
         return None;
     }
 
-    let normalized = kind
-        .strip_prefix("impl ")
-        .unwrap_or(kind)
-        .replace(' ', "");
+    let normalized = kind.strip_prefix("impl ").unwrap_or(kind).replace(' ', "");
     let without_generics = normalized
         .split('<')
         .next()
@@ -248,7 +257,6 @@ mod tests {
 
     #[test]
     fn owner_path_matches_via_normalized_path() {
-
         let normalized = s(&["MyType"]);
         assert!(owner_path_matches(
             &s(&["MyType"]),
@@ -259,8 +267,11 @@ mod tests {
 
     #[test]
     fn owner_path_matches_falls_back_to_last_segment() {
-
-        assert!(owner_path_matches(&s(&["a", "MyType"]), &s(&["b", "MyType"]), None));
+        assert!(owner_path_matches(
+            &s(&["a", "MyType"]),
+            &s(&["b", "MyType"]),
+            None
+        ));
     }
 
     #[test]

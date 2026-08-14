@@ -45,7 +45,6 @@ pub enum EnsemblePreset {
     Deep,
 }
 
-
 /// Output view for the `ensemble` command.
 ///
 /// Selects which sections are included in the rendered output. Independent

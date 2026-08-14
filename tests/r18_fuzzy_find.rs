@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,9 +15,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 #[test]
 fn regression_find_no_match_exits_nonzero() {
@@ -42,7 +42,6 @@ fn regression_find_no_match_exits_nonzero() {
     );
 }
 
-
 fn write_widget_fixture(fixture: &tempfile::TempDir) -> String {
     let mut src = String::new();
     for i in 0..60 {
@@ -56,8 +55,19 @@ fn write_widget_fixture(fixture: &tempfile::TempDir) -> String {
 fn regression_find_max_results_default_caps_output() {
     let fixture = tempdir().expect("tempdir");
     let base = write_widget_fixture(&fixture);
-    let out = run_rustgraph(&["--path", &base, "find", "widget", "--search-threshold", "0.6"]);
-    assert!(out.status.success(), "find failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "find",
+        "widget",
+        "--search-threshold",
+        "0.6",
+    ]);
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     let body_lines: Vec<&str> = stdout
         .lines()
@@ -79,10 +89,20 @@ fn regression_find_max_results_unlimited_with_zero() {
     let fixture = tempdir().expect("tempdir");
     let base = write_widget_fixture(&fixture);
     let out = run_rustgraph(&[
-        "--path", &base, "find", "widget",
-        "--search-threshold", "0.6", "--max-results", "0",
+        "--path",
+        &base,
+        "find",
+        "widget",
+        "--search-threshold",
+        "0.6",
+        "--max-results",
+        "0",
     ]);
-    assert!(out.status.success(), "find failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     let body_lines: Vec<&str> = stdout
         .lines()
@@ -101,14 +121,20 @@ fn regression_find_max_results_unlimited_with_zero() {
     );
 }
 
-
 #[test]
 fn regression_find_drops_id_suffix_by_default() {
     let fixture = tempdir().expect("tempdir");
-    write_file(&fixture.path().join("src/lib.rs"), "pub fn unique_target() {}\n");
+    write_file(
+        &fixture.path().join("src/lib.rs"),
+        "pub fn unique_target() {}\n",
+    );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "unique_target"]);
-    assert!(out.status.success(), "find failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     assert!(
         !stdout.contains("[id:"),
@@ -123,17 +149,23 @@ fn regression_find_drops_id_suffix_by_default() {
 #[test]
 fn regression_find_show_ids_flag_restores_id_suffix() {
     let fixture = tempdir().expect("tempdir");
-    write_file(&fixture.path().join("src/lib.rs"), "pub fn unique_target() {}\n");
+    write_file(
+        &fixture.path().join("src/lib.rs"),
+        "pub fn unique_target() {}\n",
+    );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "unique_target", "--show-ids"]);
-    assert!(out.status.success(), "find failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stdout = String::from_utf8_lossy(&out.stdout).to_string();
     assert!(
         stdout.contains("[id:"),
         "find --show-ids should restore `[id:`; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn regression_find_exact_returns_all_exact_matches() {
@@ -147,7 +179,11 @@ fn regression_find_exact_returns_all_exact_matches() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "build", "--exact", "-j"]);
-    assert!(out.status.success(), "find --exact failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "find --exact failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let names: Vec<String> = json["functions"]
         .as_array()
@@ -155,7 +191,11 @@ fn regression_find_exact_returns_all_exact_matches() {
         .iter()
         .map(|f| f["name"].as_str().unwrap().to_string())
         .collect();
-    assert_eq!(names.len(), 3, "expected exactly 3 exact-name matches; got: {names:?}");
+    assert_eq!(
+        names.len(),
+        3,
+        "expected exactly 3 exact-name matches; got: {names:?}"
+    );
     assert!(
         names.iter().all(|n| n == "build"),
         "every result should be exactly `build`; got: {names:?}"
@@ -164,7 +204,6 @@ fn regression_find_exact_returns_all_exact_matches() {
 
 #[test]
 fn regression_find_exact_zero_match_still_exits_nonzero() {
-
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), "pub fn alpha() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
@@ -180,7 +219,6 @@ fn regression_find_exact_zero_match_still_exits_nonzero() {
         "expected 'no match' in stderr; got: {stderr}"
     );
 }
-
 
 #[test]
 fn regression_did_you_mean_uses_higher_floor() {
@@ -198,7 +236,6 @@ pub fn unrelated_thing() {}
     assert!(!out.status.success(), "expected non-zero exit on no match");
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
 
-
     assert!(
         !stderr.contains("run_remove_context"),
         "low-similarity suggestion `run_remove_context` should be filtered out; stderr:\n{stderr}"
@@ -208,7 +245,6 @@ pub fn unrelated_thing() {}
         "low-similarity suggestion `xyz_helper` should be filtered out; stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn regression_callers_default_ambiguity_cap_is_seven() {
@@ -232,7 +268,6 @@ pub fn caller() { handle_a(); handle_b(); handle_c(); handle_d(); handle_e(); }
         "5 fuzzy matches should be within new cap=7 default; stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
-
 
     let fixture2 = tempdir().expect("tempdir");
     write_file(
@@ -262,7 +297,6 @@ pub fn caller() { handle_a(); handle_b(); handle_c(); handle_d(); handle_e(); ha
         "expected 'ambiguous' message; got: {stderr2}"
     );
 }
-
 
 #[test]
 fn regression_find_or_with_short_alts_returns_results() {
@@ -299,7 +333,6 @@ pub fn unrelated() {}
     );
 }
 
-
 #[test]
 fn regression_find_dynamic_threshold_hint_on_many_matches() {
     let fixture = tempdir().expect("tempdir");
@@ -311,7 +344,11 @@ fn regression_find_dynamic_threshold_hint_on_many_matches() {
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&["--path", &base, "find", "doohickey"]);
-    assert!(out.status.success(), "find failed: stderr={}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let stderr = String::from_utf8_lossy(&out.stderr).to_string();
     assert!(
         stderr.contains("threshold"),

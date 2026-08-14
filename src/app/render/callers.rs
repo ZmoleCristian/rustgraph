@@ -12,8 +12,6 @@ use std::fmt::Write;
 pub fn render_callers_text(report: &CallersReport) -> String {
     let mut out = String::new();
     for entry in &report.matches {
-
-
         let target_cfg = format_cfg_annotation(&entry.info.cfg_attrs)
             .map(|s| format!(" {}", s))
             .unwrap_or_default();
@@ -103,7 +101,6 @@ pub fn render_callers_text(report: &CallersReport) -> String {
     }
     out
 }
-
 
 /// Prints the [`CallersReport`] in plain-text format to stdout.
 pub fn print_callers_text(report: &CallersReport) {

@@ -92,7 +92,6 @@ pub(crate) fn build_type_aware_edges(
             continue;
         };
 
-
         let caller_input_types: Vec<TypeInfo> = caller
             .parameters
             .iter()
@@ -165,7 +164,12 @@ pub(crate) fn build_type_aware_edges(
 mod tests {
     use super::*;
 
-    fn make_func(name: &str, params: Vec<String>, ret: Option<&str>, is_async: bool) -> FunctionInfo {
+    fn make_func(
+        name: &str,
+        params: Vec<String>,
+        ret: Option<&str>,
+        is_async: bool,
+    ) -> FunctionInfo {
         FunctionInfo {
             name: name.to_string(),
             signature: format!("fn {name}"),
@@ -288,8 +292,7 @@ mod tests {
         let callee = make_func("callee", vec![], None, false);
         let funcs = vec![caller.clone(), callee.clone()];
 
-        let caller_id =
-            make_function_id(&caller.file_path, caller.start_line, &caller.name);
+        let caller_id = make_function_id(&caller.file_path, caller.start_line, &caller.name);
         // Sanity: production format is 3 parts (file:line:name), not 2.
         assert_eq!(caller_id.split(':').count(), 3);
 

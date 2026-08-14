@@ -69,19 +69,12 @@ pub fn parse_rust_file_with_ast(
                 error = %e,
                 "skipping non-UTF-8 source file"
             );
-            return Err(format!(
-                "non-UTF-8 source file at byte {}: {}",
-                e.valid_up_to(),
-                e
-            )
-            .into());
+            return Err(format!("non-UTF-8 source file at byte {}: {}", e.valid_up_to(), e).into());
         }
     };
     let syntax_tree = syn::parse_file(&content)?;
 
-    let mut visitor = CodeVisitor::new(normalize_path_separators(
-        &file_path.to_string_lossy(),
-    ));
+    let mut visitor = CodeVisitor::new(normalize_path_separators(&file_path.to_string_lossy()));
     if path_is_under_tests_dir(file_path) {
         visitor.cfg_test_depth = 1;
     }
@@ -145,9 +138,9 @@ pub fn type_decl_symbol_id(t: &TypeDeclInfo) -> String {
 }
 
 fn path_is_under_tests_dir(file_path: &Path) -> bool {
-    file_path.components().any(|c| {
-        matches!(c, std::path::Component::Normal(s) if s == "tests")
-    })
+    file_path
+        .components()
+        .any(|c| matches!(c, std::path::Component::Normal(s) if s == "tests"))
 }
 
 #[cfg(test)]
@@ -229,9 +222,14 @@ mod tests {
         .expect("write");
 
         let parsed = parse_rust_file(&path).expect("parse ok");
-        let driver = parsed.functions.iter().find(|f| f.name == "driver").expect("driver fn");
+        let driver = parsed
+            .functions
+            .iter()
+            .find(|f| f.name == "driver")
+            .expect("driver fn");
         let driver_id = function_id(driver);
-        let driver_calls = parsed.call_sites
+        let driver_calls = parsed
+            .call_sites
             .iter()
             .filter(|s| s.caller_id.as_deref() == Some(&driver_id))
             .count();
@@ -248,10 +246,7 @@ mod tests {
 
     #[test]
     fn normalize_path_separators_replaces_backslashes() {
-        assert_eq!(
-            normalize_path_separators(r"src\foo.rs"),
-            "src/foo.rs"
-        );
+        assert_eq!(normalize_path_separators(r"src\foo.rs"), "src/foo.rs");
         assert_eq!(
             normalize_path_separators(r"C:\Users\me\proj\src\foo.rs"),
             "C:/Users/me/proj/src/foo.rs"
@@ -309,7 +304,9 @@ mod tests {
         let path = dir.path().join("bin.rs");
         // 0xFF is invalid as the leading byte of a UTF-8 sequence.
         std::fs::write(&path, [0xFFu8, 0xFE, 0x00, 0x41]).expect("write");
-        let err = parse_rust_file(&path).err().expect("expected non-UTF-8 error");
+        let err = parse_rust_file(&path)
+            .err()
+            .expect("expected non-UTF-8 error");
         let msg = err.to_string();
         assert!(
             msg.contains("non-UTF-8"),

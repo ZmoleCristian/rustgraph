@@ -32,8 +32,14 @@ pub fn execute(
     match mode {
         ExecutionMode::Ensemble(request) => ensemble::run(args, project, request),
         ExecutionMode::Callers(request) => callers::run(args, project, request, changed),
-        ExecutionMode::CallGraph { detail, config } => call_graph::run(args, project, detail, config),
-        ExecutionMode::DeadCode { in_path, verbose, max_results } => dead_code::run(args, project, in_path, verbose, max_results, changed),
+        ExecutionMode::CallGraph { detail, config } => {
+            call_graph::run(args, project, detail, config)
+        }
+        ExecutionMode::DeadCode {
+            in_path,
+            verbose,
+            max_results,
+        } => dead_code::run(args, project, in_path, verbose, max_results, changed),
         ExecutionMode::Inventory { selection } => inventory::run(args, project.clone(), selection),
         ExecutionMode::Tree(request) => tree::run(args, project, request, changed),
         ExecutionMode::Grep(request) => grep::run(args, project, request, changed),
@@ -91,7 +97,6 @@ mod tests {
 
     #[test]
     fn write_string_output_succeeds_with_no_path() {
-
         write_string_output(None, "stdout-message").expect("ok");
     }
 }

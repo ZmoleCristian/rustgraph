@@ -124,7 +124,10 @@ mod tests {
     fn split_macro_call_candidates_skips_keywords() {
         let candidates = split_macro_call_candidates("if (true) { for x in 0..10 {} }");
         let bases: Vec<_> = candidates.iter().map(|(_, b)| b.clone()).collect();
-        assert!(!bases.iter().any(|b| matches!(b.as_str(), "if" | "for" | "while" | "loop" | "match" | "return")));
+        assert!(!bases.iter().any(|b| matches!(
+            b.as_str(),
+            "if" | "for" | "while" | "loop" | "match" | "return"
+        )));
     }
 
     #[test]
@@ -137,13 +140,15 @@ mod tests {
     fn split_macro_identifier_candidates_returns_identifiers() {
         let candidates = split_macro_identifier_candidates("foo bar baz");
         let bases: Vec<_> = candidates.iter().map(|(_, b)| b.clone()).collect();
-        assert_eq!(bases, vec!["foo".to_string(), "bar".to_string(), "baz".to_string()]);
+        assert_eq!(
+            bases,
+            vec!["foo".to_string(), "bar".to_string(), "baz".to_string()]
+        );
     }
 
     #[test]
     fn split_macro_identifier_candidates_filters_keywords_and_self() {
-        let candidates =
-            split_macro_identifier_candidates("self super crate fn pub use foo if");
+        let candidates = split_macro_identifier_candidates("self super crate fn pub use foo if");
         let bases: Vec<_> = candidates.iter().map(|(_, b)| b.clone()).collect();
         assert_eq!(bases, vec!["foo".to_string()]);
     }

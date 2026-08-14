@@ -3,7 +3,6 @@
 
 use serde::{Deserialize, Serialize};
 
-
 /// Format a slice of `cfg` predicate strings into a single bracketed annotation.
 ///
 /// Returns `None` when the slice is empty.  Multiple predicates are joined with

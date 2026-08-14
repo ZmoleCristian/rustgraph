@@ -96,7 +96,10 @@ mod tests {
     #[test]
     fn contains_identifier_token_matches_whole_word() {
         assert!(contains_identifier_token("foo bar", "foo"));
-        assert!(contains_identifier_token("get_user(req: Request)", "Request"));
+        assert!(contains_identifier_token(
+            "get_user(req: Request)",
+            "Request"
+        ));
         assert!(!contains_identifier_token("foo_bar", "foo"));
         assert!(!contains_identifier_token("foobar", "foo"));
     }

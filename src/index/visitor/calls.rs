@@ -109,8 +109,6 @@ mod tests {
 
     #[test]
     fn extract_call_target_from_field_call_uses_field_marker() {
-
-
         let field: syn::ExprField = parse_quote! { data.handler };
         let call = ExprCall {
             attrs: vec![],
@@ -125,8 +123,6 @@ mod tests {
 
     #[test]
     fn extract_call_target_from_complex_call_uses_complex_marker() {
-
-
         let call: ExprCall = parse_quote! { (some.field)() };
         let t = extract_call_target_from_call(&call).expect("target");
         assert_eq!(t.base, "complex_call");

@@ -19,19 +19,21 @@ fn parse_args_or_help() -> Args {
     match Args::try_parse() {
         Ok(args) => args,
         Err(e) => {
-
             match e.kind() {
                 ErrorKind::DisplayHelp
                 | ErrorKind::DisplayVersion
                 | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
-                    if matches!(e.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand) {
+                    if matches!(
+                        e.kind(),
+                        ErrorKind::DisplayHelp
+                            | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+                    ) {
                         rustgraph::mcp_install::print_nudge_if_needed();
                     }
                     e.exit()
                 }
                 _ => {}
             }
-
 
             eprint!("{}", e);
             let raw_argv: Vec<String> = std::env::args().collect();
@@ -70,7 +72,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let use_color = if args.no_color { false } else { args.color };
     colored::control::set_override(use_color);
 
-
     if let Some(rustgraph::cli::ModeCommand::Mcp(mcp_cmd)) = &args.command {
         use rustgraph::cli::McpAction;
         match &mcp_cmd.action {
@@ -96,7 +97,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("rustgraph MCP install — checking detected AI clients:");
                 }
                 rustgraph::mcp_install::print_report(&regs, *quiet);
-                let any_failed = regs.iter().any(|r| matches!(r.status, rustgraph::mcp_install::RegStatus::Failed(_)));
+                let any_failed = regs
+                    .iter()
+                    .any(|r| matches!(r.status, rustgraph::mcp_install::RegStatus::Failed(_)));
                 std::process::exit(if any_failed { 1 } else { 0 });
             }
             Some(McpAction::Uninstall { quiet }) => {
@@ -105,7 +108,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("rustgraph MCP uninstall:");
                 }
                 rustgraph::mcp_install::print_report(&regs, *quiet);
-                let any_failed = regs.iter().any(|r| matches!(r.status, rustgraph::mcp_install::RegStatus::Failed(_)));
+                let any_failed = regs
+                    .iter()
+                    .any(|r| matches!(r.status, rustgraph::mcp_install::RegStatus::Failed(_)));
                 std::process::exit(if any_failed { 1 } else { 0 });
             }
         }
@@ -131,16 +136,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match rustgraph::app::run(args) {
         Ok(()) => Ok(()),
         Err(e) => {
-
-
             let msg = e.to_string();
             if msg.starts_with("Os {") || msg.starts_with("os error") {
                 eprintln!("error: {}", msg);
-                eprintln!("hint: this typically means rustgraph tried to read a source file at a path that no longer exists. \
-                    If you passed --symbol-id or a path:LINE query, double-check the file is still there.");
+                eprintln!(
+                    "hint: this typically means rustgraph tried to read a source file at a path that no longer exists. \
+                    If you passed --symbol-id or a path:LINE query, double-check the file is still there."
+                );
                 std::process::exit(2);
             }
-
 
             eprintln!("error: {}", msg);
             std::process::exit(1);

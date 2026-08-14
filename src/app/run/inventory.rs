@@ -19,8 +19,6 @@ pub fn run(
     mut project: ProjectData,
     selection: AnalyzeSelection,
 ) -> Result<(), Box<dyn std::error::Error>> {
-
-
     if args.public_only {
         project.functions.retain(|f| f.is_pub);
         project.structs.retain(|s| s.is_pub);
@@ -41,22 +39,38 @@ pub fn run(
 
         let payload = serde_json::to_string_pretty(&InventoryOutput {
             functions: if selection.show_functions() {
-                project.functions.into_iter().map(WithSymbolId::wrap_fn).collect()
+                project
+                    .functions
+                    .into_iter()
+                    .map(WithSymbolId::wrap_fn)
+                    .collect()
             } else {
                 Vec::new()
             },
             structs: if selection.show_structs() {
-                project.structs.into_iter().map(WithSymbolId::wrap_struct).collect()
+                project
+                    .structs
+                    .into_iter()
+                    .map(WithSymbolId::wrap_struct)
+                    .collect()
             } else {
                 Vec::new()
             },
             enums: if selection.show_enums() {
-                project.enums.into_iter().map(WithSymbolId::wrap_enum).collect()
+                project
+                    .enums
+                    .into_iter()
+                    .map(WithSymbolId::wrap_enum)
+                    .collect()
             } else {
                 Vec::new()
             },
             consts: if selection.show_consts() {
-                project.consts.into_iter().map(WithSymbolId::wrap_const).collect()
+                project
+                    .consts
+                    .into_iter()
+                    .map(WithSymbolId::wrap_const)
+                    .collect()
             } else {
                 Vec::new()
             },

@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stderr_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stderr_of(out: &Output) -> String {
 fn stdout_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout).to_string()
 }
-
 
 fn write_xplat_fixture(dir: &tempfile::TempDir) -> String {
     write_file(
@@ -67,13 +67,10 @@ fn find_json_emits_cfg_attrs_array() {
     let root = write_xplat_fixture(&dir);
     let out = run_rustgraph(&["-p", &root, "-j", "find", "state_base", "--exact"]);
     let stdout = stdout_of(&out);
-    let v: serde_json::Value =
-        serde_json::from_str(&stdout).expect("find -j produces valid JSON");
+    let v: serde_json::Value = serde_json::from_str(&stdout).expect("find -j produces valid JSON");
     let fns = v["functions"].as_array().expect("functions array");
-    let state_base_hits: Vec<&serde_json::Value> = fns
-        .iter()
-        .filter(|f| f["name"] == "state_base")
-        .collect();
+    let state_base_hits: Vec<&serde_json::Value> =
+        fns.iter().filter(|f| f["name"] == "state_base").collect();
     assert_eq!(state_base_hits.len(), 2, "expected two state_base hits");
     let mut seen_macos = false;
     let mut seen_not_macos = false;
@@ -98,8 +95,6 @@ fn find_json_emits_cfg_attrs_array() {
 
 #[test]
 fn find_no_cfg_renders_unchanged() {
-
-
     let dir = tempdir().unwrap();
     write_file(
         &dir.path().join("src/lib.rs"),
@@ -113,7 +108,11 @@ fn find_no_cfg_renders_unchanged() {
         "non-cfg fn must not get cfg annotation, got: {}",
         stdout
     );
-    assert!(stdout.contains("plain_fn"), "expected fn in output: {}", stdout);
+    assert!(
+        stdout.contains("plain_fn"),
+        "expected fn in output: {}",
+        stdout
+    );
 }
 
 #[test]
@@ -149,20 +148,10 @@ fn def_lists_all_when_only_cfg_differs() {
 
 #[test]
 fn def_still_errors_on_real_ambiguity_without_cfg() {
-
     let dir = tempdir().unwrap();
-    write_file(
-        &dir.path().join("src/a.rs"),
-        "pub fn dup() -> u32 { 1 }\n",
-    );
-    write_file(
-        &dir.path().join("src/b.rs"),
-        "pub fn dup() -> u32 { 2 }\n",
-    );
-    write_file(
-        &dir.path().join("src/lib.rs"),
-        "pub mod a;\npub mod b;\n",
-    );
+    write_file(&dir.path().join("src/a.rs"), "pub fn dup() -> u32 { 1 }\n");
+    write_file(&dir.path().join("src/b.rs"), "pub fn dup() -> u32 { 2 }\n");
+    write_file(&dir.path().join("src/lib.rs"), "pub mod a;\npub mod b;\n");
     let root = dir.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["-p", &root, "def", "dup"]);
     assert!(
@@ -181,8 +170,6 @@ fn def_still_errors_on_real_ambiguity_without_cfg() {
 
 #[test]
 fn def_unique_no_cfg_renders_unchanged() {
-
-
     let dir = tempdir().unwrap();
     write_file(
         &dir.path().join("src/lib.rs"),
@@ -243,7 +230,6 @@ fn callers_shows_cfg_on_target_and_caller() {
 
 #[test]
 fn callers_no_cfg_at_all_renders_unchanged() {
-
     let dir = tempdir().unwrap();
     write_file(
         &dir.path().join("src/lib.rs"),
@@ -261,8 +247,6 @@ fn callers_no_cfg_at_all_renders_unchanged() {
 
 #[test]
 fn cfg_cascades_through_enclosing_mod() {
-
-
     let dir = tempdir().unwrap();
     write_file(
         &dir.path().join("src/lib.rs"),
@@ -293,7 +277,6 @@ fn struct_carries_cfg_attrs_in_find_json() {
     let cfg = s["cfg_attrs"].as_array().expect("cfg_attrs array");
     assert_eq!(cfg.len(), 1);
     assert_eq!(cfg[0].as_str().unwrap(), "target_os = \"linux\"");
-
 
     let out2 = run_rustgraph(&["-p", &root, "-j", "find", "Plain", "--exact"]);
     let v2: serde_json::Value = serde_json::from_str(&stdout_of(&out2)).expect("valid JSON");

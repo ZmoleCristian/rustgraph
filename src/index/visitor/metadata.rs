@@ -15,7 +15,6 @@ pub(super) struct FnMetadata {
     pub end_line: usize,
 }
 
-
 /// Normalise whitespace in a token-stream-rendered signature string.
 ///
 /// Removes spurious spaces inserted by `quote!` around angle brackets, arrows, commas,
@@ -28,13 +27,11 @@ pub(crate) fn normalize_signature(s: &str) -> String {
     while i < bytes.len() {
         let c = bytes[i] as char;
 
-
         if c == ' '
             && i + 2 < bytes.len()
             && bytes[i + 1] == b'<'
             && (bytes[i + 2] == b' ' || bytes[i + 2] == b'\'')
         {
-
             let prev = out.chars().last().unwrap_or(' ');
             if prev.is_alphanumeric() || prev == '>' || prev == '_' || prev == ')' {
                 out.push('<');
@@ -44,7 +41,6 @@ pub(crate) fn normalize_signature(s: &str) -> String {
         }
 
         if c == ' ' && i + 1 < bytes.len() && bytes[i + 1] == b'>' {
-
             let prev = out.chars().last().unwrap_or(' ');
 
             if prev != '-' && prev != '=' && prev != '<' {
@@ -52,8 +48,13 @@ pub(crate) fn normalize_signature(s: &str) -> String {
                 i += 2;
 
                 if i < bytes.len() && bytes[i] == b' ' {
-                    let after = if i + 1 < bytes.len() { bytes[i + 1] as char } else { ' ' };
-                    if after == ',' || after == ')' || after == ';' || after == ' ' || after == '>' {
+                    let after = if i + 1 < bytes.len() {
+                        bytes[i + 1] as char
+                    } else {
+                        ' '
+                    };
+                    if after == ',' || after == ')' || after == ';' || after == ' ' || after == '>'
+                    {
                         i += 1;
                     }
                 }
@@ -67,11 +68,7 @@ pub(crate) fn normalize_signature(s: &str) -> String {
             continue;
         }
 
-        if c == '&'
-            && i + 1 < bytes.len()
-            && bytes[i + 1] == b' '
-            && i + 2 < bytes.len()
-        {
+        if c == '&' && i + 1 < bytes.len() && bytes[i + 1] == b' ' && i + 2 < bytes.len() {
             let after = bytes[i + 2] as char;
             if after.is_alphanumeric() || after == '\'' || after == '_' || after == 'm' {
                 out.push('&');
@@ -112,7 +109,9 @@ impl FnMetadata {
                 .collect(),
             return_type: match &sig.output {
                 syn::ReturnType::Default => None,
-                syn::ReturnType::Type(_, ty) => Some(normalize_signature(&format!("{}", quote::quote! { #ty }))),
+                syn::ReturnType::Type(_, ty) => {
+                    Some(normalize_signature(&format!("{}", quote::quote! { #ty })))
+                }
             },
             start_line: span.start().line,
             end_line: span.end().line,
@@ -154,7 +153,6 @@ fn cfg_predicate_enables_test(meta: &Meta) -> bool {
     }
 }
 
-
 /// Collect and normalise all `#[cfg(...)]` predicates from `attrs` into a string vector.
 pub(crate) fn render_cfg_attrs(attrs: &[syn::Attribute]) -> Vec<String> {
     let mut out = Vec::new();
@@ -170,7 +168,6 @@ pub(crate) fn render_cfg_attrs(attrs: &[syn::Attribute]) -> Vec<String> {
     }
     out
 }
-
 
 fn normalize_cfg_predicate(s: &str) -> String {
     let mut out = String::with_capacity(s.len());

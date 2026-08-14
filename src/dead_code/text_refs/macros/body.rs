@@ -188,8 +188,7 @@ mod tests {
     #[test]
     fn extract_macro_body_returns_none_for_missing_file() {
         let mut cache = HashMap::new();
-        let body =
-            extract_macro_body_from_file("/nonexistent/zzz.rs", 1, 0, "vec", &mut cache);
+        let body = extract_macro_body_from_file("/nonexistent/zzz.rs", 1, 0, "vec", &mut cache);
         assert!(body.is_none());
     }
 }

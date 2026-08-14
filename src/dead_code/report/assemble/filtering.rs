@@ -59,20 +59,24 @@ pub fn check_skip_reason(
 
     let func_test_ranges = test_ranges_cache
         .entry(func.file_path.clone())
-        .or_insert_with(|| match project.and_then(|p| p.parsed_file_by_str(&func.file_path)) {
-            Some(syntax) => collect_cfg_test_ranges_from_ast(syntax),
-            None => collect_cfg_test_ranges(&func.file_path),
-        });
+        .or_insert_with(
+            || match project.and_then(|p| p.parsed_file_by_str(&func.file_path)) {
+                Some(syntax) => collect_cfg_test_ranges_from_ast(syntax),
+                None => collect_cfg_test_ranges(&func.file_path),
+            },
+        );
     if line_in_ranges(func.start_line, func_test_ranges) {
         return SkipReason::CfgTest;
     }
 
     let runtime_lines = runtime_entrypoint_cache
         .entry(func.file_path.clone())
-        .or_insert_with(|| match project.and_then(|p| p.parsed_file_by_str(&func.file_path)) {
-            Some(syntax) => collect_runtime_entrypoint_lines_from_ast(syntax),
-            None => collect_runtime_entrypoint_lines(&func.file_path),
-        });
+        .or_insert_with(
+            || match project.and_then(|p| p.parsed_file_by_str(&func.file_path)) {
+                Some(syntax) => collect_runtime_entrypoint_lines_from_ast(syntax),
+                None => collect_runtime_entrypoint_lines(&func.file_path),
+            },
+        );
     if runtime_lines.contains(&func.start_line) {
         return SkipReason::RuntimeEntrypoint;
     }
@@ -269,7 +273,10 @@ mod tests {
     #[test]
     fn common_trait_methods_contains_known_methods() {
         for m in ["from", "into", "as_ref", "to_string", "default"] {
-            assert!(COMMON_TRAIT_METHODS.contains(&m), "missing trait method {m}");
+            assert!(
+                COMMON_TRAIT_METHODS.contains(&m),
+                "missing trait method {m}"
+            );
         }
     }
 }

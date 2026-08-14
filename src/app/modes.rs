@@ -51,19 +51,22 @@ impl AnalyzeSelection {
         if !(functions || structs || enums || consts || traits || aliases) {
             Self::ALL
         } else {
-            Self { functions, structs, enums, consts, traits, aliases }
+            Self {
+                functions,
+                structs,
+                enums,
+                consts,
+                traits,
+                aliases,
+            }
         }
     }
 
     /// Derives the selection from shortcut flags (`--func`, `--struct`, `--enum`, `--const`,
     /// `--trait`, `--alias`) or the `--analyze` flag, giving precedence to shortcuts.
     pub fn from_args(args: &Args) -> Self {
-        let any_shortcut = args.func
-            || args.r#struct
-            || args.r#enum
-            || args.r#const
-            || args.r#trait
-            || args.alias;
+        let any_shortcut =
+            args.func || args.r#struct || args.r#enum || args.r#const || args.r#trait || args.alias;
 
         if any_shortcut {
             Self::from_flags(
@@ -307,7 +310,6 @@ pub struct DefRequest {
     pub in_path: Option<String>,
 }
 
-
 /// Parameters for the `members` subcommand, which lists fields or variants of a type.
 #[derive(Clone, Debug)]
 pub struct MembersRequest {
@@ -391,7 +393,6 @@ impl ExecutionMode {
                 ModeCommand::Callers(callers) => {
                     let (before_context, after_context) = callers.resolved_before_after();
 
-
                     let query = callers
                         .query
                         .or_else(|| callers.symbol_id.clone())
@@ -437,7 +438,6 @@ impl ExecutionMode {
                 ModeCommand::CallGraph(call_graph) => Self::CallGraph {
                     detail: call_graph.detail,
                     config: CallGraphConfig {
-
                         root: call_graph.root.or(call_graph.root_positional),
                         depth: call_graph.depth,
                         include_callers: call_graph.include_callers,
@@ -451,8 +451,6 @@ impl ExecutionMode {
                     files_only: tree.files_only,
                 }),
                 ModeCommand::Grep(grep) => {
-
-
                     let (before_context, after_context) = grep.resolved_before_after();
                     Self::Grep(GrepRequest {
                         pattern: grep.pattern,
@@ -485,7 +483,6 @@ impl ExecutionMode {
                 }),
                 ModeCommand::PathsBetween(pb) => Self::PathsBetween(PathsBetweenRequest {
                     from: pb.from,
-
 
                     to: pb.to.unwrap_or_default(),
                     depth: pb.depth,
@@ -522,9 +519,15 @@ impl ExecutionMode {
                         inv.alias_only,
                     ),
                 },
-                ModeCommand::Mcp(_) => unreachable!("Mcp variant intercepted in main.rs before app::run"),
-                ModeCommand::Completions(_) => unreachable!("Completions variant intercepted in main.rs before app::run"),
-                ModeCommand::GenerateMan => unreachable!("GenerateMan variant intercepted in main.rs before app::run"),
+                ModeCommand::Mcp(_) => {
+                    unreachable!("Mcp variant intercepted in main.rs before app::run")
+                }
+                ModeCommand::Completions(_) => {
+                    unreachable!("Completions variant intercepted in main.rs before app::run")
+                }
+                ModeCommand::GenerateMan => {
+                    unreachable!("GenerateMan variant intercepted in main.rs before app::run")
+                }
                 ModeCommand::Find(find) => {
                     let selection = AnalyzeSelection::from_flags(
                         find.func,
@@ -618,7 +621,10 @@ mod tests {
     fn analyze_selection_func_shortcut_only_functions() {
         let args = parse(&["rustgraph", "--func"]);
         let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::from_flags(true, false, false, false, false, false));
+        assert_eq!(
+            sel,
+            AnalyzeSelection::from_flags(true, false, false, false, false, false)
+        );
         assert!(sel.show_functions());
         assert!(!sel.show_structs());
         assert!(!sel.show_enums());
@@ -639,7 +645,10 @@ mod tests {
     fn analyze_selection_struct_and_enum_shortcuts_combine() {
         let args = parse(&["rustgraph", "--struct", "--enum"]);
         let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::from_flags(false, true, true, false, false, false));
+        assert_eq!(
+            sel,
+            AnalyzeSelection::from_flags(false, true, true, false, false, false)
+        );
         assert!(!sel.show_functions());
         assert!(sel.show_structs());
         assert!(sel.show_enums());
@@ -647,7 +656,15 @@ mod tests {
 
     #[test]
     fn analyze_selection_all_shortcuts_yield_all() {
-        let args = parse(&["rustgraph", "--func", "--struct", "--enum", "--const", "--trait", "--alias"]);
+        let args = parse(&[
+            "rustgraph",
+            "--func",
+            "--struct",
+            "--enum",
+            "--const",
+            "--trait",
+            "--alias",
+        ]);
         let sel = AnalyzeSelection::from_args(&args);
         assert_eq!(sel, AnalyzeSelection::ALL);
     }
@@ -656,7 +673,10 @@ mod tests {
     fn analyze_selection_via_analyze_flag() {
         let args = parse(&["rustgraph", "--analyze", "structs"]);
         let sel = AnalyzeSelection::from_args(&args);
-        assert_eq!(sel, AnalyzeSelection::from_flags(false, true, false, false, false, false));
+        assert_eq!(
+            sel,
+            AnalyzeSelection::from_flags(false, true, false, false, false, false)
+        );
     }
 
     #[test]
@@ -673,7 +693,10 @@ mod tests {
     #[test]
     fn execution_mode_dead_code_via_legacy_flag() {
         let args = parse(&["rustgraph", "--dead-code"]);
-        assert!(matches!(ExecutionMode::from_args(&args), ExecutionMode::DeadCode { .. }));
+        assert!(matches!(
+            ExecutionMode::from_args(&args),
+            ExecutionMode::DeadCode { .. }
+        ));
     }
 
     #[test]
@@ -729,5 +752,4 @@ mod tests {
             _ => panic!("expected callers subcommand to win"),
         }
     }
-
 }

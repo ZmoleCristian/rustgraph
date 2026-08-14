@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 #[test]
 fn callers_flat_emits_path_line_name_per_caller() {
@@ -41,36 +41,44 @@ fn callers_flat_emits_path_line_name_per_caller() {
     let stdout = stdout_of(&out);
 
     let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
-    assert!(!lines.is_empty(), "expected at least one flat entry; got: {stdout}");
+    assert!(
+        !lines.is_empty(),
+        "expected at least one flat entry; got: {stdout}"
+    );
     for line in &lines {
         let parts: Vec<&str> = line.splitn(3, ':').collect();
-        assert_eq!(parts.len(), 3, "expected path:line:name format; got: {line}");
+        assert_eq!(
+            parts.len(),
+            3,
+            "expected path:line:name format; got: {line}"
+        );
     }
 
     assert!(stdout.contains("caller_a"), "caller_a missing: {stdout}");
     assert!(stdout.contains("caller_b"), "caller_b missing: {stdout}");
 }
 
-
 #[test]
 fn callers_flat_depth2_deduplicates() {
     let dir = tempdir().unwrap();
     write_file(
         &dir.path().join("src/lib.rs"),
-
-
         "pub fn target() {}\nfn mid() { target(); }\nfn shared_caller() { mid(); target(); }\n",
     );
     let base = dir.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "callers", "target", "--flat", "--depth", "2"]);
+    let out = run_rustgraph(&[
+        "--path", &base, "callers", "target", "--flat", "--depth", "2",
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let stdout = stdout_of(&out);
     let lines: Vec<&str> = stdout.lines().filter(|l| !l.is_empty()).collect();
 
     let shared_count = lines.iter().filter(|l| l.contains("shared_caller")).count();
-    assert_eq!(shared_count, 1, "shared_caller should appear once (dedup); got: {stdout}");
+    assert_eq!(
+        shared_count, 1,
+        "shared_caller should appear once (dedup); got: {stdout}"
+    );
 }
-
 
 #[test]
 fn callers_flat_conflicts_with_json() {
@@ -85,7 +93,6 @@ fn callers_flat_conflicts_with_json() {
     assert!(!out.status.success(), "expected error for --flat -j combo");
 }
 
-
 #[test]
 fn callers_flat_with_depth_includes_transitive() {
     let dir = tempdir().unwrap();
@@ -94,21 +101,20 @@ fn callers_flat_with_depth_includes_transitive() {
         "pub fn target() {}\nfn level1() { target(); }\nfn level2() { level1(); }\n",
     );
     let base = dir.path().to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "callers", "target", "--flat", "--depth", "2"]);
+    let out = run_rustgraph(&[
+        "--path", &base, "callers", "target", "--flat", "--depth", "2",
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let stdout = stdout_of(&out);
     assert!(stdout.contains("level1"), "level1 missing: {stdout}");
     assert!(stdout.contains("level2"), "level2 missing: {stdout}");
 }
 
-
 #[test]
 fn find_auto_relax_fires_at_default_threshold() {
     let dir = tempdir().unwrap();
     write_file(
         &dir.path().join("src/lib.rs"),
-
-
         "pub fn fetch_data() {}\npub fn store_data() {}\n",
     );
     let base = dir.path().to_string_lossy().to_string();
@@ -126,9 +132,11 @@ fn find_auto_relax_fires_at_default_threshold() {
         "expected auto-relax note on stdout (dual-emit); got: {stdout}"
     );
 
-    assert!(out.status.success(), "expected exit 0 when relaxed candidates found");
+    assert!(
+        out.status.success(),
+        "expected exit 0 when relaxed candidates found"
+    );
 }
-
 
 #[test]
 fn find_auto_relax_json_emits_results() {
@@ -139,36 +147,47 @@ fn find_auto_relax_json_emits_results() {
     );
     let base = dir.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "feech_deta", "--json"]);
-    assert!(out.status.success(), "expected exit 0 when relaxed candidates found");
+    assert!(
+        out.status.success(),
+        "expected exit 0 when relaxed candidates found"
+    );
     let stdout = stdout_of(&out);
 
-    let v: serde_json::Value = serde_json::from_str(&stdout)
-        .unwrap_or_else(|e| panic!("--json relaxed fallback must emit JSON on stdout ({e}); got: {stdout:?}"));
+    let v: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
+        panic!("--json relaxed fallback must emit JSON on stdout ({e}); got: {stdout:?}")
+    });
     let names: Vec<&str> = v["functions"]
         .as_array()
         .expect("functions array")
         .iter()
         .map(|f| f["name"].as_str().unwrap())
         .collect();
-    assert!(names.contains(&"fetch_data"), "relaxed candidate missing: {stdout}");
+    assert!(
+        names.contains(&"fetch_data"),
+        "relaxed candidate missing: {stdout}"
+    );
     assert!(
         v["note"].as_str().unwrap_or("").contains("relaxed to 0.7"),
         "note field must carry the relax explanation: {stdout}"
     );
 }
 
-
 #[test]
 fn find_auto_relax_json_writes_output_file() {
     let dir = tempdir().unwrap();
-    write_file(
-        &dir.path().join("src/lib.rs"),
-        "pub fn fetch_data() {}\n",
-    );
+    write_file(&dir.path().join("src/lib.rs"), "pub fn fetch_data() {}\n");
     let base = dir.path().to_string_lossy().to_string();
     let out_path = dir.path().join("relaxed.json");
     let out_arg = out_path.to_string_lossy().to_string();
-    let out = run_rustgraph(&["--path", &base, "find", "feech_deta", "--json", "-o", &out_arg]);
+    let out = run_rustgraph(&[
+        "--path",
+        &base,
+        "find",
+        "feech_deta",
+        "--json",
+        "-o",
+        &out_arg,
+    ]);
     assert!(out.status.success(), "stderr: {}", stderr_of(&out));
     let contents = fs::read_to_string(&out_path)
         .expect("--json -o on the relaxed fallback must write the output file");
@@ -179,35 +198,35 @@ fn find_auto_relax_json_writes_output_file() {
     );
 }
 
-
 #[test]
 fn find_auto_relax_skips_when_threshold_explicit() {
     let dir = tempdir().unwrap();
-    write_file(
-        &dir.path().join("src/lib.rs"),
-        "pub fn fetch_data() {}\n",
-    );
+    write_file(&dir.path().join("src/lib.rs"), "pub fn fetch_data() {}\n");
     let base = dir.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "--path", &base, "--search-threshold", "0.95", "find", "feech_deta",
+        "--path",
+        &base,
+        "--search-threshold",
+        "0.95",
+        "find",
+        "feech_deta",
     ]);
     let stderr = stderr_of(&out);
     assert!(
         !stderr.contains("relaxed to 0.7"),
         "auto-relax should NOT fire when threshold != 0.85; got: {stderr}"
     );
-    assert!(!out.status.success(), "expected non-zero exit for genuine no-match");
+    assert!(
+        !out.status.success(),
+        "expected non-zero exit for genuine no-match"
+    );
 }
-
 
 #[test]
 fn find_auto_relax_skips_short_query() {
     let dir = tempdir().unwrap();
-    write_file(
-        &dir.path().join("src/lib.rs"),
-        "pub fn run_event() {}\n",
-    );
+    write_file(&dir.path().join("src/lib.rs"), "pub fn run_event() {}\n");
     let base = dir.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&["--path", &base, "find", "xyz"]);
@@ -218,27 +237,29 @@ fn find_auto_relax_skips_short_query() {
     );
 }
 
-
 #[test]
 fn find_auto_relax_respects_selection_filter() {
     let dir = tempdir().unwrap();
     write_file(
         &dir.path().join("src/lib.rs"),
-
-
         "pub struct FetchData;\npub fn unrelated() {}\n",
     );
     let base = dir.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "feech_data", "--func"]);
 
-    assert!(!out.status.success(), "expected non-zero: only struct candidate filtered by --func");
+    assert!(
+        !out.status.success(),
+        "expected non-zero: only struct candidate filtered by --func"
+    );
     let stderr = stderr_of(&out);
 
     if stderr.contains("relaxed to 0.7") {
-        assert!(!out.status.success(), "auto-relax with 0 fn candidates after filter must exit non-zero");
+        assert!(
+            !out.status.success(),
+            "auto-relax with 0 fn candidates after filter must exit non-zero"
+        );
     }
 }
-
 
 #[test]
 fn grep_unwrap_paren_pattern_is_valid() {
@@ -255,11 +276,17 @@ pub fn bar() {}
     let base = dir.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&["--path", &base, "grep", r"\.unwrap\(\)"]);
-    assert!(out.status.success(), r"\.unwrap\(\) should be valid pattern; stderr: {}", stderr_of(&out));
+    assert!(
+        out.status.success(),
+        r"\.unwrap\(\) should be valid pattern; stderr: {}",
+        stderr_of(&out)
+    );
     let stdout = stdout_of(&out);
-    assert!(stdout.contains("unwrap"), "expected match on unwrap(); got: {stdout}");
+    assert!(
+        stdout.contains("unwrap"),
+        "expected match on unwrap(); got: {stdout}"
+    );
 }
-
 
 #[test]
 fn grep_unwrap_word_boundary_pattern_is_valid() {
@@ -275,16 +302,18 @@ pub fn bar() {}
     );
     let base = dir.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "grep", r"\.unwrap\b"]);
-    assert!(out.status.success(), r"\.unwrap\b should be valid; stderr: {}", stderr_of(&out));
+    assert!(
+        out.status.success(),
+        r"\.unwrap\b should be valid; stderr: {}",
+        stderr_of(&out)
+    );
     let stdout = stdout_of(&out);
     assert!(stdout.contains("unwrap"), "expected match; got: {stdout}");
 }
 
-
 #[test]
 fn callers_ambiguity_shows_preview_for_2_matches() {
     let dir = tempdir().unwrap();
-
 
     write_file(
         &dir.path().join("src/alpha.rs"),
@@ -297,24 +326,37 @@ fn callers_ambiguity_shows_preview_for_2_matches() {
     let base = dir.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "--path", &base, "callers", "run_cli", "--ambiguity-cap", "1",
+        "--path",
+        &base,
+        "callers",
+        "run_cli",
+        "--ambiguity-cap",
+        "1",
     ]);
     assert!(!out.status.success(), "expected non-zero (ambiguous)");
     let stderr = stderr_of(&out);
 
-    assert!(stderr.contains("| "), "expected body preview lines (| prefix); got: {stderr}");
+    assert!(
+        stderr.contains("| "),
+        "expected body preview lines (| prefix); got: {stderr}"
+    );
 
-    assert!(stderr.contains("symbol ids as the target"), "expected symbol-id target hints; got: {stderr}");
+    assert!(
+        stderr.contains("symbol ids as the target"),
+        "expected symbol-id target hints; got: {stderr}"
+    );
 
-    assert!(stderr.contains("ambiguous: 2"), "expected 'ambiguous: 2' header; got: {stderr}");
+    assert!(
+        stderr.contains("ambiguous: 2"),
+        "expected 'ambiguous: 2' header; got: {stderr}"
+    );
 }
-
 
 #[test]
 fn callers_ambiguity_no_preview_when_many_matches() {
     let dir = tempdir().unwrap();
 
-    for (i, letter) in ["a","b","c","d","e","f"].iter().enumerate() {
+    for (i, letter) in ["a", "b", "c", "d", "e", "f"].iter().enumerate() {
         write_file(
             &dir.path().join(format!("src/{letter}.rs")),
             &format!("pub fn shared_fn() -> u{i}  {{ 0 }}\n"),
@@ -323,16 +365,26 @@ fn callers_ambiguity_no_preview_when_many_matches() {
     let base = dir.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "--path", &base, "callers", "shared_fn", "--ambiguity-cap", "1",
+        "--path",
+        &base,
+        "callers",
+        "shared_fn",
+        "--ambiguity-cap",
+        "1",
     ]);
     assert!(!out.status.success(), "expected non-zero (ambiguous)");
     let stderr = stderr_of(&out);
 
-    assert!(!stderr.contains("| "), "expected no preview when >5 matches; got: {stderr}");
+    assert!(
+        !stderr.contains("| "),
+        "expected no preview when >5 matches; got: {stderr}"
+    );
 
-    assert!(stderr.contains("symbol ids as the target"), "expected candidate list; got: {stderr}");
+    assert!(
+        stderr.contains("symbol ids as the target"),
+        "expected candidate list; got: {stderr}"
+    );
 }
-
 
 #[test]
 fn ensemble_ambiguity_shows_preview_for_2_matches() {
@@ -347,10 +399,21 @@ fn ensemble_ambiguity_shows_preview_for_2_matches() {
     );
     let base = dir.path().to_string_lossy().to_string();
     let out = run_rustgraph(&[
-        "--path", &base, "ensemble", "dispatch", "--ambiguity-cap", "1",
+        "--path",
+        &base,
+        "ensemble",
+        "dispatch",
+        "--ambiguity-cap",
+        "1",
     ]);
     assert!(!out.status.success(), "expected non-zero (ambiguous)");
     let stderr = stderr_of(&out);
-    assert!(stderr.contains("| "), "expected body preview (| prefix) for ensemble; got: {stderr}");
-    assert!(stderr.contains("symbol ids as the target"), "expected symbol-id target hints; got: {stderr}");
+    assert!(
+        stderr.contains("| "),
+        "expected body preview (| prefix) for ensemble; got: {stderr}"
+    );
+    assert!(
+        stderr.contains("symbol ids as the target"),
+        "expected symbol-id target hints; got: {stderr}"
+    );
 }

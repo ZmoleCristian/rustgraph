@@ -180,8 +180,7 @@ mod tests {
     #[test]
     fn classify_io_boundaries_classifies_role_source_when_more_source_keywords() {
         let f = func("parse_input", "fn parse_input() {}");
-        let signals =
-            classify_io_boundaries_for_function("id", &f, &["read_data".to_string()]);
+        let signals = classify_io_boundaries_for_function("id", &f, &["read_data".to_string()]);
         if !signals.is_empty() {
             assert_eq!(signals[0].role, "source");
         }
@@ -199,7 +198,6 @@ mod tests {
 
     #[test]
     fn classify_io_boundaries_caps_evidence_length() {
-
         let outgoing = vec![
             "http".to_string(),
             "request".to_string(),

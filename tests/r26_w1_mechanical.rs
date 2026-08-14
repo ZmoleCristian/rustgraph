@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 fn paths_between_fixture_n_paths(n: usize) -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -43,10 +43,8 @@ fn paths_between_fixture_n_paths(n: usize) -> tempfile::TempDir {
     dir
 }
 
-
 #[test]
 fn fix1_header_shows_truncation_indicator_when_cap_hit() {
-
     let fixture = paths_between_fixture_n_paths(12);
     let base = fixture.path().to_string_lossy().to_string();
 
@@ -58,7 +56,6 @@ fn fix1_header_shows_truncation_indicator_when_cap_hit() {
     );
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("search clamped"),
         "R26-W1+R27 Fix 1: header must contain 'search clamped' when cap fires; got:\n{stdout}"
@@ -69,13 +66,20 @@ fn fix1_header_shows_truncation_indicator_when_cap_hit() {
     );
 }
 
-
 #[test]
 fn fix1_unlimited_max_results_shows_clean_count() {
     let fixture = paths_between_fixture_n_paths(12);
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&["-p", &base, "paths-between", "start", "end", "--max-results", "0"]);
+    let out = run_rustgraph(&[
+        "-p",
+        &base,
+        "paths-between",
+        "start",
+        "end",
+        "--max-results",
+        "0",
+    ]);
     assert!(
         out.status.success(),
         "paths-between --max-results 0 should succeed; stderr:\n{}",
@@ -94,10 +98,8 @@ fn fix1_unlimited_max_results_shows_clean_count() {
     );
 }
 
-
 #[test]
 fn fix1_under_cap_shows_clean_count() {
-
     let fixture = paths_between_fixture_n_paths(2);
     let base = fixture.path().to_string_lossy().to_string();
 
@@ -119,27 +121,18 @@ fn fix1_under_cap_shows_clean_count() {
     );
 }
 
-
 fn ambiguous_fn_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
 
-    write_file(
-        &dir.path().join("src/alpha.rs"),
-        "pub fn common() {}\n",
-    );
-    write_file(
-        &dir.path().join("src/beta.rs"),
-        "pub fn common() {}\n",
-    );
+    write_file(&dir.path().join("src/alpha.rs"), "pub fn common() {}\n");
+    write_file(&dir.path().join("src/beta.rs"), "pub fn common() {}\n");
     dir
 }
-
 
 #[test]
 fn fix2_ambiguity_candidate_lines_are_copy_pasteable() {
     let fixture = ambiguous_fn_fixture();
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["-p", &base, "callers", "common", "--ambiguity-cap", "1"]);
     assert!(
@@ -188,7 +181,6 @@ fn fix2_ambiguity_candidate_lines_are_copy_pasteable() {
     }
 }
 
-
 fn grep_fixture_with_test_and_non_test() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
@@ -211,14 +203,18 @@ mod tests {
     dir
 }
 
-
 #[test]
 fn fix3_by_file_exclude_tests_no_function_summary_header() {
     let fixture = grep_fixture_with_test_and_non_test();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "grep", "target", "--by-file", "--exclude-tests",
+        "-p",
+        &base,
+        "grep",
+        "target",
+        "--by-file",
+        "--exclude-tests",
     ]);
     assert!(
         out.status.success(),
@@ -233,15 +229,12 @@ fn fix3_by_file_exclude_tests_no_function_summary_header() {
     );
 }
 
-
 #[test]
 fn fix3_by_function_still_emits_function_summary() {
     let fixture = grep_fixture_with_test_and_non_test();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "-p", &base, "grep", "target", "--by-function",
-    ]);
+    let out = run_rustgraph(&["-p", &base, "grep", "target", "--by-function"]);
     assert!(
         out.status.success(),
         "grep --by-function should succeed; stderr:\n{}",
@@ -253,7 +246,6 @@ fn fix3_by_function_still_emits_function_summary() {
         "Fix 3 sanity: --by-function must still emit the function summary header; got:\n{stdout}"
     );
 }
-
 
 fn target_in_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
@@ -268,14 +260,20 @@ fn target_in_fixture() -> tempfile::TempDir {
     dir
 }
 
-
 #[test]
 fn fix4_target_in_before_cap_check_succeeds_when_narrowed() {
     let fixture = target_in_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "callers", "common", "--target-in", "keep", "--ambiguity-cap", "1",
+        "-p",
+        &base,
+        "callers",
+        "common",
+        "--target-in",
+        "keep",
+        "--ambiguity-cap",
+        "1",
     ]);
     assert!(
         out.status.success(),
@@ -295,15 +293,20 @@ fn fix4_target_in_before_cap_check_succeeds_when_narrowed() {
     );
 }
 
-
 #[test]
 fn fix4_target_in_that_leaves_too_many_still_errors() {
     let fixture = target_in_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let out = run_rustgraph(&[
-        "-p", &base, "callers", "common", "--target-in", "src", "--ambiguity-cap", "1",
+        "-p",
+        &base,
+        "callers",
+        "common",
+        "--target-in",
+        "src",
+        "--ambiguity-cap",
+        "1",
     ]);
     assert!(
         !out.status.success(),

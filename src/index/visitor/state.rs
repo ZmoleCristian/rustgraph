@@ -71,7 +71,6 @@ impl CodeVisitor {
         }
     }
 
-
     /// Combine inherited module-level `cfg` predicates with the item's own predicates.
     pub(crate) fn effective_cfg_attrs(&self, own: Vec<String>) -> Vec<String> {
         let mut combined = self.mod_cfg_stack.clone();
@@ -187,10 +186,7 @@ mod tests {
         let span = item.span();
         v.record_call_site("foo".to_string(), "foo".to_string(), "function", span);
         assert_eq!(v.call_sites.len(), 1);
-        assert_eq!(
-            v.call_sites[0].caller_id.as_deref(),
-            Some("file:1:caller")
-        );
+        assert_eq!(v.call_sites[0].caller_id.as_deref(), Some("file:1:caller"));
         assert_eq!(v.function_calls["file:1:caller"], vec!["foo"]);
     }
 

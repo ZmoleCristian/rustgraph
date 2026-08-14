@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -30,7 +28,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 #[test]
 fn fix1_find_exact_block_renders_above_fuzzy_block() {
@@ -82,13 +79,11 @@ pub fn session_resume() -> Session { Session { id: 0 } }
     );
 }
 
-
 #[test]
 fn fix1_find_omits_banners_when_only_one_partition_present() {
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
-
         "pub fn widget_render() {}\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
@@ -112,7 +107,6 @@ fn fix1_find_omits_banners_when_only_one_partition_present() {
         "expected widget_render in output; got:\n{stdout}"
     );
 
-
     let fixture2 = tempdir().expect("tempdir");
     write_file(
         &fixture2.path().join("src/lib.rs"),
@@ -135,7 +129,6 @@ fn fix1_find_omits_banners_when_only_one_partition_present() {
         "single-block (only fuzzy) should suppress fuzzy banner; got:\n{stdout2}"
     );
 }
-
 
 #[test]
 fn fix1_find_json_partitions_into_exact_and_fuzzy_per_kind() {
@@ -190,11 +183,9 @@ pub fn session_save() {}
         "expected 2 fuzzy fn matches (session_load + session_save); got: {fns_fuzzy:#?}"
     );
 
-
     let structs = json["structs"].as_array().expect("structs (legacy) array");
     assert_eq!(structs.len(), structs_exact.len() + structs_fuzzy.len());
 }
-
 
 #[test]
 fn fix2_find_exact_with_pipe_or_returns_each_alt() {
@@ -229,7 +220,6 @@ pub fn unrelated() {}
     );
 }
 
-
 #[test]
 fn fix3_find_exact_header_omits_threshold_annotation() {
     let fixture = tempdir().expect("tempdir");
@@ -255,7 +245,6 @@ fn fix3_find_exact_header_omits_threshold_annotation() {
     );
 }
 
-
 #[test]
 fn fix3_find_exact_no_match_error_omits_threshold() {
     let fixture = tempdir().expect("tempdir");
@@ -277,7 +266,6 @@ fn fix3_find_exact_no_match_error_omits_threshold() {
         "no-match in --exact should reference `exact mode`; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix4_def_same_kind_ambiguity_suggests_in_and_symbol_id() {
@@ -321,7 +309,6 @@ fn fix4_def_same_kind_ambiguity_suggests_in_and_symbol_id() {
     );
 }
 
-
 #[test]
 fn fix4_def_mixed_kind_ambiguity_keeps_kind_filter_hint() {
     let fixture = tempdir().expect("tempdir");
@@ -342,7 +329,6 @@ fn fix4_def_mixed_kind_ambiguity_keeps_kind_filter_hint() {
         "mixed-kind ambiguity must keep the --func/--struct/--enum hint; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix5_paths_between_header_reflects_to_module_substring() {
@@ -385,7 +371,6 @@ pub fn handle_request() {
         !stdout.contains("→ ''"),
         "header must not contain the bug-shape `→ ''`; got:\n{stdout}"
     );
-
 
     assert!(
         stdout.contains("module:src/foo"),

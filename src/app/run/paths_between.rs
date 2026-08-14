@@ -7,8 +7,7 @@ use super::super::project::ProjectData;
 use super::switchboard::write_string_output;
 use crate::cli::Args;
 use crate::index::qualifier::{
-    candidate_matches_qualifier, qualifier_for_callee, resolve_callee_candidates,
-    ResolutionStats,
+    ResolutionStats, candidate_matches_qualifier, qualifier_for_callee, resolve_callee_candidates,
 };
 use crate::{FunctionInfo, function_id};
 
@@ -31,7 +30,6 @@ pub fn run(
 
     let mut from_ids = resolve_query(&request.from, project);
 
-
     let mut to_ids: Vec<String> = if !request.to.is_empty() {
         resolve_query(&request.to, project)
     } else {
@@ -53,7 +51,6 @@ pub fn run(
         }
     }
 
-
     if let Some(needle) = &request.in_path {
         from_ids.retain(|id| by_id.get(id).is_some_and(|f| f.file_path.contains(needle)));
         to_ids.retain(|id| by_id.get(id).is_some_and(|f| f.file_path.contains(needle)));
@@ -73,8 +70,6 @@ pub fn run(
         .into());
     }
     if to_ids.is_empty() {
-
-
         if let Some(module_substr) = &request.to_module
             && request.to.is_empty()
         {
@@ -111,15 +106,12 @@ pub fn run(
         request.depth
     };
 
-
     let cap_is_unlimited = request.max_results == 0;
     let max_paths = if cap_is_unlimited {
         usize::MAX
     } else {
-
         request.max_results + 1
     };
-
 
     let mut resolution_stats = ResolutionStats::default();
     let strict_only = args.strict_resolution;
@@ -148,17 +140,14 @@ pub fn run(
         }
     }
 
-
     let bfs_clamped = !cap_is_unlimited && paths.len() == request.max_results + 1;
 
     paths = dedup_preserve_order(paths);
-
 
     let cap_hit = bfs_clamped || (!cap_is_unlimited && paths.len() > request.max_results);
     if !cap_is_unlimited && paths.len() > request.max_results {
         paths.truncate(request.max_results);
     }
-
 
     let call_site_index: HashMap<(String, String), usize> = if request.show_call_sites {
         let mut m: HashMap<(String, String), usize> = HashMap::new();
@@ -194,7 +183,6 @@ pub fn run(
         })
         .collect();
 
-
     let to_display = compose_to_display(&request.to, request.to_module.as_deref());
     let mut report = PathsReport {
         from: request.from.clone(),
@@ -214,8 +202,6 @@ pub fn run(
     };
 
     if report.paths.is_empty() {
-
-
         let from_set: HashSet<String> = from_ids.iter().cloned().collect();
         let reverse_path_cap = if args.json { 3 } else { 1 };
         let mut reverse_paths: Vec<Vec<String>> = Vec::new();
@@ -243,8 +229,6 @@ pub fn run(
         }
         let reverse_has_path = !reverse_paths.is_empty();
         if reverse_has_path {
-
-
             let to_label_for_revcmd = if request.to.is_empty() {
                 to_display.as_str()
             } else {
@@ -254,7 +238,6 @@ pub fn run(
                 "no path from '{}' to '{}' within --depth={}; reverse direction has path(s) — try `rustgraph paths-between {} {}`",
                 request.from, to_display, request.depth, to_label_for_revcmd, request.from
             );
-
 
             if args.json {
                 reverse_paths.truncate(3);
@@ -287,7 +270,6 @@ pub fn run(
         write_string_output(args.output.as_deref(), &render_text(&report))?;
     }
 
-
     resolution_stats.emit_stderr_note();
 
     Ok(())
@@ -306,7 +288,6 @@ fn dfs(
     max_depth: usize,
     max_paths: usize,
 
-
     strict_only: bool,
     stats: &mut ResolutionStats,
 ) {
@@ -324,13 +305,10 @@ fn dfs(
         return;
     };
     for callee_name in callees {
-
-
         let bare = callee_name
             .rsplit(|c: char| c == '.' || c == ':')
             .next()
             .unwrap_or(callee_name.as_str());
-
 
         let (filtered, mode) = resolve_callee_candidates(callee_name, bare, by_name, strict_only);
         stats.record(mode);
@@ -343,7 +321,20 @@ fn dfs(
                 continue;
             }
             stack.push(id.clone());
-            dfs(&id, to_set, call_map, by_name, by_id, stack, visited, out, max_depth, max_paths, strict_only, stats);
+            dfs(
+                &id,
+                to_set,
+                call_map,
+                by_name,
+                by_id,
+                stack,
+                visited,
+                out,
+                max_depth,
+                max_paths,
+                strict_only,
+                stats,
+            );
             stack.pop();
             visited.remove(&id);
             if out.len() >= max_paths {
@@ -381,7 +372,6 @@ fn resolve_query(query: &str, project: &ProjectData) -> Vec<String> {
             return hits;
         }
     }
-
 
     if let Some(qualifier) = qualifier_for_callee(trimmed) {
         let bare = trimmed
@@ -429,7 +419,6 @@ fn node_view(f: &FunctionInfo) -> NodeView {
     }
 }
 
-
 fn compose_to_display(to: &str, to_module: Option<&str>) -> String {
     if !to.is_empty() {
         return to.to_string();
@@ -447,17 +436,14 @@ struct PathsReport {
     from: String,
     to: String,
 
-
     #[serde(skip)]
     to_display: String,
     from_resolved: Vec<NodeView>,
     to_resolved: Vec<NodeView>,
     paths: Vec<Vec<NodeView>>,
 
-
     #[serde(skip)]
     cap_hit: bool,
-
 
     #[serde(skip_serializing_if = "Option::is_none")]
     reverse_suggestion: Option<Vec<Vec<NodeView>>>,
@@ -465,7 +451,6 @@ struct PathsReport {
 
 fn render_text(report: &PathsReport) -> String {
     let mut out = String::new();
-
 
     let path_count_label = if report.cap_hit {
         format!(
@@ -477,9 +462,7 @@ fn render_text(report: &PathsReport) -> String {
     };
     out.push_str(&format!(
         "rustgraph paths-between '{}' → '{}'  [{}]\n",
-        report.from,
-        report.to_display,
-        path_count_label
+        report.from, report.to_display, path_count_label
     ));
     if report.paths.is_empty() {
         return out;

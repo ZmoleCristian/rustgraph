@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -26,7 +27,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 fn write_members_fixture(dir: &tempfile::TempDir) -> String {
     write_file(
@@ -52,7 +52,6 @@ fn write_members_fixture(dir: &tempfile::TempDir) -> String {
     dir.path().to_string_lossy().to_string()
 }
 
-
 #[test]
 fn members_struct_lists_three_field_sections_with_counts_and_sites() {
     let fixture = tempdir().expect("tempdir");
@@ -66,18 +65,15 @@ fn members_struct_lists_three_field_sections_with_counts_and_sites() {
     );
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("members 'Foo'") && stdout.contains("3 field(s)"),
         "expected header `members 'Foo': 3 field(s)`; got:\n{stdout}"
     );
 
-
     assert!(
         stdout.contains("x:") && stdout.contains("y:") && stdout.contains("z:"),
         "expected x/y/z field sections; got:\n{stdout}"
     );
-
 
     assert!(
         stdout.contains("x: 3 access"),
@@ -94,7 +90,6 @@ fn members_struct_lists_three_field_sections_with_counts_and_sites() {
         "expected `z: 3 access(es)`; got:\n{stdout}"
     );
 
-
     assert!(
         stdout.contains("usage/mod.rs"),
         "expected sites in usage/mod.rs; got:\n{stdout}"
@@ -104,7 +99,6 @@ fn members_struct_lists_three_field_sections_with_counts_and_sites() {
         "expected field-access source fragments; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn members_in_filter_restricts_sites_to_matching_paths() {
@@ -118,7 +112,6 @@ fn members_in_filter_restricts_sites_to_matching_paths() {
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-
 
     assert!(
         stdout.contains("usage/mod.rs"),
@@ -134,7 +127,6 @@ fn members_in_filter_restricts_sites_to_matching_paths() {
     );
 }
 
-
 #[test]
 fn members_max_results_caps_each_field_section_independently() {
     let fixture = tempdir().expect("tempdir");
@@ -148,7 +140,6 @@ fn members_max_results_caps_each_field_section_independently() {
     );
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("showing 1 of 3"),
         "expected `(showing 1 of 3; ...)` for x and z; got:\n{stdout}"
@@ -157,7 +148,6 @@ fn members_max_results_caps_each_field_section_independently() {
         stdout.contains("use --max-results to expand"),
         "expected --max-results hint; got:\n{stdout}"
     );
-
 
     assert!(
         stdout.contains("x: 3 access"),
@@ -168,7 +158,6 @@ fn members_max_results_caps_each_field_section_independently() {
         "header count should still show full 3; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn members_json_returns_structured_envelope() {
@@ -204,7 +193,6 @@ fn members_json_returns_structured_envelope() {
     let fields = v["fields"].as_array().expect("fields should be an array");
     assert_eq!(fields.len(), 3, "expected 3 field entries");
 
-
     let x_field = fields
         .iter()
         .find(|f| f["name"].as_str() == Some("x"))
@@ -224,14 +212,12 @@ fn members_json_returns_structured_envelope() {
         .expect("z field present");
     assert_eq!(z_field["access_count"].as_u64(), Some(3));
 
-
     let site = &x_field["sites"][0];
     assert!(site["file_path"].is_string());
     assert!(site["line"].is_u64());
     assert!(site["col"].is_u64());
     assert!(site["line_text"].is_string());
 }
-
 
 #[test]
 fn members_on_enum_errors_with_redirect_to_refs_kind_variant() {
@@ -259,12 +245,10 @@ fn members_on_enum_errors_with_redirect_to_refs_kind_variant() {
     );
 }
 
-
 #[test]
 fn members_on_nonexistent_struct_suggests_similar_names() {
     let fixture = tempdir().expect("tempdir");
     let base = write_members_fixture(&fixture);
-
 
     let out = run_rustgraph(&["-p", &base, "members", "Fooz"]);
     assert!(
@@ -285,7 +269,6 @@ fn members_on_nonexistent_struct_suggests_similar_names() {
 
 #[test]
 fn members_on_nonexistent_unrelated_name_errors_without_did_you_mean() {
-
     let fixture = tempdir().expect("tempdir");
     let base = write_members_fixture(&fixture);
 
@@ -303,12 +286,10 @@ fn members_on_nonexistent_unrelated_name_errors_without_did_you_mean() {
     );
 }
 
-
 #[test]
 fn bonus_refs_type_kind_field_zero_hits_suggests_members() {
     let fixture = tempdir().expect("tempdir");
     let base = write_members_fixture(&fixture);
-
 
     let out = run_rustgraph(&["-p", &base, "refs", "Foo", "--kind", "field"]);
     assert!(
@@ -329,12 +310,17 @@ fn bonus_refs_type_kind_field_zero_hits_suggests_members() {
 
 #[test]
 fn bonus_refs_unknown_name_kind_field_omits_members_hint() {
-
-
     let fixture = tempdir().expect("tempdir");
     let base = write_members_fixture(&fixture);
 
-    let out = run_rustgraph(&["-p", &base, "refs", "WhollyUnknownName123", "--kind", "field"]);
+    let out = run_rustgraph(&[
+        "-p",
+        &base,
+        "refs",
+        "WhollyUnknownName123",
+        "--kind",
+        "field",
+    ]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
     let stderr = stderr_of(&out);
     assert!(
@@ -350,8 +336,6 @@ fn bonus_refs_unknown_name_kind_field_omits_members_hint() {
 
 #[test]
 fn bonus_refs_enum_kind_field_omits_members_hint() {
-
-
     let fixture = tempdir().expect("tempdir");
     let base = write_members_fixture(&fixture);
 
@@ -364,11 +348,8 @@ fn bonus_refs_enum_kind_field_omits_members_hint() {
     );
 }
 
-
 #[test]
 fn anti_oscillation_refs_kind_field_on_field_name_still_works() {
-
-
     let fixture = tempdir().expect("tempdir");
     let base = write_members_fixture(&fixture);
 
@@ -384,8 +365,6 @@ fn anti_oscillation_refs_kind_field_on_field_name_still_works() {
 
 #[test]
 fn anti_oscillation_refs_assoc_call_runtime_hint_still_works() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -407,7 +386,6 @@ fn anti_oscillation_refs_assoc_call_runtime_hint_still_works() {
         "R24-W3 qualifier suggestion should still fire; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn members_appears_in_top_level_help_cheat_sheet() {

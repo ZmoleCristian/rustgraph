@@ -10,7 +10,6 @@ use crate::cli::Args;
 
 use super::switchboard::write_string_output;
 
-
 /// Resolved numeric limits that control how much data `build_function_ensemble` fetches.
 ///
 /// Derived from an `EnsemblePreset` (`Quick` / `Balanced` / `Deep`) and not exposed directly in
@@ -38,8 +37,6 @@ pub fn run(
     request: EnsembleRequest,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(kind) = exact_non_function_kind(&request.query, project) {
-
-
         let article = if kind == "enum" { "an" } else { "a" };
         return Err(format!(
             "'{}' is {} {}, not a function. Try `rustgraph refs {}` or `rustgraph usages {}` to find references.",
@@ -58,7 +55,6 @@ pub fn run(
 
     let config = resolve_config(request.preset);
     let sections = if !request.sections.is_empty() {
-
         request
             .sections
             .iter()
@@ -109,7 +105,9 @@ pub fn run(
 
     if let Some(needle) = &request.target_in {
         let before = ensemble.matches.len();
-        ensemble.matches.retain(|m| m.info.file_path.contains(needle));
+        ensemble
+            .matches
+            .retain(|m| m.info.file_path.contains(needle));
         if ensemble.matches.is_empty() && before > 0 {
             eprintln!(
                 "hint: --target-in '{}' filtered out all {} match(es); try a shorter substring",
@@ -119,8 +117,6 @@ pub fn run(
     }
 
     if args.exclude_tests {
-
-
         let test_ids: std::collections::HashSet<String> = project
             .functions
             .iter()
@@ -140,14 +136,17 @@ pub fn run(
             n.upstream_total = n.upstream.len();
             n.downstream_total = n.downstream.len();
 
-            m.call_sites
-                .retain(|cs| !cs.caller_name.as_ref().is_some_and(|n| test_names.contains(n)));
+            m.call_sites.retain(|cs| {
+                !cs.caller_name
+                    .as_ref()
+                    .is_some_and(|n| test_names.contains(n))
+            });
             m.call_sites_total = m.call_sites.len();
 
-            m.io_boundaries.retain(|b| !test_names.contains(&b.function_name));
+            m.io_boundaries
+                .retain(|b| !test_names.contains(&b.function_name));
         }
     }
-
 
     if request.no_boundaries {
         for m in ensemble.matches.iter_mut() {
@@ -161,8 +160,9 @@ pub fn run(
     }
 
     if ensemble.matches.is_empty() {
-
-        if let Some(hint) = super::callers::type_redirect_hint(project, &request.query, args.search_threshold) {
+        if let Some(hint) =
+            super::callers::type_redirect_hint(project, &request.query, args.search_threshold)
+        {
             return Err(hint.into());
         }
         return Err(format!(
@@ -171,7 +171,6 @@ pub fn run(
         )
         .into());
     } else if ensemble.matches.len() > request.ambiguity_cap && !request.all {
-
         let n = ensemble.matches.len();
         let mut msg = format!(
             "ambiguous: {} matches for '{}'. Disambiguate by re-running with one of these symbol ids as the target:",
@@ -181,7 +180,12 @@ pub fn run(
             let sym_id = format!("{}:{}:{}", m.info.file_path, m.info.start_line, m.info.name);
             msg.push_str(&format!("\n  {}", sym_id));
             if n <= 5 {
-                let preview = super::callers::read_body_preview_pub(&args.path, &m.info.file_path, m.info.start_line, 3);
+                let preview = super::callers::read_body_preview_pub(
+                    &args.path,
+                    &m.info.file_path,
+                    m.info.start_line,
+                    3,
+                );
                 for line in &preview {
                     msg.push_str(&format!("\n    | {}", line));
                 }
@@ -201,7 +205,10 @@ pub fn run(
             ensemble.matches.len()
         );
         for m in &ensemble.matches {
-            eprintln!("  - {}:{} {}", m.info.file_path, m.info.start_line, m.info.name);
+            eprintln!(
+                "  - {}:{} {}",
+                m.info.file_path, m.info.start_line, m.info.name
+            );
         }
     }
 
@@ -211,10 +218,11 @@ pub fn run(
         let payload = serde_json::to_string_pretty(&value)?;
         write_string_output(args.output.as_deref(), &payload)?;
     } else {
-
-
         let is_default_summary = request.sections.is_empty()
-            && matches!(request.view.unwrap_or(EnsembleView::Summary), EnsembleView::Summary);
+            && matches!(
+                request.view.unwrap_or(EnsembleView::Summary),
+                EnsembleView::Summary
+            );
         if let Some(hint) = section_override_hint(&request.sections) {
             print!("{}", hint);
         } else if request.view.is_none() {
@@ -281,11 +289,7 @@ fn resolve_config(preset: Option<EnsemblePreset>) -> EnsembleConfig {
 }
 
 fn resolve_sections(view: Option<EnsembleView>) -> Vec<String> {
-
-
     match view.unwrap_or(EnsembleView::Summary) {
-
-
         EnsembleView::Summary => vec![
             "structs".to_string(),
             "call-sites".to_string(),
@@ -303,7 +307,6 @@ fn resolve_sections(view: Option<EnsembleView>) -> Vec<String> {
     }
 }
 
-
 fn summary_view_footer(sections: &[String]) -> Option<String> {
     let normalized: Vec<String> = sections
         .iter()
@@ -311,12 +314,17 @@ fn summary_view_footer(sections: &[String]) -> Option<String> {
         .filter(|s| !s.is_empty())
         .collect();
 
-
     if normalized.iter().any(|s| s == "all") || normalized.is_empty() {
         return None;
     }
     let has = |name: &str| normalized.iter().any(|s| s == name);
-    let optional = ["code", "lifecycle", "neighborhood", "boundaries", "dataflow"];
+    let optional = [
+        "code",
+        "lifecycle",
+        "neighborhood",
+        "boundaries",
+        "dataflow",
+    ];
     let all_present = optional.iter().all(|name| has(name));
     if all_present {
         return None;
@@ -341,7 +349,6 @@ fn summary_view_footer(sections: &[String]) -> Option<String> {
         tips.join(", ")
     ))
 }
-
 
 fn section_override_hint(raw_sections: &[String]) -> Option<String> {
     if raw_sections.is_empty() {

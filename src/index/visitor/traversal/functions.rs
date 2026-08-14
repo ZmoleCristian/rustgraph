@@ -205,7 +205,10 @@ mod tests {
         visit_item_trait(&mut visitor, &item_trait);
         assert_eq!(visitor.functions.len(), 1);
         assert_eq!(visitor.functions[0].kind, "trait_fn(MyTrait)");
-        assert!(!visitor.functions[0].is_pub, "trait fn is_pub is always false in this code");
+        assert!(
+            !visitor.functions[0].is_pub,
+            "trait fn is_pub is always false in this code"
+        );
     }
 
     #[test]

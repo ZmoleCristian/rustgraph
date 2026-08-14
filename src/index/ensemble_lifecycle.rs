@@ -508,8 +508,9 @@ mod tests {
         let mut outgoing: HashMap<String, Vec<String>> = HashMap::new();
         outgoing.insert("a".into(), vec!["b".into()]);
         outgoing.insert("b".into(), vec!["c".into()]);
-        let end_set: HashSet<String> =
-            ["a".to_string(), "b".to_string(), "c".to_string()].into_iter().collect();
+        let end_set: HashSet<String> = ["a".to_string(), "b".to_string(), "c".to_string()]
+            .into_iter()
+            .collect();
 
         let search = LifecyclePathSearch {
             outgoing: &outgoing,
@@ -574,8 +575,9 @@ mod tests {
         function_by_id.insert("b3".into(), &b3);
         let mut outgoing: HashMap<String, Vec<String>> = HashMap::new();
         outgoing.insert("a".into(), vec!["b1".into(), "b2".into(), "b3".into()]);
-        let end_set: HashSet<String> =
-            ["b1".to_string(), "b2".to_string(), "b3".to_string()].into_iter().collect();
+        let end_set: HashSet<String> = ["b1".to_string(), "b2".to_string(), "b3".to_string()]
+            .into_iter()
+            .collect();
         let search = LifecyclePathSearch {
             outgoing: &outgoing,
             end_set: &end_set,
@@ -598,9 +600,8 @@ mod tests {
         // iterative loop only walks a manageable prefix and emits one path.
         let n = 10_000usize;
         let funcs: Vec<FunctionInfo> = (0..n).map(|i| make_func(&format!("n{i}"))).collect();
-        let function_by_id: HashMap<String, &FunctionInfo> = (0..n)
-            .map(|i| (format!("n{i}"), &funcs[i]))
-            .collect();
+        let function_by_id: HashMap<String, &FunctionInfo> =
+            (0..n).map(|i| (format!("n{i}"), &funcs[i])).collect();
         let outgoing: HashMap<String, Vec<String>> = (0..n - 1)
             .map(|i| (format!("n{i}"), vec![format!("n{}", i + 1)]))
             .collect();
@@ -619,7 +620,11 @@ mod tests {
         let mut paths = Vec::new();
         let mut truncated = false;
         search.dfs("n0", &mut current, &mut paths, &mut truncated);
-        assert_eq!(paths.len(), 1, "expected exactly one path within max_paths cap");
+        assert_eq!(
+            paths.len(),
+            1,
+            "expected exactly one path within max_paths cap"
+        );
         assert!(current.is_empty(), "current path must be fully drained");
     }
 

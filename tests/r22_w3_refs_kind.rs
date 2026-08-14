@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,7 +15,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -27,7 +28,6 @@ fn stdout_of(out: &Output) -> String {
 fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
-
 
 fn build_fixture() -> TempDir {
     let dir = tempdir().expect("tempdir");
@@ -84,7 +84,6 @@ fn refs_kinds(out: &Output) -> Vec<String> {
         .collect()
 }
 
-
 #[test]
 fn refs_no_kind_filter_returns_multiple_kinds() {
     let dir = build_fixture();
@@ -100,14 +99,19 @@ fn refs_no_kind_filter_returns_multiple_kinds() {
     assert!(!kinds.is_empty(), "expected refs hits; got none");
 
     let unique: std::collections::HashSet<&str> = kinds.iter().map(String::as_str).collect();
-    assert!(unique.contains("field"), "expected `field` kind in: {kinds:?}");
-    assert!(unique.contains("path"), "expected `path` kind in: {kinds:?}");
+    assert!(
+        unique.contains("field"),
+        "expected `field` kind in: {kinds:?}"
+    );
+    assert!(
+        unique.contains("path"),
+        "expected `path` kind in: {kinds:?}"
+    );
     assert!(
         unique.len() >= 2,
         "expected multiple kinds (no filter); got: {unique:?}"
     );
 }
-
 
 #[test]
 fn refs_kind_field_filters_to_only_fields() {
@@ -127,7 +131,6 @@ fn refs_kind_field_filters_to_only_fields() {
         "expected only `field` kind; got: {kinds:?}"
     );
 }
-
 
 #[test]
 fn refs_kind_multi_value_unions_allowed_kinds() {
@@ -153,7 +156,6 @@ fn refs_kind_multi_value_unions_allowed_kinds() {
         "expected only field/path; got: {kinds:?}"
     );
 }
-
 
 #[test]
 fn refs_kind_invalid_value_errors_with_possible_values() {
@@ -181,7 +183,6 @@ fn refs_kind_invalid_value_errors_with_possible_values() {
     }
 }
 
-
 #[test]
 fn refs_kind_filter_applies_to_json_output() {
     let dir = build_fixture();
@@ -206,7 +207,6 @@ fn refs_kind_filter_applies_to_json_output() {
         );
     }
 }
-
 
 #[test]
 fn refs_audit_all_four_priority_kinds_fire_on_fixture() {
@@ -235,7 +235,6 @@ fn refs_audit_all_four_priority_kinds_fire_on_fixture() {
     }
 }
 
-
 #[test]
 fn refs_kind_variant_filters_enum_variants_only() {
     let dir = build_fixture();
@@ -255,14 +254,19 @@ fn refs_kind_variant_filters_enum_variants_only() {
     );
 }
 
-
 #[test]
 fn refs_kind_assoc_call_filters_struct_assoc_fns_only() {
     let dir = build_fixture();
     let path = dir.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "--path", &path, "refs", "StructHost", "--kind", "assoc_call", "-j",
+        "--path",
+        &path,
+        "refs",
+        "StructHost",
+        "--kind",
+        "assoc_call",
+        "-j",
     ]);
     assert!(
         out.status.success(),
@@ -276,7 +280,6 @@ fn refs_kind_assoc_call_filters_struct_assoc_fns_only() {
         "expected only `assoc_call` kind; got: {kinds:?}"
     );
 }
-
 
 #[test]
 fn refs_help_lists_all_priority_kinds() {

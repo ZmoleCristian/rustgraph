@@ -65,8 +65,6 @@ mod tests {
 
     #[test]
     fn colorize_type_preserves_underlying_text() {
-
-
         for variant in [
             "Result<()>",
             "Option<u32>",
@@ -109,7 +107,6 @@ mod tests {
 
     #[test]
     fn colorize_parameter_handles_multiple_colons_via_type_only() {
-
         let out = colorize_parameter("a::b::C");
         assert_eq!(strip_ansi(&out).trim(), "a::b::C");
     }

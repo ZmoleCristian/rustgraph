@@ -54,7 +54,6 @@ pub(crate) fn collect_hits(
         m
     };
 
-
     let project_enum_names: HashSet<String> =
         project.enums.iter().map(|e| e.name.clone()).collect();
     let project_struct_names: HashSet<String> =
@@ -117,9 +116,7 @@ pub(crate) fn collect_hits(
             .then(a.col.cmp(&b.col))
             .then(kind_priority(a.kind).cmp(&kind_priority(b.kind)))
     });
-    hits.dedup_by(|a, b| {
-        a.file_path == b.file_path && a.line == b.line && a.col == b.col
-    });
+    hits.dedup_by(|a, b| a.file_path == b.file_path && a.line == b.line && a.col == b.col);
     hits
 }
 
@@ -145,13 +142,11 @@ pub fn run(
         let project_struct_names: HashSet<String> =
             project.structs.iter().map(|s| s.name.clone()).collect();
 
-
         let mut notes: Vec<String> = Vec::new();
         notes.push(format!(
             "no references found for ident '{}' (kinds={:?}); check spelling or kind filter",
             request.ident, request.kind
         ));
-
 
         if request.kind.is_empty()
             && request
@@ -190,12 +185,10 @@ pub fn run(
             }
         }
 
-
         let kinds_set: HashSet<&str> = request.kind.iter().map(|s| s.as_str()).collect();
         let want_assoc = kinds_set.contains("assoc_call");
         let want_variant = kinds_set.contains("variant");
         let want_field = kinds_set.contains("field");
-
 
         if want_field && project_struct_names.contains(&request.ident) {
             notes.push(format!(
@@ -208,7 +201,6 @@ pub fn run(
             let mut suggestions: Vec<(String, &'static str)> = Vec::new();
 
             if want_variant {
-
                 for enum_info in &project.enums {
                     if enum_info.variants.iter().any(|v| v.name == request.ident) {
                         suggestions.push((enum_info.name.clone(), "variant"));
@@ -217,8 +209,6 @@ pub fn run(
             }
 
             if want_assoc {
-
-
                 let needle = format!("::{}", request.ident);
                 let mut found_types: HashSet<String> = HashSet::new();
                 let known: HashSet<&str> = project
@@ -247,8 +237,6 @@ pub fn run(
                             .rev()
                             .collect();
                         if !qual.is_empty() && known.contains(qual.as_str()) {
-
-
                             let end = abs + needle.len();
                             let next_ok = content[end..]
                                 .chars()
@@ -271,7 +259,6 @@ pub fn run(
             }
 
             if !suggestions.is_empty() {
-
                 let mut seen: HashSet<(String, &'static str)> = HashSet::new();
                 let suggestions: Vec<_> = suggestions
                     .into_iter()
@@ -302,7 +289,6 @@ pub fn run(
             }
         }
 
-
         for n in &notes {
             eprintln!("{}", n);
         }
@@ -313,14 +299,14 @@ pub fn run(
         }
     }
 
-
     if let Some(ranges) = changed {
-        hits.retain(|h| match (h.enclosing_function_start, h.enclosing_function_end) {
-            (Some(start), Some(end)) => fn_was_changed(&h.file_path, start, end, ranges),
-            _ => false,
-        });
+        hits.retain(
+            |h| match (h.enclosing_function_start, h.enclosing_function_end) {
+                (Some(start), Some(end)) => fn_was_changed(&h.file_path, start, end, ranges),
+                _ => false,
+            },
+        );
     }
-
 
     let total_hits = hits.len();
     let cap = if request.max_results == 0 {
@@ -341,7 +327,6 @@ pub fn run(
             struct ByFnGroup<'a> {
                 enclosing_function: Option<&'a str>,
                 enclosing_function_start: Option<usize>,
-
 
                 is_test: bool,
                 count: usize,
@@ -396,8 +381,6 @@ pub fn run(
             super::switchboard::write_string_output(args.output.as_deref(), &payload)?;
         }
     } else {
-
-
         let scoped_files: usize = match &request.in_path {
             Some(needle) => project
                 .rust_files
@@ -408,20 +391,20 @@ pub fn run(
         };
         let mut out = format!(
             "rustgraph refs '{}' across {} file(s): {} reference(s)\n",
-            request.ident,
-            scoped_files,
-            total_hits
+            request.ident, scoped_files, total_hits
         );
         if request.by_function {
             let mut groups: HashMap<Option<String>, Vec<&RefHit>> = HashMap::new();
             for h in &display_hits {
-                groups.entry(h.enclosing_function.clone()).or_default().push(h);
+                groups
+                    .entry(h.enclosing_function.clone())
+                    .or_default()
+                    .push(h);
             }
             let mut entries: Vec<(Option<String>, Vec<&RefHit>)> = groups.into_iter().collect();
             entries.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
             for (name, hs) in entries {
                 let label = name.as_deref().unwrap_or("<top-level>");
-
 
                 let test_tag = if hs.iter().any(|h| h.enclosing_function_is_test) {
                     " [test]"
@@ -481,7 +464,6 @@ pub(crate) struct RefHit {
     pub(crate) enclosing_function_start: Option<usize>,
     pub(crate) enclosing_function_end: Option<usize>,
 
-
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub(crate) enclosing_function_is_test: bool,
 }
@@ -495,9 +477,7 @@ struct RefsVisitor<'a> {
     hits: &'a mut Vec<RefHit>,
     content_lines: Vec<String>,
 
-
     project_enum_names: &'a HashSet<String>,
-
 
     project_struct_names: &'a HashSet<String>,
 }
@@ -535,7 +515,6 @@ impl<'a> RefsVisitor<'a> {
             .unwrap_or(false)
     }
 
-
     fn matches_as_qualifier(&self, path: &syn::Path) -> bool {
         let segs = &path.segments;
         if segs.len() < 2 {
@@ -543,7 +522,6 @@ impl<'a> RefsVisitor<'a> {
         }
         segs[segs.len() - 2].ident == self.ident
     }
-
 
     fn classify_qualifier(&self, path: &syn::Path) -> &'static str {
         let parent_ident = match path.segments.iter().rev().nth(1) {
@@ -558,7 +536,6 @@ impl<'a> RefsVisitor<'a> {
             "path"
         }
     }
-
 
     /// Last-resort macro coverage: when a macro body parses as neither an expr list nor a
     /// statement list, walk its raw token stream and record bare ident matches as kind
@@ -642,8 +619,6 @@ impl<'ast> Visit<'ast> for RefsVisitor<'_> {
         if self.matches_path(&node.path) {
             self.record(node.path.span(), "struct");
         } else if self.matches_as_qualifier(&node.path) {
-
-
             self.record(node.path.span(), self.classify_qualifier(&node.path));
         }
         syn::visit::visit_expr_struct(self, node);
@@ -655,8 +630,8 @@ impl<'ast> Visit<'ast> for RefsVisitor<'_> {
     // token scan tagged `macro` so a reference inside a macro is NEVER silently lost.
     fn visit_macro(&mut self, node: &'ast syn::Macro) {
         use syn::punctuated::Punctuated;
-        if let Ok(exprs) = node
-            .parse_body_with(Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated)
+        if let Ok(exprs) =
+            node.parse_body_with(Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated)
         {
             for e in &exprs {
                 Visit::visit_expr(self, e);
@@ -700,10 +675,7 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
-    fn run_cmd(
-        path: &Path,
-        request: RefsRequest,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    fn run_cmd(path: &Path, request: RefsRequest) -> Result<String, Box<dyn std::error::Error>> {
         use crate::cli::Args;
         use clap::Parser;
         let path_arg = path.to_string_lossy().to_string();

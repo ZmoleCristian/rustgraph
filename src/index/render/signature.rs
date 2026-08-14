@@ -29,7 +29,11 @@ pub fn format_type_decl_signature(decl: &TypeDeclInfo, use_color: bool) -> Strin
         signature_parts.push("pub".bright_green().bold().to_string());
     }
 
-    let keyword = if decl.kind == "trait" { "trait" } else { "type" };
+    let keyword = if decl.kind == "trait" {
+        "trait"
+    } else {
+        "type"
+    };
     signature_parts.push(keyword.bright_blue().bold().to_string());
     signature_parts.push(decl.name.bright_yellow().bold().underline().to_string());
 
@@ -76,7 +80,14 @@ pub fn format_const_signature(const_info: &ConstInfo, use_color: bool) -> String
         "const"
     };
     signature_parts.push(keyword.bright_magenta().bold().to_string());
-    signature_parts.push(const_info.name.bright_yellow().bold().underline().to_string());
+    signature_parts.push(
+        const_info
+            .name
+            .bright_yellow()
+            .bold()
+            .underline()
+            .to_string(),
+    );
     signature_parts.push(format!(": {}", colorize_type(&const_info.ty)));
 
     format!(

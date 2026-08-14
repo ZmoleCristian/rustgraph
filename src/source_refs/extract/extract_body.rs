@@ -128,6 +128,5 @@ mod tests {
         let body = extract_call_args_body(&l, 0, 4).expect("body");
         assert!(body.contains("a"));
         assert!(body.contains("b"));
-
     }
 }

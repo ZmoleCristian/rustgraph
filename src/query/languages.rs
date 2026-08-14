@@ -381,7 +381,6 @@ fn count_code_lines(content: &str, language: &str) -> usize {
                         }
                     }
 
-
                     break;
                 }
 
@@ -523,7 +522,10 @@ mod tests {
 
     #[test]
     fn language_for_path_recognises_dockerfile_by_name() {
-        assert_eq!(language_for_path(Path::new("Dockerfile")), Some("dockerfile"));
+        assert_eq!(
+            language_for_path(Path::new("Dockerfile")),
+            Some("dockerfile")
+        );
     }
 
     #[test]

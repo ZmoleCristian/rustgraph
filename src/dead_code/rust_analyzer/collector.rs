@@ -118,7 +118,11 @@ mod tests {
     fn is_test_reference_recognizes_test_paths() {
         let mut cache: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
         assert!(is_test_reference("/repo/tests/x.rs", 1, &mut cache));
-        assert!(is_test_reference("/repo/src/parser/tests.rs", 1, &mut cache));
+        assert!(is_test_reference(
+            "/repo/src/parser/tests.rs",
+            1,
+            &mut cache
+        ));
         assert!(!is_test_reference("/repo/src/lib.rs", 1, &mut cache));
     }
 

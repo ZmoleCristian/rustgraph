@@ -176,8 +176,6 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     if !args.no_auto_path && args.path == std::path::PathBuf::from(".") {
         if let Some(detected) = find_crate_root_from_cwd() {
-
-
             let cwd = std::env::current_dir().ok();
             let is_silent = cwd.as_ref().is_some_and(|c| {
                 std::fs::canonicalize(c).ok() == std::fs::canonicalize(&detected).ok()
@@ -211,10 +209,8 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
     let mut project = ProjectData::load(&args.path, args.include_ignored);
 
     for extra in &args.also {
-        let extra_canon =
-            std::fs::canonicalize(extra).unwrap_or_else(|_| extra.clone());
-        let primary_canon =
-            std::fs::canonicalize(&args.path).unwrap_or_else(|_| args.path.clone());
+        let extra_canon = std::fs::canonicalize(extra).unwrap_or_else(|_| extra.clone());
+        let primary_canon = std::fs::canonicalize(&args.path).unwrap_or_else(|_| args.path.clone());
         if extra_canon == primary_canon {
             eprintln!("--also '{}': same as -p root, skipped", extra.display());
             continue;
@@ -260,7 +256,6 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     crate::index::set_root_hint(args.path.clone());
 
-
     if !matches!(
         mode,
         ExecutionMode::Ensemble(_) | ExecutionMode::Callers(_) | ExecutionMode::CallGraph { .. }
@@ -272,7 +267,6 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
             args.match_signature,
         );
     }
-
 
     let changed_ranges = if args.changed {
         let git_ref = args
@@ -316,15 +310,15 @@ mod tests {
         // would mis-split on the drive-letter colon, producing
         // ("C", "/Users/.../foo.rs:42:bar") and silently breaking every call
         // graph lookup on Windows. `rsplit_once` is OS-agnostic.
-        let parts = split_function_id(r"C:\Users\me\proj\src\foo.rs:42:bar")
-            .expect("split should succeed");
+        let parts =
+            split_function_id(r"C:\Users\me\proj\src\foo.rs:42:bar").expect("split should succeed");
         assert_eq!(parts, (r"C:\Users\me\proj\src\foo.rs", "42", "bar"));
     }
 
     #[test]
     fn split_function_id_windows_absolute_forward_slashes() {
-        let parts = split_function_id("C:/Users/me/proj/src/foo.rs:42:bar")
-            .expect("split should succeed");
+        let parts =
+            split_function_id("C:/Users/me/proj/src/foo.rs:42:bar").expect("split should succeed");
         assert_eq!(parts, ("C:/Users/me/proj/src/foo.rs", "42", "bar"));
     }
 

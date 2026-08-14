@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -27,7 +28,6 @@ fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
 
-
 fn unwrap_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
@@ -37,7 +37,6 @@ fn unwrap_fixture() -> tempfile::TempDir {
     dir
 }
 
-
 fn no_match_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
@@ -46,7 +45,6 @@ fn no_match_fixture() -> tempfile::TempDir {
     );
     dir
 }
-
 
 #[test]
 fn fix1_paren_warning_suppressed_when_matches_found() {
@@ -61,7 +59,6 @@ fn fix1_paren_warning_suppressed_when_matches_found() {
         stderr_of(&out)
     );
 
-
     let stdout = stdout_of(&out);
     assert!(
         stdout.contains("unwrap()"),
@@ -71,7 +68,6 @@ fn fix1_paren_warning_suppressed_when_matches_found() {
         stdout.contains("2 match"),
         "expected 2 matches in headline; got:\n{stdout}"
     );
-
 
     let stderr = stderr_of(&out);
     assert!(
@@ -88,12 +84,10 @@ fn fix1_paren_warning_suppressed_when_matches_found() {
     );
 }
 
-
 #[test]
 fn fix1_paren_warning_fires_when_zero_matches() {
     let fixture = no_match_fixture();
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["-p", &base, "grep", r"\.\(broken\)"]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
@@ -110,13 +104,11 @@ fn fix1_paren_warning_fires_when_zero_matches() {
         "expected `note:` + `Rust regex uses bare (...)` text; got stderr:\n{stderr}"
     );
 
-
     assert!(
         stderr.contains("'\\.(broken)'"),
         "expected suggested `\\.(broken)` (only paren backslashes stripped) in stderr; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix1_pipe_warning_still_fires_with_matches() {
@@ -130,13 +122,11 @@ fn fix1_pipe_warning_still_fires_with_matches() {
     let out = run_rustgraph(&["-p", &base, "grep", r"Foo\|Bar"]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
 
-
     let stdout = stdout_of(&out);
     assert!(
         stdout.contains("Foo|Bar"),
         "expected literal `Foo|Bar` to match; got stdout:\n{stdout}"
     );
-
 
     let stderr = stderr_of(&out);
     assert!(
@@ -145,12 +135,10 @@ fn fix1_pipe_warning_still_fires_with_matches() {
     );
 }
 
-
 #[test]
 fn fix1_paren_warning_emitted_on_compile_fail() {
     let fixture = no_match_fixture();
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["-p", &base, "grep", "[invalid"]);
     assert!(
@@ -169,7 +157,6 @@ fn fix1_paren_warning_emitted_on_compile_fail() {
         "no paren escapes → no paren warning; got:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix1_pipe_warning_keeps_loud_banner() {
@@ -190,7 +177,6 @@ fn fix1_pipe_warning_keeps_loud_banner() {
     );
 }
 
-
 fn zorblax_sig_only_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
@@ -200,7 +186,6 @@ fn zorblax_sig_only_fixture() -> tempfile::TempDir {
     dir
 }
 
-
 fn no_zorblax_fixture() -> tempfile::TempDir {
     let dir = tempdir().expect("tempdir");
     write_file(
@@ -209,7 +194,6 @@ fn no_zorblax_fixture() -> tempfile::TempDir {
     );
     dir
 }
-
 
 #[test]
 fn fix2_find_match_signature_returns_sig_hit_with_visibility_note() {
@@ -224,13 +208,11 @@ fn fix2_find_match_signature_returns_sig_hit_with_visibility_note() {
         stderr_of(&out)
     );
 
-
     let stdout = stdout_of(&out);
     assert!(
         stdout.contains("handler") && stdout.contains("[sig]"),
         "expected sig hit `handler [sig]`; got stdout:\n{stdout}"
     );
-
 
     let stderr = stderr_of(&out);
     assert!(
@@ -246,7 +228,6 @@ fn fix2_find_match_signature_returns_sig_hit_with_visibility_note() {
         "expected `1 signature/path matches` count in note; got stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix2_find_match_signature_genuine_no_match_exits_one() {
@@ -272,14 +253,18 @@ fn fix2_find_match_signature_genuine_no_match_exits_one() {
     );
 }
 
-
 #[test]
 fn fix2_visibility_note_pins_all_sig_format() {
     let fixture = zorblax_sig_only_fixture();
     let base = fixture.path().to_string_lossy().to_string();
 
     let out = run_rustgraph(&[
-        "-p", &base, "--match-signature", "find", "Zorblax", "--func",
+        "-p",
+        &base,
+        "--match-signature",
+        "find",
+        "Zorblax",
+        "--func",
     ]);
     assert!(out.status.success(), "stderr={}", stderr_of(&out));
     let stderr = stderr_of(&out);
@@ -293,10 +278,8 @@ fn fix2_visibility_note_pins_all_sig_format() {
     );
 }
 
-
 #[test]
 fn fix2_visibility_note_mixed_emits_additive_breakdown() {
-
     let dir = tempdir().expect("tempdir");
     write_file(
         &dir.path().join("src/lib.rs"),
@@ -313,7 +296,6 @@ fn fix2_visibility_note_mixed_emits_additive_breakdown() {
         "expected both [name] (struct) and [sig] (fn) tags in mixed result set; got stdout:\n{stdout}"
     );
 
-
     let stderr = stderr_of(&out);
     assert!(
         stderr.contains("1 name + 1 sig/path matches"),
@@ -324,19 +306,16 @@ fn fix2_visibility_note_mixed_emits_additive_breakdown() {
         "R26-W2 additive note must credit --match-signature; got stderr:\n{stderr}"
     );
 
-
     assert!(
         !stderr.contains("0 name matches; showing"),
         "OLD-format `0 name matches; showing` must not fire when name hits exist; got stderr:\n{stderr}"
     );
 }
 
-
 #[test]
 fn fix2_visibility_note_suppressed_in_default_mode() {
     let fixture = zorblax_sig_only_fixture();
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["-p", &base, "find", "Zorblax"]);
     assert!(
@@ -351,7 +330,6 @@ fn fix2_visibility_note_suppressed_in_default_mode() {
         "visibility note keyed on --match-signature; default mode stays quiet; got stderr:\n{stderr}"
     );
 }
-
 
 #[test]
 fn fix2_sig_tag_still_renders_alongside_visibility_note() {

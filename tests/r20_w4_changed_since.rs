@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -26,7 +24,6 @@ fn git(cwd: &Path, args: &[&str]) -> Output {
     let out = Command::new("git")
         .args(args)
         .current_dir(cwd)
-
         .env("GIT_AUTHOR_NAME", "test")
         .env("GIT_AUTHOR_EMAIL", "test@example.com")
         .env("GIT_COMMITTER_NAME", "test")
@@ -44,7 +41,6 @@ fn git(cwd: &Path, args: &[&str]) -> Output {
     out
 }
 
-
 fn init_repo(path: &Path) {
     git(path, &["init", "-q", "--initial-branch=main"]);
     git(path, &["config", "user.email", "test@example.com"]);
@@ -57,7 +53,6 @@ fn commit_all(path: &Path, msg: &str) {
     git(path, &["commit", "-q", "-m", msg, "--no-verify"]);
 }
 
-
 #[test]
 fn regression_changed_filters_find_to_modified_fns() {
     let fixture = tempdir().expect("tempdir");
@@ -69,13 +64,11 @@ fn regression_changed_filters_find_to_modified_fns() {
     );
     commit_all(root, "initial");
 
-
     write_file(
         &root.join("src/lib.rs"),
         "pub fn a() {\n    println!(\"v2\");\n    println!(\"another\");\n}\npub fn b() { println!(\"b\"); }\n",
     );
     commit_all(root, "touch a");
-
 
     let out = run_rustgraph_in(
         root,
@@ -121,7 +114,6 @@ fn regression_changed_filters_find_to_modified_fns() {
     );
 }
 
-
 #[test]
 fn regression_changed_filters_callers_to_modified_callers() {
     let fixture = tempdir().expect("tempdir");
@@ -136,7 +128,6 @@ pub fn caller_b() { target(); }
 "#,
     );
     commit_all(root, "initial");
-
 
     write_file(
         &root.join("src/lib.rs"),
@@ -175,12 +166,7 @@ pub fn caller_b() { target(); }
         panic!("expected valid json; got: {} (err: {})", stdout, e);
     });
     let matches = v["matches"].as_array().expect("matches array");
-    assert_eq!(
-        matches.len(),
-        1,
-        "expected 1 target match; got: {}",
-        stdout
-    );
+    assert_eq!(matches.len(), 1, "expected 1 target match; got: {}", stdout);
     let empty = Vec::new();
     let caller_names: Vec<&str> = matches[0]["callers"]
         .as_array()
@@ -200,23 +186,18 @@ pub fn caller_b() { target(); }
     );
 }
 
-
 #[test]
 fn regression_changed_default_since_is_head_minus_one() {
     let fixture = tempdir().expect("tempdir");
     let root = fixture.path();
     init_repo(root);
-    write_file(
-        &root.join("src/lib.rs"),
-        "pub fn first_commit_fn() {}\n",
-    );
+    write_file(&root.join("src/lib.rs"), "pub fn first_commit_fn() {}\n");
     commit_all(root, "initial");
     write_file(
         &root.join("src/lib.rs"),
         "pub fn first_commit_fn() {}\npub fn second_commit_fn() {}\n",
     );
     commit_all(root, "add second_commit_fn");
-
 
     let out = run_rustgraph_in(
         root,
@@ -258,13 +239,11 @@ fn regression_changed_default_since_is_head_minus_one() {
     );
 }
 
-
 #[test]
 fn regression_changed_errors_in_non_git_dir() {
     let fixture = tempdir().expect("tempdir");
     let root = fixture.path();
     write_file(&root.join("src/lib.rs"), "pub fn alone() {}\n");
-
 
     let out = run_rustgraph_in(
         root,
@@ -293,7 +272,6 @@ fn regression_changed_errors_in_non_git_dir() {
     );
 }
 
-
 #[test]
 fn regression_changed_with_zero_changes_returns_empty() {
     let fixture = tempdir().expect("tempdir");
@@ -301,7 +279,6 @@ fn regression_changed_with_zero_changes_returns_empty() {
     init_repo(root);
     write_file(&root.join("src/lib.rs"), "pub fn x() {}\n");
     commit_all(root, "initial");
-
 
     let out = run_rustgraph_in(
         root,
@@ -337,7 +314,6 @@ fn regression_changed_with_zero_changes_returns_empty() {
     );
 }
 
-
 #[test]
 fn regression_changed_filters_dead_code_to_modified_dead_fns() {
     let fixture = tempdir().expect("tempdir");
@@ -352,7 +328,6 @@ fn caller() { used(); }
 "#,
     );
     commit_all(root, "initial");
-
 
     write_file(
         &root.join("src/lib.rs"),

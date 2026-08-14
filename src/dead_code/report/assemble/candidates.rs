@@ -175,6 +175,9 @@ mod tests {
         ];
         let ctx = build_candidate_context(&funcs);
         let names: Vec<_> = ctx.candidates.iter().map(|f| f.name.clone()).collect();
-        assert_eq!(names, vec!["a".to_string(), "m".to_string(), "z".to_string()]);
+        assert_eq!(
+            names,
+            vec!["a".to_string(), "m".to_string(), "z".to_string()]
+        );
     }
 }

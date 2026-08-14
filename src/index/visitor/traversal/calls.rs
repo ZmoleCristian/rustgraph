@@ -1,5 +1,6 @@
 use super::super::calls::extract_macro_path;
 use super::super::{CodeVisitor, extract_call_target_from_call};
+use proc_macro2::{Delimiter, TokenTree};
 use syn::spanned::Spanned;
 use syn::{Expr, ExprCall, ExprMacro, ExprMethodCall, ItemMacro};
 
@@ -41,6 +42,47 @@ pub fn visit_item_macro(visitor: &mut CodeVisitor, macro_call: &ItemMacro) {
     let (full, base) = extract_macro_path(&macro_call.mac);
     visitor.record_call_site(full, base, "macro", macro_call.span());
     syn::visit::visit_item_macro(visitor, macro_call);
+}
+
+/// Record `ident(...)` shapes inside a macro's token stream as call edges.
+///
+/// Macro bodies are opaque to the AST walk — calls made inside `tokio::select!`
+/// arms or `sqlx::query!` arguments produced no edge at all, so a function
+/// invoked only from a macro body reported zero callers. Wired at the leaf
+/// [`syn::visit::Visit::visit_macro`], which every macro position (expression,
+/// statement, item, local initializer) funnels through. Tokens are a
+/// heuristic, not resolved calls: uppercase idents are skipped (`Some(..)` and
+/// friends are constructors, not calls), a `name!(..)` shape is excluded by
+/// the ident-group adjacency rule, and sites carry the `macro_token` kind so
+/// consumers can tell a guessed edge from a resolved one.
+pub(super) fn record_macro_token_calls(visitor: &mut CodeVisitor, mac: &syn::Macro) {
+    record_token_calls(visitor, mac.tokens.clone());
+}
+
+fn record_token_calls(visitor: &mut CodeVisitor, stream: proc_macro2::TokenStream) {
+    let trees: Vec<TokenTree> = stream.into_iter().collect();
+    for tree in &trees {
+        if let TokenTree::Group(group) = tree {
+            record_token_calls(visitor, group.stream());
+        }
+    }
+    for pair in trees.windows(2) {
+        let [TokenTree::Ident(ident), TokenTree::Group(group)] = pair else {
+            continue;
+        };
+        if group.delimiter() != Delimiter::Parenthesis {
+            continue;
+        }
+        let name = ident.to_string();
+        let starts_lower = name
+            .chars()
+            .next()
+            .is_some_and(|first| first.is_lowercase());
+        if !starts_lower {
+            continue;
+        }
+        visitor.record_call_site(name.clone(), name, "macro_token", ident.span());
+    }
 }
 
 #[cfg(test)]
@@ -89,7 +131,10 @@ mod tests {
         let m: ExprMacro = parse_quote! { println!("hi") };
         visit_expr_macro(&mut visitor, &m);
 
-        let cs = visitor.call_sites.iter().find(|cs| cs.callee_base == "println!");
+        let cs = visitor
+            .call_sites
+            .iter()
+            .find(|cs| cs.callee_base == "println!");
         assert!(cs.is_some());
         assert_eq!(cs.unwrap().call_kind, "macro");
     }
@@ -99,7 +144,10 @@ mod tests {
         let mut visitor = CodeVisitor::new("file.rs".to_string());
         let im: ItemMacro = parse_quote! { entrypoint!(process_instruction); };
         visit_item_macro(&mut visitor, &im);
-        let cs = visitor.call_sites.iter().find(|cs| cs.callee_base == "entrypoint!");
+        let cs = visitor
+            .call_sites
+            .iter()
+            .find(|cs| cs.callee_base == "entrypoint!");
         assert!(cs.is_some());
     }
 

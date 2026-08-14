@@ -5,7 +5,6 @@
 
 use super::{ConstInfo, EnumInfo, FunctionInfo, StructInfo, TypeDeclInfo};
 
-
 /// Which field of a symbol record caused it to match a query.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -27,7 +26,6 @@ impl MatchKind {
             MatchKind::Path => "[path]",
         }
     }
-
 
     /// Lower-case string identifier (e.g. `"name"`, `"sig"`, `"path"`).
     pub fn as_str(self) -> &'static str {
@@ -119,7 +117,6 @@ pub fn fuzzy_similarity(query: &str, target: &str) -> f64 {
     1.0 - (distance as f64 / max_len as f64)
 }
 
-
 /// Return the threshold that should actually be applied given `query`.
 ///
 /// Short single-term queries (≤ 3 characters) are clamped to `1.0` to prevent
@@ -134,7 +131,11 @@ pub fn effective_threshold(query: &str, requested_threshold: f64) -> f64 {
         .filter(|s| !s.is_empty())
         .collect();
     let short_query = !multi_term && alts.iter().any(|a| a.len() <= 3);
-    if short_query { 1.0_f64.max(requested_threshold) } else { requested_threshold }
+    if short_query {
+        1.0_f64.max(requested_threshold)
+    } else {
+        requested_threshold
+    }
 }
 
 /// Search functions, structs, enums, consts, and trait/alias decls by name using fuzzy matching.
@@ -149,10 +150,24 @@ pub fn search_items(
     type_decls: &[TypeDeclInfo],
     search_terms: &str,
     threshold: f64,
-) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>, Vec<ConstInfo>, Vec<TypeDeclInfo>) {
-    search_items_with_options(functions, structs, enums, consts, type_decls, search_terms, threshold, false)
+) -> (
+    Vec<FunctionInfo>,
+    Vec<StructInfo>,
+    Vec<EnumInfo>,
+    Vec<ConstInfo>,
+    Vec<TypeDeclInfo>,
+) {
+    search_items_with_options(
+        functions,
+        structs,
+        enums,
+        consts,
+        type_decls,
+        search_terms,
+        threshold,
+        false,
+    )
 }
-
 
 /// Like [`search_items`] with an additional `match_signature` flag.
 ///
@@ -167,7 +182,13 @@ pub fn search_items_with_options(
     search_terms: &str,
     threshold: f64,
     match_signature: bool,
-) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>, Vec<ConstInfo>, Vec<TypeDeclInfo>) {
+) -> (
+    Vec<FunctionInfo>,
+    Vec<StructInfo>,
+    Vec<EnumInfo>,
+    Vec<ConstInfo>,
+    Vec<TypeDeclInfo>,
+) {
     let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) = search_items_full(
         functions,
         structs,
@@ -187,7 +208,6 @@ pub fn search_items_with_options(
         type_decls_out.into_iter().map(|(t, _)| t).collect(),
     )
 }
-
 
 /// Like [`search_items_with_options`] but returns each item paired with its [`MatchKind`].
 pub fn search_items_with_kinds(
@@ -219,7 +239,6 @@ pub fn search_items_with_kinds(
     );
     (fns, structs_out, enums_out, consts_out, type_decls_out)
 }
-
 
 /// Like [`search_items_with_kinds`] but also returns a `bool` indicating whether a
 /// threshold fallback was triggered (i.e. the effective threshold was relaxed).
@@ -253,7 +272,6 @@ pub fn search_items_with_kinds_and_fallback(
     )
 }
 
-
 /// Exact case-insensitive name search: only items whose lowercased name equals a search term.
 pub fn search_items_exact(
     functions: &[FunctionInfo],
@@ -262,9 +280,24 @@ pub fn search_items_exact(
     consts: &[ConstInfo],
     type_decls: &[TypeDeclInfo],
     search_terms: &str,
-) -> (Vec<FunctionInfo>, Vec<StructInfo>, Vec<EnumInfo>, Vec<ConstInfo>, Vec<TypeDeclInfo>) {
-    let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) =
-        search_items_full(functions, structs, enums, consts, type_decls, search_terms, 1.0, false, true);
+) -> (
+    Vec<FunctionInfo>,
+    Vec<StructInfo>,
+    Vec<EnumInfo>,
+    Vec<ConstInfo>,
+    Vec<TypeDeclInfo>,
+) {
+    let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) = search_items_full(
+        functions,
+        structs,
+        enums,
+        consts,
+        type_decls,
+        search_terms,
+        1.0,
+        false,
+        true,
+    );
     (
         fns.into_iter().map(|(f, _)| f).collect(),
         structs_out.into_iter().map(|(s, _)| s).collect(),
@@ -273,7 +306,6 @@ pub fn search_items_exact(
         type_decls_out.into_iter().map(|(t, _)| t).collect(),
     )
 }
-
 
 /// Like [`search_items_exact`] but returns each item paired with its [`MatchKind`].
 pub fn search_items_exact_with_kinds(
@@ -290,11 +322,19 @@ pub fn search_items_exact_with_kinds(
     Vec<(ConstInfo, MatchKind)>,
     Vec<(TypeDeclInfo, MatchKind)>,
 ) {
-    let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) =
-        search_items_full(functions, structs, enums, consts, type_decls, search_terms, 1.0, false, true);
+    let (fns, structs_out, enums_out, consts_out, type_decls_out, _fallback) = search_items_full(
+        functions,
+        structs,
+        enums,
+        consts,
+        type_decls,
+        search_terms,
+        1.0,
+        false,
+        true,
+    );
     (fns, structs_out, enums_out, consts_out, type_decls_out)
 }
-
 
 fn search_items_full(
     functions: &[FunctionInfo],
@@ -319,7 +359,6 @@ fn search_items_full(
         .map(|s| s.trim().to_lowercase())
         .filter(|s| !s.is_empty())
         .collect();
-
 
     let mut fallback_fired = false;
     let fns = match_kind(
@@ -388,7 +427,6 @@ fn search_items_full(
         |t| t.start_line,
     );
 
-
     let any_hits = !fns.is_empty()
         || !structs_out.is_empty()
         || !enums_out.is_empty()
@@ -396,7 +434,14 @@ fn search_items_full(
         || !type_decls_out.is_empty();
     let fallback = fallback_fired && any_hits;
 
-    (fns, structs_out, enums_out, consts_out, type_decls_out, fallback)
+    (
+        fns,
+        structs_out,
+        enums_out,
+        consts_out,
+        type_decls_out,
+        fallback,
+    )
 }
 
 fn match_kind<T: Clone>(
@@ -412,8 +457,6 @@ fn match_kind<T: Clone>(
     path_of: impl Fn(&T) -> &str,
     start_line_of: impl Fn(&T) -> usize,
 ) -> Vec<(T, MatchKind)> {
-
-
     if exact_only {
         return items
             .iter()
@@ -425,7 +468,6 @@ fn match_kind<T: Clone>(
             .map(|it| (it, MatchKind::Name))
             .collect();
     }
-
 
     let effective_threshold = effective_threshold(full_query, threshold);
     let mut scored: Vec<(f64, T)> = items
@@ -439,7 +481,6 @@ fn match_kind<T: Clone>(
             best.map(|score| (score, it.clone()))
         })
         .collect();
-
 
     if scored.is_empty() && effective_threshold > threshold {
         let rescued: Vec<(f64, T)> = items
@@ -461,7 +502,6 @@ fn match_kind<T: Clone>(
     let mut name_results: Vec<(T, MatchKind)> = if !scored.is_empty() {
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
 
-
         let multi_term = terms.len() > 1;
         if !multi_term && scored.first().map(|(s, _)| *s) == Some(1.0) {
             scored
@@ -481,7 +521,6 @@ fn match_kind<T: Clone>(
     if !match_signature {
         return name_results;
     }
-
 
     let mut seen: std::collections::HashSet<(String, String, usize)> = name_results
         .iter()
@@ -515,7 +554,6 @@ fn match_kind<T: Clone>(
     name_results
 }
 
-
 /// Score `query` against a symbol `name` and return the score if it meets `threshold`.
 ///
 /// Priority order: exact match (1.0) > prefix match (≥ 0.95) > substring match (≥ 0.85)
@@ -536,7 +574,11 @@ pub fn name_score(query: &str, name: &str, threshold: f64) -> Option<f64> {
     } else {
         fuzzy_similarity(&q, &n)
     };
-    if score >= threshold { Some(score) } else { None }
+    if score >= threshold {
+        Some(score)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -615,7 +657,6 @@ mod tests {
     fn edit_distance_supports_unicode_chars() {
         assert_eq!(edit_distance("café", "cafe"), 1);
     }
-
 
     /// Reference 2D Levenshtein implementation, used only by the
     /// rolling-row parity test below.
@@ -721,7 +762,8 @@ mod tests {
             func("beta", "fn beta"),
             func("gamma", "fn gamma"),
         ];
-        let (matched_fns, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "alpha | beta", 0.7);
+        let (matched_fns, _, _, _, _) =
+            search_items(&funcs, &[], &[], &[], &[], "alpha | beta", 0.7);
         assert_eq!(matched_fns.len(), 2);
     }
 
@@ -731,7 +773,10 @@ mod tests {
         let prefix = name_score("load", "load_jsonl", 0.85).expect("prefix");
         let substr = name_score("load", "preload_data", 0.85).expect("substr");
         assert_eq!(exact, 1.0);
-        assert!(prefix < exact && prefix > substr, "prefix={prefix} substr={substr}");
+        assert!(
+            prefix < exact && prefix > substr,
+            "prefix={prefix} substr={substr}"
+        );
         assert!(substr >= 0.85, "substr={substr}");
     }
 
@@ -742,14 +787,11 @@ mod tests {
 
     #[test]
     fn name_score_threshold_zero_admits_disjoint() {
-
         assert!(name_score("qrstuv", "alpha", 0.0).is_some());
     }
 
     #[test]
     fn search_items_exact_name_fast_path_suppresses_substring() {
-
-
         let funcs = vec![
             func("load", "fn load"),
             func("load_jsonl", "fn load_jsonl"),
@@ -758,30 +800,34 @@ mod tests {
         ];
         let (matched, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "load", 0.85);
         let names: Vec<&str> = matched.iter().map(|f| f.name.as_str()).collect();
-        assert_eq!(names, vec!["load"], "fast path should return exact-only: {names:?}");
+        assert_eq!(
+            names,
+            vec!["load"],
+            "fast path should return exact-only: {names:?}"
+        );
     }
 
     #[test]
     fn search_items_substring_returned_when_no_exact_match() {
-
-
-        let funcs = vec![
-            func("load", "fn load"),
-            func("load_jsonl", "fn load_jsonl"),
-        ];
+        let funcs = vec![func("load", "fn load"), func("load_jsonl", "fn load_jsonl")];
         let (matched, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "loa", 0.85);
         let names: Vec<&str> = matched.iter().map(|f| f.name.as_str()).collect();
 
-        assert_eq!(matched.len(), 2, "R26-W3 fallback should rescue prefix/substring hits: {names:?}");
+        assert_eq!(
+            matched.len(),
+            2,
+            "R26-W3 fallback should rescue prefix/substring hits: {names:?}"
+        );
         for n in &["load", "load_jsonl"] {
-            assert!(names.contains(n), "expected `{n}` in fallback hits: {names:?}");
+            assert!(
+                names.contains(n),
+                "expected `{n}` in fallback hits: {names:?}"
+            );
         }
     }
 
     #[test]
     fn regression_short_query_exact_name_fast_path() {
-
-
         let funcs = vec![
             func("new", "fn new"),
             func("newest_jsonl", "fn newest_jsonl"),
@@ -790,13 +836,15 @@ mod tests {
         ];
         let (matched, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "new", 0.85);
         let names: Vec<&str> = matched.iter().map(|f| f.name.as_str()).collect();
-        assert_eq!(names, vec!["new"], "short-query precision violated: {names:?}");
+        assert_eq!(
+            names,
+            vec!["new"],
+            "short-query precision violated: {names:?}"
+        );
     }
 
     #[test]
     fn regression_short_query_returns_empty_when_no_exact_match() {
-
-
         let funcs = vec![
             func("handle_get", "fn handle_get"),
             func("target_files", "fn target_files"),
@@ -804,7 +852,11 @@ mod tests {
         ];
         let (matched, _, _, _, _) = search_items(&funcs, &[], &[], &[], &[], "get", 0.85);
         let names: Vec<&str> = matched.iter().map(|f| f.name.as_str()).collect();
-        assert_eq!(matched.len(), 3, "R26-W3 fallback rescues substring hits at 0.85: {names:?}");
+        assert_eq!(
+            matched.len(),
+            3,
+            "R26-W3 fallback rescues substring hits at 0.85: {names:?}"
+        );
     }
 
     #[test]

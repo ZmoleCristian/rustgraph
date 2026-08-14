@@ -28,16 +28,15 @@ pub use resolve::resolve_call_targets;
 pub use search::*;
 pub use types::*;
 
+pub(crate) use ensemble_flow::collect_framework_handler_refs;
 pub(crate) use resolve::{
     build_function_module_lookup, infer_file_crate_key, infer_file_module_segments,
     resolve_ambiguous_call_target_for_functions,
 };
-pub(crate) use ensemble_flow::collect_framework_handler_refs;
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
 static ROOT_HINT: OnceLock<std::sync::RwLock<Option<PathBuf>>> = OnceLock::new();
-
 
 /// Override the project root used when resolving relative file paths.
 ///
@@ -56,7 +55,6 @@ pub fn resolve_root_hint() -> Option<PathBuf> {
         .get()
         .and_then(|lock| lock.read().ok().and_then(|g| g.clone()))
 }
-
 
 /// Resolve a potentially relative file path to an absolute `PathBuf`.
 ///

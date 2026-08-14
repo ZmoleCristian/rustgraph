@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,7 +14,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -27,12 +28,10 @@ fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
 
-
 #[test]
 fn fix1_tree_bare_word_with_src_dir_suggests_direct_form() {
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), "pub mod alpha;\n");
-
 
     write_file(&fixture.path().join("src/alpha/mod.rs"), "pub fn x() {}\n");
     let base = fixture.path().to_string_lossy().to_string();
@@ -45,7 +44,6 @@ fn fix1_tree_bare_word_with_src_dir_suggests_direct_form() {
     );
     let stderr = stderr_of(&out);
     let stdout = stdout_of(&out);
-
 
     assert!(
         stdout.contains("0 file(s)"),
@@ -65,7 +63,6 @@ fn fix1_tree_bare_word_with_src_dir_suggests_direct_form() {
 
 #[test]
 fn fix1_tree_existing_path_no_suggestion() {
-
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), "pub mod beta;\n");
     write_file(&fixture.path().join("src/beta/mod.rs"), "pub fn y() {}\n");
@@ -80,7 +77,6 @@ fn fix1_tree_existing_path_no_suggestion() {
     let stdout = stdout_of(&out);
     let stderr = stderr_of(&out);
 
-
     assert!(
         stdout.contains("mod.rs"),
         "expected normal tree output for valid prefix; got:\n{stdout}"
@@ -92,9 +88,7 @@ fn fix1_tree_existing_path_no_suggestion() {
     );
 }
 
-
 fn write_large_fixture(dir: &Path) {
-
     let mut a = String::new();
     for i in 0..40 {
         a.push_str(&format!("pub fn fn_a_{}() {{}}\n", i));
@@ -153,7 +147,6 @@ fn fix2_call_graph_unscoped_large_project_works_with_all() {
 
 #[test]
 fn fix2_call_graph_unscoped_small_project_renders_without_all() {
-
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
@@ -175,14 +168,11 @@ fn fix2_call_graph_unscoped_small_project_renders_without_all() {
     );
 }
 
-
 #[test]
 fn fix3_call_graph_include_callers_renders_caller_tree() {
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
-
-
         "pub fn target_for_test() {}\n\
          pub fn caller_one() { target_for_test(); }\n\
          pub fn caller_two() { target_for_test(); }\n\
@@ -207,7 +197,6 @@ fn fix3_call_graph_include_callers_renders_caller_tree() {
     );
     let stdout = stdout_of(&out);
 
-
     assert!(
         stdout.contains("caller_one"),
         "expected `caller_one` in --include-callers output; got:\n{stdout}"
@@ -216,7 +205,6 @@ fn fix3_call_graph_include_callers_renders_caller_tree() {
         stdout.contains("caller_two"),
         "expected `caller_two` in --include-callers output; got:\n{stdout}"
     );
-
 
     assert!(
         stdout.contains("caller_three"),
@@ -228,7 +216,6 @@ fn fix3_call_graph_include_callers_renders_caller_tree() {
         "expected `Callers of target_for_test` header in upstream block; got:\n{stdout}"
     );
 }
-
 
 const FAN_FIXTURE: &str = r#"
 pub fn down_a() {}
@@ -262,7 +249,6 @@ fn fix4_ensemble_default_summary_uses_compact_neighborhood() {
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-
 
     assert!(
         stdout.contains("Upstream:") && stdout.contains("caller(s)"),
@@ -303,21 +289,13 @@ fn fix4_ensemble_view_full_keeps_verbose_neighborhood() {
     write_file(&fixture.path().join("src/lib.rs"), FAN_FIXTURE);
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "-p",
-        &base,
-        "ensemble",
-        "target_fan",
-        "--view",
-        "full",
-    ]);
+    let out = run_rustgraph(&["-p", &base, "ensemble", "target_fan", "--view", "full"]);
     assert!(
         out.status.success(),
         "ensemble --view full failed: stderr={}",
         stderr_of(&out)
     );
     let stdout = stdout_of(&out);
-
 
     assert!(
         stdout.contains("Upstream callers:"),
@@ -336,8 +314,6 @@ fn fix4_ensemble_view_full_keeps_verbose_neighborhood() {
 
 #[test]
 fn fix4_ensemble_section_neighborhood_keeps_verbose_form() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), FAN_FIXTURE);
     let base = fixture.path().to_string_lossy().to_string();
@@ -363,7 +339,6 @@ fn fix4_ensemble_section_neighborhood_keeps_verbose_form() {
     );
 }
 
-
 const ASSOC_FIXTURE: &str = "\
 pub struct SessionDocument;
 impl SessionDocument {
@@ -376,20 +351,11 @@ fn caller() {
 
 #[test]
 fn fix5_refs_leaf_with_assoc_call_kind_returns_zero() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), ASSOC_FIXTURE);
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "-p",
-        &base,
-        "refs",
-        "load",
-        "--kind",
-        "assoc_call",
-    ]);
+    let out = run_rustgraph(&["-p", &base, "refs", "load", "--kind", "assoc_call"]);
     assert!(
         out.status.success(),
         "refs (with empty result) should still succeed; stderr={}",
@@ -404,8 +370,6 @@ fn fix5_refs_leaf_with_assoc_call_kind_returns_zero() {
 
 #[test]
 fn fix5_refs_qualifier_with_assoc_call_kind_returns_match() {
-
-
     let fixture = tempdir().expect("tempdir");
     write_file(&fixture.path().join("src/lib.rs"), ASSOC_FIXTURE);
     let base = fixture.path().to_string_lossy().to_string();

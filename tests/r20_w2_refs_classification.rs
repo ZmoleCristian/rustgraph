@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,9 +15,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 #[test]
 fn regression_refs_struct_assoc_fn_not_classified_as_variant() {
@@ -39,11 +39,7 @@ fn regression_refs_struct_assoc_fn_not_classified_as_variant() {
         String::from_utf8_lossy(&out.stderr)
     );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid JSON");
-    let refs = json["refs"]
-        .as_array()
-        .expect("refs array")
-        .clone();
-
+    let refs = json["refs"].as_array().expect("refs array").clone();
 
     let assoc_call_sites: Vec<&Value> = refs
         .iter()
@@ -59,7 +55,6 @@ fn regression_refs_struct_assoc_fn_not_classified_as_variant() {
         "expected at least one ref hit for `SessionDocument::load`; refs payload:\n{:#?}",
         refs
     );
-
 
     for site in &assoc_call_sites {
         let kind = site["kind"].as_str().unwrap_or("");
@@ -78,7 +73,6 @@ fn regression_refs_struct_assoc_fn_not_classified_as_variant() {
     }
 }
 
-
 #[test]
 fn regression_refs_enum_variant_correctly_classified() {
     let fixture = tempdir().expect("tempdir");
@@ -96,10 +90,7 @@ fn regression_refs_enum_variant_correctly_classified() {
         String::from_utf8_lossy(&out.stderr)
     );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid JSON");
-    let refs = json["refs"]
-        .as_array()
-        .expect("refs array")
-        .clone();
+    let refs = json["refs"].as_array().expect("refs array").clone();
 
     let variant_sites: Vec<&Value> = refs
         .iter()

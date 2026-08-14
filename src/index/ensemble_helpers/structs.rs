@@ -86,7 +86,11 @@ pub fn collect_used_structs(
 ) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
     let content = fs::read_to_string(crate::index::resolve_read_path(&func.file_path))?;
     let syntax_tree = syn::parse_file(&content)?;
-    Ok(collect_used_structs_in_ast(&syntax_tree, func, known_structs))
+    Ok(collect_used_structs_in_ast(
+        &syntax_tree,
+        func,
+        known_structs,
+    ))
 }
 
 /// Cache-aware variant of [`collect_used_structs`]: looks the parsed
@@ -125,10 +129,7 @@ mod tests {
     use tempfile::NamedTempFile;
 
     fn temp_with(contents: &str) -> NamedTempFile {
-        let mut tmp = tempfile::Builder::new()
-            .suffix(".rs")
-            .tempfile()
-            .unwrap();
+        let mut tmp = tempfile::Builder::new().suffix(".rs").tempfile().unwrap();
         tmp.write_all(contents.as_bytes()).unwrap();
         tmp.flush().unwrap();
         tmp
@@ -156,9 +157,7 @@ mod tests {
 
     #[test]
     fn collect_used_structs_finds_referenced_struct_names() {
-        let file = temp_with(
-            "pub fn run() {\n    let _ = User { name: \"x\".to_string() };\n}\n",
-        );
+        let file = temp_with("pub fn run() {\n    let _ = User { name: \"x\".to_string() };\n}\n");
         let path = file.path().to_string_lossy().to_string();
         let mut known = HashSet::new();
         known.insert("User".to_string());
@@ -182,9 +181,7 @@ mod tests {
 
     #[test]
     fn collect_used_structs_skips_unknown_struct_names() {
-        let file = temp_with(
-            "pub fn run() {\n    let _ = SomeOtherType {};\n}\n",
-        );
+        let file = temp_with("pub fn run() {\n    let _ = SomeOtherType {};\n}\n");
         let path = file.path().to_string_lossy().to_string();
         let mut known = HashSet::new();
         known.insert("KnownType".to_string());

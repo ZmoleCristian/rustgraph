@@ -10,7 +10,6 @@ use syn::{
     TraitItemFn, UseTree,
 };
 
-
 fn collect_use_aliases(tree: &UseTree, out: &mut Vec<(String, String)>) {
     match tree {
         UseTree::Path(p) => collect_use_aliases(&p.tree, out),
@@ -20,15 +19,17 @@ fn collect_use_aliases(tree: &UseTree, out: &mut Vec<(String, String)>) {
             }
         }
         UseTree::Rename(r) => {
-
             out.push((r.rename.to_string(), r.ident.to_string()));
         }
         UseTree::Name(_) | UseTree::Glob(_) => {}
     }
 }
 
-
-fn collect_pub_use_reexports(tree: &UseTree, prefix: &mut Vec<String>, out: &mut Vec<(String, String)>) {
+fn collect_pub_use_reexports(
+    tree: &UseTree,
+    prefix: &mut Vec<String>,
+    out: &mut Vec<(String, String)>,
+) {
     match tree {
         UseTree::Path(p) => {
             prefix.push(p.ident.to_string());
@@ -47,7 +48,6 @@ fn collect_pub_use_reexports(tree: &UseTree, prefix: &mut Vec<String>, out: &mut
             out.push((alias_local, full.join("::")));
         }
         UseTree::Rename(r) => {
-
             let mut full = prefix.clone();
             full.push(r.ident.to_string());
             out.push((r.rename.to_string(), full.join("::")));
@@ -93,6 +93,11 @@ impl<'ast> Visit<'ast> for CodeVisitor {
         calls::visit_item_macro(self, macro_call);
     }
 
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        calls::record_macro_token_calls(self, mac);
+        syn::visit::visit_macro(self, mac);
+    }
+
     fn visit_item_struct(&mut self, item_struct: &'ast ItemStruct) {
         types::visit_item_struct(self, item_struct);
     }
@@ -120,9 +125,7 @@ impl<'ast> Visit<'ast> for CodeVisitor {
     fn visit_item_use(&mut self, item_use: &'ast ItemUse) {
         collect_use_aliases(&item_use.tree, &mut self.aliases);
 
-
         if matches!(item_use.vis, syn::Visibility::Public(_)) {
-
             let mut module_segs = infer_file_module_segments(&self.file_path);
             module_segs.extend(self.mod_stack.iter().cloned());
             let containing_module = module_segs.join("::");
@@ -144,14 +147,12 @@ impl<'ast> Visit<'ast> for CodeVisitor {
             self.cfg_test_depth += 1;
         }
 
-
         let pushed_mod = if item_mod.content.is_some() {
             self.mod_stack.push(item_mod.ident.to_string());
             true
         } else {
             false
         };
-
 
         let mod_cfgs = if item_mod.content.is_some() {
             render_cfg_attrs(&item_mod.attrs)

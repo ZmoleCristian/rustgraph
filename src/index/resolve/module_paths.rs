@@ -242,8 +242,6 @@ mod tests {
 
     #[test]
     fn build_function_module_lookup_assigns_module_paths() {
-
-
         let func = FunctionInfo {
             name: "foo".to_string(),
             signature: "fn foo".to_string(),

@@ -47,10 +47,7 @@ mod tests {
     use tempfile::NamedTempFile;
 
     fn temp_with(content: &str) -> NamedTempFile {
-        let mut tmp = tempfile::Builder::new()
-            .suffix(".rs")
-            .tempfile()
-            .unwrap();
+        let mut tmp = tempfile::Builder::new().suffix(".rs").tempfile().unwrap();
         tmp.write_all(content.as_bytes()).unwrap();
         tmp.flush().unwrap();
         tmp
@@ -59,14 +56,8 @@ mod tests {
     #[test]
     fn extract_nth_returns_none_for_missing_file() {
         let mut cache = FileLinesCache::new();
-        let result = extract_nth_call_arg_segment_from_file(
-            "/no/such/file.rs",
-            1,
-            0,
-            "foo",
-            0,
-            &mut cache,
-        );
+        let result =
+            extract_nth_call_arg_segment_from_file("/no/such/file.rs", 1, 0, "foo", 0, &mut cache);
         assert!(result.is_none());
     }
 

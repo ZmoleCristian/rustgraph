@@ -182,8 +182,7 @@ mod tests {
         by_id.insert(id2, &f2);
         by_id.insert(id3, &f3);
 
-        let (total, truncated, items) =
-            collect_related_functions("root", &adjacency, &by_id, 1, 2);
+        let (total, truncated, items) = collect_related_functions("root", &adjacency, &by_id, 1, 2);
         assert_eq!(total, 3);
         assert!(truncated);
         assert_eq!(items.len(), 2);

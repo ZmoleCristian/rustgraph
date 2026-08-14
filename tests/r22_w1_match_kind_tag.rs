@@ -1,5 +1,3 @@
-
-
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
@@ -17,7 +15,10 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -28,7 +29,6 @@ fn stderr_of(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).to_string()
 }
 
-
 #[test]
 fn find_exact_name_hit_renders_name_tag() {
     let fixture = tempdir().expect("tempdir");
@@ -38,7 +38,11 @@ fn find_exact_name_hit_renders_name_tag() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "handle_event"]);
-    assert!(out.status.success(), "find failed: stderr={}", stderr_of(&out));
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        stderr_of(&out)
+    );
     let stdout = stdout_of(&out);
     assert!(
         stdout.contains("handle_event"),
@@ -58,19 +62,20 @@ fn find_exact_name_hit_renders_name_tag() {
     );
 }
 
-
 #[test]
 fn find_fuzzy_name_hit_renders_name_tag() {
     let fixture = tempdir().expect("tempdir");
     write_file(
         &fixture.path().join("src/lib.rs"),
-
-
         "pub fn handle_event_extended_v2() {}\npub fn unrelated_helper() {}\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "handle_event_extended"]);
-    assert!(out.status.success(), "find failed: stderr={}", stderr_of(&out));
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        stderr_of(&out)
+    );
     let stdout = stdout_of(&out);
     assert!(
         stdout.contains("handle_event_extended_v2"),
@@ -87,7 +92,6 @@ fn find_fuzzy_name_hit_renders_name_tag() {
         "fuzzy-only result must announce there was no exact hit; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn find_match_signature_signature_fragment_renders_sig_tag() {
@@ -131,11 +135,9 @@ pub fn unrelated_helper() -> u32 { 0 }
     );
 }
 
-
 #[test]
 fn find_match_signature_path_fragment_renders_path_tag() {
     let fixture = tempdir().expect("tempdir");
-
 
     write_file(
         &fixture.path().join("src/sessions/parse.rs"),
@@ -161,13 +163,11 @@ fn find_match_signature_path_fragment_renders_path_tag() {
         "expected `[path]` tag on path-fallback hit (R22-W1); got:\n{stdout}"
     );
 
-
     assert!(
         !stdout.contains("[name]"),
         "path-only hit should not be tagged `[name]`; got:\n{stdout}"
     );
 }
-
 
 #[test]
 fn find_json_output_includes_match_kind_field() {
@@ -182,24 +182,22 @@ pub fn unique_handler_fn() {}
     );
     let base = fixture.path().to_string_lossy().to_string();
 
-
-    let out = run_rustgraph(&[
-        "--path",
-        &base,
-        "find",
-        "unique_handler_fn",
-        "-j",
-        "--func",
-    ]);
-    assert!(out.status.success(), "find failed: stderr={}", stderr_of(&out));
+    let out = run_rustgraph(&["--path", &base, "find", "unique_handler_fn", "-j", "--func"]);
+    assert!(
+        out.status.success(),
+        "find failed: stderr={}",
+        stderr_of(&out)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let funcs = json["functions"].as_array().expect("functions array");
-    assert!(!funcs.is_empty(), "expected at least one fn hit; json={json:#?}");
+    assert!(
+        !funcs.is_empty(),
+        "expected at least one fn hit; json={json:#?}"
+    );
     for f in funcs {
         let mk = f["match_kind"].as_str().expect("match_kind field present");
         assert_eq!(mk, "name", "default-mode hit should be `name`; got {mk:?}");
     }
-
 
     let out = run_rustgraph(&[
         "--path",
@@ -217,7 +215,10 @@ pub fn unique_handler_fn() {}
     );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let funcs = json["functions"].as_array().expect("functions array");
-    assert!(!funcs.is_empty(), "expected at least one fn hit; json={json:#?}");
+    assert!(
+        !funcs.is_empty(),
+        "expected at least one fn hit; json={json:#?}"
+    );
     for f in funcs {
         let mk = f["match_kind"].as_str().expect("match_kind field present");
         assert_eq!(
@@ -227,7 +228,6 @@ pub fn unique_handler_fn() {}
     }
 }
 
-
 #[test]
 fn find_exact_case_insensitive_matches_lowercase_definition() {
     let fixture = tempdir().expect("tempdir");
@@ -236,7 +236,6 @@ fn find_exact_case_insensitive_matches_lowercase_definition() {
         "pub fn handle_event() {}\npub struct ImportantThing;\npub enum SomeColor { Red, Blue }\n",
     );
     let base = fixture.path().to_string_lossy().to_string();
-
 
     let out = run_rustgraph(&["--path", &base, "find", "HANDLE_EVENT", "--exact"]);
     assert!(
@@ -255,7 +254,6 @@ fn find_exact_case_insensitive_matches_lowercase_definition() {
         "--exact hit should still carry `[name]` tag (R22-W1 uniform tagging); got:\n{stdout}"
     );
 
-
     let out = run_rustgraph(&["--path", &base, "find", "iMpOrTaNtThInG", "--exact"]);
     assert!(
         out.status.success(),
@@ -267,7 +265,6 @@ fn find_exact_case_insensitive_matches_lowercase_definition() {
         stdout.contains("ImportantThing"),
         "mixed-case query should match struct (case-insensitive --exact); got:\n{stdout}"
     );
-
 
     let out = run_rustgraph(&["--path", &base, "find", "somecolor", "--exact"]);
     assert!(
@@ -282,7 +279,6 @@ fn find_exact_case_insensitive_matches_lowercase_definition() {
     );
 }
 
-
 #[test]
 fn find_exact_json_carries_name_match_kind() {
     let fixture = tempdir().expect("tempdir");
@@ -292,10 +288,18 @@ fn find_exact_json_carries_name_match_kind() {
     );
     let base = fixture.path().to_string_lossy().to_string();
     let out = run_rustgraph(&["--path", &base, "find", "alpha", "--exact", "-j"]);
-    assert!(out.status.success(), "find --exact -j failed: stderr={}", stderr_of(&out));
+    assert!(
+        out.status.success(),
+        "find --exact -j failed: stderr={}",
+        stderr_of(&out)
+    );
     let json: Value = serde_json::from_slice(&out.stdout).expect("valid json");
     let funcs = json["functions"].as_array().expect("functions array");
-    assert_eq!(funcs.len(), 1, "expected exactly one alpha hit; got: {funcs:#?}");
+    assert_eq!(
+        funcs.len(),
+        1,
+        "expected exactly one alpha hit; got: {funcs:#?}"
+    );
     assert_eq!(
         funcs[0]["match_kind"].as_str(),
         Some("name"),

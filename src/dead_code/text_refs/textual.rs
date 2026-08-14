@@ -135,33 +135,22 @@ mod textual_tests {
         let mut tr = HashMap::new();
         let mut mr = HashMap::new();
         let mut fl = HashMap::new();
-        let (non_test, test_only) = collect_textual_function_refs(
-            &files,
-            &name_counts,
-            &mut tr,
-            &mut mr,
-            &mut fl,
-        );
+        let (non_test, test_only) =
+            collect_textual_function_refs(&files, &name_counts, &mut tr, &mut mr, &mut fl);
         assert_eq!(non_test.get("my_fn"), Some(&2));
         assert!(test_only.is_empty());
     }
 
     #[test]
     fn collect_textual_function_refs_skips_duplicate_named_candidates() {
-
         let files = write_files(&[("src/lib.rs", "fn x() { my_fn(); }\n")]);
         let mut name_counts = HashMap::new();
         name_counts.insert("my_fn".to_string(), 2usize);
         let mut tr = HashMap::new();
         let mut mr = HashMap::new();
         let mut fl = HashMap::new();
-        let (non_test, _) = collect_textual_function_refs(
-            &files,
-            &name_counts,
-            &mut tr,
-            &mut mr,
-            &mut fl,
-        );
+        let (non_test, _) =
+            collect_textual_function_refs(&files, &name_counts, &mut tr, &mut mr, &mut fl);
         assert!(non_test.get("my_fn").is_none());
     }
 
@@ -173,13 +162,8 @@ mod textual_tests {
         let mut tr = HashMap::new();
         let mut mr = HashMap::new();
         let mut fl = HashMap::new();
-        let (non_test, test_only) = collect_textual_function_refs(
-            &files,
-            &name_counts,
-            &mut tr,
-            &mut mr,
-            &mut fl,
-        );
+        let (non_test, test_only) =
+            collect_textual_function_refs(&files, &name_counts, &mut tr, &mut mr, &mut fl);
         assert!(non_test.is_empty());
         assert_eq!(test_only.get("my_fn"), Some(&1));
     }
@@ -192,32 +176,25 @@ mod textual_tests {
         let mut tr = HashMap::new();
         let mut mr = HashMap::new();
         let mut fl = HashMap::new();
-        let (non_test, test_only) = collect_textual_function_refs(
-            &files,
-            &name_counts,
-            &mut tr,
-            &mut mr,
-            &mut fl,
-        );
+        let (non_test, test_only) =
+            collect_textual_function_refs(&files, &name_counts, &mut tr, &mut mr, &mut fl);
         assert!(non_test.is_empty());
         assert!(test_only.is_empty());
     }
 
     #[test]
     fn collect_textual_function_argument_refs_finds_handler_in_map() {
-        let files = write_files(&[("src/lib.rs", "fn x() { vec.into_iter().map(my_handler); }\n")]);
+        let files = write_files(&[(
+            "src/lib.rs",
+            "fn x() { vec.into_iter().map(my_handler); }\n",
+        )]);
         let mut name_counts = HashMap::new();
         name_counts.insert("my_handler".to_string(), 1usize);
         let mut tr = HashMap::new();
         let mut mr = HashMap::new();
         let mut fl = HashMap::new();
-        let (non_test, _) = collect_textual_function_argument_refs(
-            &files,
-            &name_counts,
-            &mut tr,
-            &mut mr,
-            &mut fl,
-        );
+        let (non_test, _) =
+            collect_textual_function_argument_refs(&files, &name_counts, &mut tr, &mut mr, &mut fl);
         assert_eq!(non_test.get("my_handler"), Some(&1));
     }
 
@@ -229,13 +206,8 @@ mod textual_tests {
         let mut tr = HashMap::new();
         let mut mr = HashMap::new();
         let mut fl = HashMap::new();
-        let (non_test, _) = collect_textual_function_argument_refs(
-            &files,
-            &name_counts,
-            &mut tr,
-            &mut mr,
-            &mut fl,
-        );
+        let (non_test, _) =
+            collect_textual_function_argument_refs(&files, &name_counts, &mut tr, &mut mr, &mut fl);
         assert_eq!(non_test.get("my_reducer"), Some(&1));
     }
 }
@@ -283,7 +255,6 @@ pub(crate) fn collect_textual_function_argument_refs(
             file_lines_cache.insert(file.clone(), lines);
         }
 
-
         macro_rules_ranges_cache
             .entry(file.clone())
             .or_insert_with(|| collect_macro_rules_ranges(&file));
@@ -291,7 +262,6 @@ pub(crate) fn collect_textual_function_argument_refs(
             .get(&file)
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
-
 
         struct WorkItem {
             line_no: usize,
@@ -319,11 +289,15 @@ pub(crate) fn collect_textual_function_argument_refs(
                     };
                     let call_col = search_from + found_at;
                     search_from = call_col + marker.len();
-                    work.push(WorkItem { line_no, call_col, wrapper, arg_index });
+                    work.push(WorkItem {
+                        line_no,
+                        call_col,
+                        wrapper,
+                        arg_index,
+                    });
                 }
             }
         }
-
 
         for item in work {
             let Some(arg_expr) = extract_call_arg_segment_from_file(

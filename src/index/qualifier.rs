@@ -6,7 +6,6 @@ use std::collections::HashMap;
 
 use crate::FunctionInfo;
 
-
 /// How a call site was resolved to a set of candidate functions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResolutionMode {
@@ -20,7 +19,6 @@ pub enum ResolutionMode {
     /// so the call site was suppressed rather than falling back.
     StrictSuppressed,
 }
-
 
 /// Counters tracking how many call sites were resolved under each [`ResolutionMode`].
 #[derive(Debug, Default, Clone, Copy)]
@@ -43,7 +41,6 @@ impl ResolutionStats {
         }
     }
 
-
     /// Add all counters from `other` into `self`.
     pub fn merge(&mut self, other: &Self) {
         self.strict += other.strict;
@@ -51,12 +48,10 @@ impl ResolutionStats {
         self.strict_suppressed += other.strict_suppressed;
     }
 
-
     /// Return the sum of all three counters.
     pub fn total(&self) -> usize {
         self.strict + self.fell_back_to_loose + self.strict_suppressed
     }
-
 
     /// Print a human-readable note to stderr when loose fallback or suppression occurred.
     pub fn emit_stderr_note(&self) {
@@ -81,7 +76,6 @@ impl ResolutionStats {
     }
 }
 
-
 /// Resolve a callee expression to a ranked candidate list.
 ///
 /// Applies type-qualifier filtering, module-path narrowing, and method-preference
@@ -94,7 +88,6 @@ pub fn resolve_callee_candidates<'a>(
     strict_only: bool,
 ) -> (Vec<&'a FunctionInfo>, ResolutionMode) {
     let Some(matches) = by_name.get(bare) else {
-
         return (Vec::new(), ResolutionMode::Strict);
     };
     let qualifier = qualifier_for_callee(callee_name);
@@ -110,25 +103,16 @@ pub fn resolve_callee_candidates<'a>(
         })
         .collect();
     if type_filtered.is_empty() {
-
         return loose_fallback(matches, strict_only);
     }
-    let module_narrowed = narrow_candidates_by_module_path(
-        callee_name,
-        &type_filtered,
-        |f| f.file_path.as_str(),
-    );
+    let module_narrowed =
+        narrow_candidates_by_module_path(callee_name, &type_filtered, |f| f.file_path.as_str());
     let module_owned: Vec<&FunctionInfo> = module_narrowed.into_iter().copied().collect();
     if module_owned.is_empty() {
-
-
         return loose_fallback(matches, strict_only);
     }
-    let method_narrowed = narrow_candidates_to_methods(
-        callee_name,
-        &module_owned,
-        |f| f.kind.as_str(),
-    );
+    let method_narrowed =
+        narrow_candidates_to_methods(callee_name, &module_owned, |f| f.kind.as_str());
     let final_owned: Vec<&FunctionInfo> = method_narrowed.into_iter().copied().collect();
     if final_owned.is_empty() {
         return loose_fallback(matches, strict_only);
@@ -136,21 +120,19 @@ pub fn resolve_callee_candidates<'a>(
     (final_owned, ResolutionMode::Strict)
 }
 
-
 fn loose_fallback<'a>(
     bare_matches: &Vec<&'a FunctionInfo>,
     strict_only: bool,
 ) -> (Vec<&'a FunctionInfo>, ResolutionMode) {
     if strict_only {
-
-
         (Vec::new(), ResolutionMode::StrictSuppressed)
     } else {
-
-        (bare_matches.iter().copied().collect(), ResolutionMode::FellBackToLoose)
+        (
+            bare_matches.iter().copied().collect(),
+            ResolutionMode::FellBackToLoose,
+        )
     }
 }
-
 
 /// Extract the Pascal-case type qualifier from a callee expression, if present.
 ///
@@ -161,7 +143,6 @@ pub fn qualifier_for_callee(callee_name: &str) -> Option<String> {
     if !callee_name.contains('.') && !callee_name.contains("::") {
         return None;
     }
-
 
     let last_dot = callee_name.rfind('.');
     let last_colon_pair = callee_name.rfind("::");
@@ -180,14 +161,12 @@ pub fn qualifier_for_callee(callee_name: &str) -> Option<String> {
         .rsplit(|c: char| c == '.' || c == ':')
         .find(|s| !s.is_empty())?;
 
-
     let first = last_seg.chars().next()?;
     if !first.is_ascii_uppercase() {
         return None;
     }
     Some(last_seg.to_string())
 }
-
 
 /// Pre-formatted needles for matching a single qualifier against many
 /// candidate functions. Build once outside the per-candidate loop, then
@@ -211,21 +190,24 @@ impl<'a> QualifierNeedles<'a> {
 /// Variant of [`candidate_matches_qualifier`] that takes pre-formatted
 /// needles. Used by hot loops that resolve many candidates against the same
 /// qualifier; saves two `format!` allocations per candidate.
-pub fn candidate_matches_needles(
-    candidate: &FunctionInfo,
-    needles: &QualifierNeedles<'_>,
-) -> bool {
+pub fn candidate_matches_needles(candidate: &FunctionInfo, needles: &QualifierNeedles<'_>) -> bool {
     let kind = candidate.kind.as_str();
     if kind == needles.method_exact || kind == needles.trait_fn_exact {
         return true;
     }
-    if let Some(stripped) = kind.strip_prefix("method(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(stripped) = kind
+        .strip_prefix("method(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let bare_type = stripped.split('<').next().unwrap_or(stripped).trim();
         if bare_type == needles.qualifier {
             return true;
         }
     }
-    if let Some(stripped) = kind.strip_prefix("trait_fn(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(stripped) = kind
+        .strip_prefix("trait_fn(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let bare_type = stripped.split('<').next().unwrap_or(stripped).trim();
         if bare_type == needles.qualifier {
             return true;
@@ -246,7 +228,6 @@ pub fn candidate_matches_qualifier(candidate: &FunctionInfo, qualifier: Option<&
     let needles = QualifierNeedles::new(q);
     candidate_matches_needles(candidate, &needles)
 }
-
 
 /// Extract lowercase module-path segments from a `::` qualified callee name.
 ///
@@ -272,14 +253,12 @@ pub fn module_path_qualifier(callee_name: &str) -> Option<Vec<String>> {
         return None;
     }
 
-
     let last = segments.last()?;
     if last.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
         return None;
     }
     Some(segments)
 }
-
 
 /// Retain only the candidates whose file path matches the module-path qualifier of `callee_name`.
 ///
@@ -321,13 +300,10 @@ where
         })
         .collect();
     if narrowed.is_empty() {
-
-
         return candidates.iter().collect();
     }
     narrowed
 }
-
 
 /// Return `true` when the callee's receiver looks like a variable (lowercase or `_`) rather
 /// than a type, indicating that method candidates should be preferred over free functions.
@@ -345,14 +321,11 @@ pub fn prefer_methods_for_dotted(callee_name: &str) -> bool {
         .find(|s| !s.is_empty())
         .unwrap_or(receiver);
     if last_seg == "receiver" {
-
-
         return true;
     }
     let first = last_seg.chars().next();
     matches!(first, Some(c) if c.is_ascii_lowercase() || c == '_')
 }
-
 
 /// Retain only method/trait-function candidates when the callee expression uses a
 /// variable receiver (as determined by [`prefer_methods_for_dotted`]).
@@ -381,7 +354,6 @@ where
         })
         .collect();
     if methods.is_empty() {
-
         return candidates.iter().collect();
     }
     methods
@@ -411,54 +383,52 @@ mod tests {
         }
     }
 
-
     #[test]
     fn qualifier_for_type_colon_method() {
-        assert_eq!(qualifier_for_callee("Daemon::run_cli"), Some("Daemon".to_string()));
+        assert_eq!(
+            qualifier_for_callee("Daemon::run_cli"),
+            Some("Daemon".to_string())
+        );
     }
 
     #[test]
     fn qualifier_for_type_dot_method() {
-
-        assert_eq!(qualifier_for_callee("Daemon.run_cli"), Some("Daemon".to_string()));
+        assert_eq!(
+            qualifier_for_callee("Daemon.run_cli"),
+            Some("Daemon".to_string())
+        );
     }
 
     #[test]
     fn qualifier_for_module_path_picks_last_segment() {
-
-
-        assert_eq!(qualifier_for_callee("module::A::new"), Some("A".to_string()));
+        assert_eq!(
+            qualifier_for_callee("module::A::new"),
+            Some("A".to_string())
+        );
     }
 
     #[test]
     fn qualifier_for_lowercase_module_returns_none() {
-
-
         assert_eq!(qualifier_for_callee("std::mem::take"), None);
     }
 
     #[test]
     fn qualifier_for_variable_receiver_returns_none() {
-
         assert_eq!(qualifier_for_callee("obj.foo"), None);
     }
 
     #[test]
     fn qualifier_for_complex_receiver_returns_none() {
-
         assert_eq!(qualifier_for_callee("receiver.method"), None);
     }
 
     #[test]
     fn qualifier_for_bare_name_returns_none() {
-
         assert_eq!(qualifier_for_callee("foo"), None);
     }
 
     #[test]
     fn qualifier_for_generics_in_type_segment() {
-
-
         assert_eq!(
             qualifier_for_callee("Wrapper<'a, T>::method"),
             Some("Wrapper<'a, T>".to_string())
@@ -467,14 +437,11 @@ mod tests {
 
     #[test]
     fn qualifier_for_empty_prefix_returns_none() {
-
         assert_eq!(qualifier_for_callee("::foo"), None);
     }
 
-
     #[test]
     fn candidate_matches_when_qualifier_is_none() {
-
         let f = fn_with_kind("foo", "function");
         assert!(candidate_matches_qualifier(&f, None));
     }
@@ -493,23 +460,18 @@ mod tests {
 
     #[test]
     fn candidate_rejects_method_of_other_type() {
-
-
         let f = fn_with_kind("new", "method(Session)");
         assert!(!candidate_matches_qualifier(&f, Some("Daemon")));
     }
 
     #[test]
     fn candidate_rejects_free_function_when_qualified() {
-
-
         let f = fn_with_kind("compute", "function");
         assert!(!candidate_matches_qualifier(&f, Some("Foo")));
     }
 
     #[test]
     fn candidate_matches_generics_method_kind() {
-
         let f = fn_with_kind("get", "method(Wrapper<'a, T>)");
         assert!(candidate_matches_qualifier(&f, Some("Wrapper")));
     }
@@ -581,7 +543,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn module_path_qualifier_extracts_lowercase_segments() {
         assert_eq!(
@@ -597,7 +558,6 @@ mod tests {
 
     #[test]
     fn module_path_qualifier_returns_none_for_pascal_last_segment() {
-
         assert_eq!(module_path_qualifier("module::Type::method"), None);
     }
 
@@ -616,10 +576,8 @@ mod tests {
 
     #[test]
     fn module_path_qualifier_skips_empty_prefix() {
-
         assert_eq!(module_path_qualifier("::foo"), None);
     }
-
 
     fn fn_with_path(name: &str, file_path: &str) -> FunctionInfo {
         FunctionInfo {
@@ -660,9 +618,8 @@ mod tests {
             fn_with_path("foo", "src/api.rs"),
             fn_with_path("foo", "src/lib.rs"),
         ];
-        let kept = narrow_candidates_by_module_path("nonexistent::foo", &cands, |f| {
-            f.file_path.as_str()
-        });
+        let kept =
+            narrow_candidates_by_module_path("nonexistent::foo", &cands, |f| f.file_path.as_str());
 
         assert_eq!(kept.len(), 2);
     }
@@ -680,26 +637,21 @@ mod tests {
     #[test]
     fn narrow_is_noop_for_single_candidate() {
         let cands = vec![fn_with_path("foo", "src/a.rs")];
-        let kept = narrow_candidates_by_module_path("module::foo", &cands, |f| {
-            f.file_path.as_str()
-        });
+        let kept =
+            narrow_candidates_by_module_path("module::foo", &cands, |f| f.file_path.as_str());
         assert_eq!(kept.len(), 1);
     }
 
     #[test]
     fn narrow_skips_crate_prefix() {
-
         let cands = vec![
             fn_with_path("foo", "src/a.rs"),
             fn_with_path("foo", "src/b.rs"),
         ];
-        let kept = narrow_candidates_by_module_path("crate::foo", &cands, |f| {
-            f.file_path.as_str()
-        });
+        let kept = narrow_candidates_by_module_path("crate::foo", &cands, |f| f.file_path.as_str());
 
         assert_eq!(kept.len(), 2);
     }
-
 
     #[test]
     fn prefer_methods_for_lowercase_variable_receiver() {
@@ -713,13 +665,11 @@ mod tests {
 
     #[test]
     fn prefer_methods_for_complex_receiver_sentinel() {
-
         assert!(prefer_methods_for_dotted("receiver.method"));
     }
 
     #[test]
     fn prefer_methods_skips_pascal_receiver() {
-
         assert!(!prefer_methods_for_dotted("Daemon.method"));
     }
 
@@ -735,11 +685,8 @@ mod tests {
 
     #[test]
     fn prefer_methods_handles_module_qualified_variable() {
-
-
         assert!(prefer_methods_for_dotted("crate::state.refresh"));
     }
-
 
     #[test]
     fn narrow_to_methods_keeps_method_when_free_fn_present() {
@@ -747,17 +694,14 @@ mod tests {
             fn_with_kind("refresh", "function"),
             fn_with_kind("refresh", "method(Daemon)"),
         ];
-        let kept = narrow_candidates_to_methods("daemon_state.refresh", &cands, |f| {
-            f.kind.as_str()
-        });
+        let kept =
+            narrow_candidates_to_methods("daemon_state.refresh", &cands, |f| f.kind.as_str());
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].kind, "method(Daemon)");
     }
 
     #[test]
     fn narrow_to_methods_returns_all_when_no_method_candidate() {
-
-
         let cands = vec![
             fn_with_kind("refresh", "function"),
             fn_with_kind("refresh", "function"),
@@ -786,7 +730,6 @@ mod tests {
         assert_eq!(kept.len(), 1);
         assert!(kept[0].kind.starts_with("trait_fn("));
     }
-
 
     fn fn_with_kind_and_path(name: &str, kind: &str, file_path: &str) -> FunctionInfo {
         FunctionInfo {
@@ -818,7 +761,6 @@ mod tests {
 
     #[test]
     fn resolve_strict_when_type_qualifier_matches() {
-
         let fns = vec![
             fn_with_kind_and_path("new", "method(Daemon)", "src/daemon.rs"),
             fn_with_kind_and_path("new", "method(Session)", "src/session.rs"),
@@ -832,16 +774,10 @@ mod tests {
 
     #[test]
     fn resolve_falls_back_when_strict_zeroes() {
-
-
-        let fns = vec![
-            fn_with_kind_and_path("foo", "function", "src/util.rs"),
-        ];
+        let fns = vec![fn_with_kind_and_path("foo", "function", "src/util.rs")];
         let by_name = build_index(&fns);
 
-
         let (kept, mode) = resolve_callee_candidates("Bar::foo", "foo", &by_name, false);
-
 
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].kind, "function");
@@ -850,11 +786,7 @@ mod tests {
 
     #[test]
     fn resolve_strict_only_suppresses_fallback() {
-
-
-        let fns = vec![
-            fn_with_kind_and_path("foo", "function", "src/util.rs"),
-        ];
+        let fns = vec![fn_with_kind_and_path("foo", "function", "src/util.rs")];
         let by_name = build_index(&fns);
         let (kept, mode) = resolve_callee_candidates("Bar::foo", "foo", &by_name, true);
         assert!(kept.is_empty(), "strict_only should produce empty result");
@@ -863,8 +795,6 @@ mod tests {
 
     #[test]
     fn resolve_no_bare_match_returns_strict_empty() {
-
-
         let fns: Vec<FunctionInfo> = vec![];
         let by_name = build_index(&fns);
         let (kept, mode) = resolve_callee_candidates("foo", "foo", &by_name, false);
@@ -874,8 +804,6 @@ mod tests {
 
     #[test]
     fn resolve_dotted_method_preference_strict_succeeds() {
-
-
         let fns = vec![
             fn_with_kind_and_path("refresh", "function", "src/api.rs"),
             fn_with_kind_and_path("refresh", "method(Daemon)", "src/daemon.rs"),
@@ -889,8 +817,6 @@ mod tests {
 
     #[test]
     fn resolve_bare_name_strict_returns_all() {
-
-
         let fns = vec![
             fn_with_kind_and_path("foo", "function", "src/a.rs"),
             fn_with_kind_and_path("foo", "function", "src/b.rs"),
@@ -900,7 +826,6 @@ mod tests {
         assert_eq!(kept.len(), 2);
         assert_eq!(mode, ResolutionMode::Strict);
     }
-
 
     #[test]
     fn stats_record_increments_per_mode() {
@@ -916,8 +841,16 @@ mod tests {
 
     #[test]
     fn stats_merge_sums_counters() {
-        let mut a = ResolutionStats { strict: 1, fell_back_to_loose: 2, strict_suppressed: 3 };
-        let b = ResolutionStats { strict: 10, fell_back_to_loose: 20, strict_suppressed: 30 };
+        let mut a = ResolutionStats {
+            strict: 1,
+            fell_back_to_loose: 2,
+            strict_suppressed: 3,
+        };
+        let b = ResolutionStats {
+            strict: 10,
+            fell_back_to_loose: 20,
+            strict_suppressed: 30,
+        };
         a.merge(&b);
         assert_eq!(a.strict, 11);
         assert_eq!(a.fell_back_to_loose, 22);

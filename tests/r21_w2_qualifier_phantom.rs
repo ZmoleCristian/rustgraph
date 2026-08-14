@@ -1,5 +1,3 @@
-
-
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -16,9 +14,11 @@ fn run_rustgraph(args: &[&str]) -> Output {
     let bin = env!("CARGO_BIN_EXE_rustgraph");
     let mut full: Vec<&str> = vec!["--absolute-paths", "--no-auto-path"];
     full.extend_from_slice(args);
-    Command::new(bin).args(full).output().expect("run rustgraph")
+    Command::new(bin)
+        .args(full)
+        .output()
+        .expect("run rustgraph")
 }
-
 
 fn fixture_homonym_methods() -> tempfile::TempDir {
     let fixture = tempdir().expect("tempdir");
@@ -34,7 +34,6 @@ fn fixture_homonym_methods() -> tempfile::TempDir {
     fixture
 }
 
-
 #[test]
 fn regression_callers_bare_name_returns_all_matches_loose() {
     let fixture = fixture_homonym_methods();
@@ -47,7 +46,6 @@ fn regression_callers_bare_name_returns_all_matches_loose() {
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("src/lib.rs:2-2"),
@@ -64,7 +62,6 @@ fn regression_callers_bare_name_returns_all_matches_loose() {
     );
 }
 
-
 #[test]
 fn regression_callers_qualified_type_method_only_returns_owning_type() {
     let fixture = fixture_homonym_methods();
@@ -78,7 +75,6 @@ fn regression_callers_qualified_type_method_only_returns_owning_type() {
         String::from_utf8_lossy(&out.stdout)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("src/lib.rs:2"),
@@ -99,15 +95,17 @@ fn regression_callers_qualified_type_method_only_returns_owning_type() {
     );
 }
 
-
 #[test]
 fn regression_paths_between_qualified_to_resolves_only_target_type() {
     let fixture = fixture_homonym_methods();
     let base = fixture.path().to_string_lossy().to_string();
 
-
     let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "caller_d", "Daemon::run_cli",
+        "--path",
+        &base,
+        "paths-between",
+        "caller_d",
+        "Daemon::run_cli",
     ]);
     assert!(
         out.status.success(),
@@ -116,7 +114,6 @@ fn regression_paths_between_qualified_to_resolves_only_target_type() {
         String::from_utf8_lossy(&out.stdout)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("[1 path(s)]"),
@@ -131,10 +128,7 @@ fn regression_paths_between_qualified_to_resolves_only_target_type() {
         "Session::run_cli (line 4) is a phantom; strict-qualified resolution must drop it. stdout:\n{stdout}"
     );
 
-
-    let out2 = run_rustgraph(&[
-        "--path", &base, "paths-between", "caller_d", "run_cli",
-    ]);
+    let out2 = run_rustgraph(&["--path", &base, "paths-between", "caller_d", "run_cli"]);
     assert!(
         out2.status.success(),
         "paths-between should succeed for loose TO. stderr:\n{}",
@@ -151,22 +145,18 @@ fn regression_paths_between_qualified_to_resolves_only_target_type() {
     );
 }
 
-
 #[test]
 fn regression_paths_between_anti_oscillation_loose_target_still_resolves() {
     let fixture = fixture_homonym_methods();
     let base = fixture.path().to_string_lossy().to_string();
 
-    let out = run_rustgraph(&[
-        "--path", &base, "paths-between", "caller_s", "run_cli",
-    ]);
+    let out = run_rustgraph(&["--path", &base, "paths-between", "caller_s", "run_cli"]);
     assert!(
         out.status.success(),
         "paths-between should succeed for caller_s with loose TO. stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
     let stdout = String::from_utf8_lossy(&out.stdout);
-
 
     assert!(
         stdout.contains("[1 path(s)]"),
@@ -180,7 +170,6 @@ fn regression_paths_between_anti_oscillation_loose_target_still_resolves() {
         !stdout.contains("src/lib.rs:2"),
         "Daemon::run_cli (line 2) is unreachable from caller_s; must not appear. stdout:\n{stdout}"
     );
-
 
     let out2 = run_rustgraph(&["--path", &base, "callers", "run_cli"]);
     assert!(
