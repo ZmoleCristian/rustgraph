@@ -4,7 +4,7 @@
 #   2. wait for CI green        → fail-fast if build/release fails
 #   3. verify release artifacts → no point publishing if binaries missing
 #   4. cargo publish            → crates.io
-#   5. AUR push reminder        → manual, your routine
+#   5. publish both AUR packages
 #
 # Idempotent where it can be: re-running after a partial failure skips done steps.
 # Refuses to run on a dirty working tree or with a missing version match.

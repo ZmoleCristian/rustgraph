@@ -304,27 +304,42 @@ Restrict to derive\-generated or hand\-written impls.
 \fBExample:\fR \fBrustgraph impls Serialize \-\-handwritten\-only\fR
 .SS paths-between
 \fBrustgraph paths\-between\fR [\fB\-\-depth\fR \fIN\fR]
-[\fB\-n\fR \fIN\fR] [\fB\-\-show\-call\-sites\fR]
+[\fB\-n\fR \fIN\fR] [\fB\-\-max\-expansions\fR \fIN\fR]
+[\fB\-\-show\-call\-sites\fR]
 [\fB\-\-target\-in\fR \fIPATH_SUBSTR\fR]
 [\fB\-\-to\-module\fR \fIPATH_SUBSTR\fR] \fIFROM\fR [\fITO\fR]
 .PP
-Aliased as \fBwhy\fR. DFS through the call graph to enumerate paths
-from \fIFROM\fR to \fITO\fR. Answers "does \fIA\fR actually reach
-\fIB\fR, and through what?". Both arguments accept a name,
-\fIpath.rs\fR:\fILINE\fR, or \fIsymbol_id\fR.
+Aliased as \fBwhy\fR. Resolves the internal call graph once, prunes
+nodes that cannot reach the destination, and enumerates shorter paths
+first. Answers "does \fIA\fR actually reach \fIB\fR, and through
+what?". Both arguments accept a name, \fIpath.rs\fR:\fILINE\fR, or
+\fIsymbol_id\fR. Incompatible method/free-function homonyms and
+unmatched external qualifiers are suppressed rather than fabricated as
+local edges.
 .TP
 \fB\-\-depth\fR \fIN\fR
 Maximum path length in nodes (default \fB8\fR; \fB0\fR for unlimited).
-High values explode combinatorially in dense graphs.
+The limit is exact: a three-node path requires \fB\-\-depth 3\fR.
 .TP
 \fB\-n\fR, \fB\-\-max\-results\fR \fIN\fR
 Cap on the number of paths emitted (default \fB10\fR; \fB0\fR for
 unlimited).
 .TP
+\fB\-\-max\-expansions\fR \fIN\fR
+Hard cap on path states queued and examined (default \fB100000\fR;
+\fB0\fR for unlimited). Bounds CPU and queue memory during
+combinatorial all-path enumeration. Text and JSON output disclose when
+the cap truncates a search; JSON also includes \fBexpansions\fR and
+\fBmax_expansions\fR.
+.TP
 .B \-\-show\-call\-sites
-Annotate each hop with the source line where the next call happens.
-First lookup wins when a function calls the same callee from multiple
-sites.
+Annotate each hop with the source line of the exact resolved edge.
+Source order wins when a function calls the same resolved callee from
+multiple sites.
+.TP
+\fB\-\-target\-in\fR \fIPATH_SUBSTR\fR
+Restrict endpoints and traversal nodes to function files containing
+\fIPATH_SUBSTR\fR.
 .TP
 \fB\-\-to\-module\fR \fIPATH_SUBSTR\fR
 Blast\-radius mode: search to \fIany\fR function whose file path
@@ -615,10 +630,16 @@ before editing, not just locate it. One ensemble call typically replaces
 4\(en6 grep + read cycles.
 .TP
 .B rustgraph_paths_between
-Enumerate distinct call\-graph paths from \fIFROM\fR to \fITO\fR via DFS.
-Answers "does \fIA\fR reach \fIB\fR, and through what?". Default
-\fBmax_results: 8\fR; pass \fB0\fR for full enumeration.
-\fBshow_call_sites: true\fR annotates each hop with the source line.
+Enumerate resolved call\-graph paths from \fIFROM\fR to \fITO\fR,
+shortest first, after reverse\-reachability pruning. Answers "does
+\fIA\fR reach \fIB\fR, and through what?". Defaults:
+\fBdepth: 8\fR, \fBmax_results: 10\fR,
+\fBmax_expansions: 100000\fR. \fBshow_call_sites: true\fR annotates
+each exact edge. \fBexclude_tests: true\fR removes test endpoints and
+traversal nodes. \fBtimeout_ms\fR controls the cancellation\-safe
+subprocess deadline (default \fB30000\fR, clamped to
+\fB100..300000\fR milliseconds). A cancelled or timed\-out MCP request
+terminates its child process.
 .TP
 .B rustgraph_tree
 Module/file tree with per\-file symbol counts (fn, struct, enum, plus

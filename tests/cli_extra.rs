@@ -1692,7 +1692,7 @@ fn regression_paths_between_resolves_qualified_call_chain() {
         "pub fn main() { mycrate::deep::target_fn(); }\n",
     );
     write_file(
-        &fixture.path().join("src/lib.rs"),
+        &fixture.path().join("src/deep.rs"),
         "pub fn target_fn() { let _ = 1; }\n",
     );
     let base = fixture.path().to_string_lossy().to_string();

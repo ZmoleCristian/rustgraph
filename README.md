@@ -79,6 +79,13 @@ rustgraph usages <Type>          # who constructs/mentions a type (callers + ref
 
 Run `rustgraph --help` for the full list, `rustgraph <cmd> --help` for flags.
 
+`paths-between` resolves the internal call graph once, prunes nodes that cannot
+reach the destination, and emits shorter paths first. Its exact node-depth
+limit and `--max-expansions` search-state budget (default `100000`) keep dense
+or ambiguous graphs bounded; JSON output reports when that budget truncated a
+search. The MCP wrapper also terminates cancelled subprocesses and applies a
+30-second default deadline to this tool (`timeout_ms` can override it).
+
 ## MCP server (Claude / Codex / Gemini)
 
 `rustgraph` ships an MCP server that exposes 6 of the most-used subcommands as

@@ -65,9 +65,6 @@ pub(crate) fn resolve_ambiguous_call_target(
     if candidate_ids.is_empty() {
         return None;
     }
-    if candidate_ids.len() == 1 {
-        return Some(candidate_ids[0].clone());
-    }
 
     let caller_module = call_site
         .caller_id
@@ -143,6 +140,15 @@ pub(crate) fn resolve_ambiguous_call_target(
                 }
             }
         }
+
+        // A qualified call whose qualifier matches no local module is most
+        // likely external (`tokio::spawn`, `std::mem::take`, ...).  Falling
+        // through to the sole same-name local function fabricates an edge.
+        return None;
+    }
+
+    if candidate_ids.len() == 1 {
+        return Some(candidate_ids[0].clone());
     }
 
     let mut same_file = candidate_ids

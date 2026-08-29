@@ -271,6 +271,8 @@ pub struct PathsBetweenRequest {
     pub depth: usize,
     /// Maximum number of distinct paths to return.
     pub max_results: usize,
+    /// Maximum number of path states to examine before returning a bounded result.
+    pub max_expansions: usize,
     /// Restrict the graph traversal to functions under this path prefix.
     pub in_path: Option<String>,
     /// Annotate each hop with its concrete call-site location.
@@ -490,6 +492,7 @@ impl ExecutionMode {
                     to: pb.to.unwrap_or_default(),
                     depth: pb.depth,
                     max_results: pb.max_results,
+                    max_expansions: pb.max_expansions,
                     in_path: pb.in_path,
                     show_call_sites: pb.show_call_sites,
                     to_module: pb.to_module,

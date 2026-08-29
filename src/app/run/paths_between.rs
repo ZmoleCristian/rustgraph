@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
 use serde::Serialize;
 
@@ -6,18 +7,18 @@ use super::super::modes::PathsBetweenRequest;
 use super::super::project::ProjectData;
 use super::switchboard::write_string_output;
 use crate::cli::Args;
-use crate::index::qualifier::{
-    candidate_matches_qualifier, qualifier_for_callee, resolve_callee_candidates,
-    ResolutionStats,
-};
+use crate::index::qualifier::{candidate_matches_qualifier, qualifier_for_callee};
+use crate::index::{collect_framework_handler_refs, resolve_call_targets};
 use crate::{FunctionInfo, function_id};
 
-/// Implements `rustgraph paths-between <from> <to>` — DFS reachability search in the call graph.
+/// Implements `rustgraph paths-between <from> <to>` — bounded shortest-first search in the call graph.
 ///
 /// Resolves both endpoints (by name, `path:line`, or qualified path), optionally restricts to a
-/// module via `--to-module`, and returns all call paths up to `--depth` hops and `--max-results`
-/// total paths. When no forward path exists, automatically probes the reverse direction and
-/// suggests the swapped command. Outputs a `PathsReport` in text or JSON.
+/// module via `--to-module`, and returns call paths up to `--depth` nodes and `--max-results`
+/// total paths. Call sites are resolved and deduplicated once, then a reverse reachability pass
+/// prunes every node that cannot reach the destination. `--max-expansions` provides a hard bound
+/// for explicit all-path enumeration. When no forward path exists, the reverse direction is
+/// probed and a swapped command is suggested. Outputs a `PathsReport` in text or JSON.
 pub fn run(
     args: &Args,
     project: &ProjectData,
@@ -27,6 +28,19 @@ pub fn run(
         .functions
         .iter()
         .map(|f| (function_id(f), f))
+        .collect();
+
+    let allowed_ids: HashSet<String> = project
+        .functions
+        .iter()
+        .filter(|function| !args.exclude_tests || !function.is_test)
+        .filter(|function| {
+            request
+                .in_path
+                .as_ref()
+                .is_none_or(|needle| function.file_path.contains(needle))
+        })
+        .map(function_id)
         .collect();
 
     let mut from_ids = resolve_query(&request.from, project);
@@ -43,6 +57,7 @@ pub fn run(
             .iter()
             .filter(|f| f.file_path.contains(module_substr))
             .map(function_id)
+            .filter(|id| allowed_ids.contains(id))
             .collect();
 
         let mut seen: HashSet<String> = to_ids.iter().cloned().collect();
@@ -54,10 +69,12 @@ pub fn run(
     }
 
 
-    if let Some(needle) = &request.in_path {
-        from_ids.retain(|id| by_id.get(id).is_some_and(|f| f.file_path.contains(needle)));
-        to_ids.retain(|id| by_id.get(id).is_some_and(|f| f.file_path.contains(needle)));
-    }
+    from_ids.retain(|id| allowed_ids.contains(id));
+    to_ids.retain(|id| allowed_ids.contains(id));
+    from_ids.sort();
+    from_ids.dedup();
+    to_ids.sort();
+    to_ids.dedup();
 
     if from_ids.is_empty() {
         return Err(format!(
@@ -66,7 +83,7 @@ pub fn run(
             request
                 .in_path
                 .as_deref()
-                .map(|p| format!(" with --in '{}'", p))
+                .map(|p| format!(" with --target-in '{}'", p))
                 .unwrap_or_default(),
             request.from
         )
@@ -90,108 +107,33 @@ pub fn run(
             request
                 .in_path
                 .as_deref()
-                .map(|p| format!(" with --in '{}'", p))
+                .map(|p| format!(" with --target-in '{}'", p))
                 .unwrap_or_default(),
             request.to
         )
         .into());
     }
-    let by_name: HashMap<&str, Vec<&FunctionInfo>> = {
-        let mut m: HashMap<&str, Vec<&FunctionInfo>> = HashMap::new();
-        for f in &project.functions {
-            m.entry(f.name.as_str()).or_default().push(f);
-        }
-        m
-    };
-    let to_set: HashSet<String> = to_ids.iter().cloned().collect();
-
-    let max_depth = if request.depth == 0 {
+    let max_nodes = if request.depth == 0 {
         usize::MAX
     } else {
         request.depth
     };
 
-
-    let cap_is_unlimited = request.max_results == 0;
-    let max_paths = if cap_is_unlimited {
-        usize::MAX
-    } else {
-
-        request.max_results + 1
-    };
-
-
-    let mut resolution_stats = ResolutionStats::default();
-    let strict_only = args.strict_resolution;
-
-    let mut paths: Vec<Vec<String>> = Vec::new();
-    for from in &from_ids {
-        let mut stack: Vec<String> = vec![from.clone()];
-        let mut visited: HashSet<String> = HashSet::new();
-        visited.insert(from.clone());
-        dfs(
-            from,
-            &to_set,
-            &project.call_map,
-            &by_name,
-            &by_id,
-            &mut stack,
-            &mut visited,
-            &mut paths,
-            max_depth,
-            max_paths,
-            strict_only,
-            &mut resolution_stats,
-        );
-        if paths.len() >= max_paths {
-            break;
-        }
-    }
-
-
-    let bfs_clamped = !cap_is_unlimited && paths.len() == request.max_results + 1;
-
-    paths = dedup_preserve_order(paths);
-
-
-    let cap_hit = bfs_clamped || (!cap_is_unlimited && paths.len() > request.max_results);
-    if !cap_is_unlimited && paths.len() > request.max_results {
-        paths.truncate(request.max_results);
-    }
-
-
-    let call_site_index: HashMap<(String, String), usize> = if request.show_call_sites {
-        let mut m: HashMap<(String, String), usize> = HashMap::new();
-        for s in &project.call_sites {
-            if let Some(cid) = &s.caller_id {
-                m.entry((cid.clone(), s.callee_base.clone()))
-                    .or_insert(s.line);
-            }
-        }
-        m
-    } else {
-        HashMap::new()
-    };
-
-    let mapped_paths: Vec<Vec<NodeView>> = paths
-        .into_iter()
-        .map(|p| {
-            let mut nv: Vec<NodeView> = p
-                .iter()
-                .filter_map(|id| by_id.get(id).map(|f| node_view(f)))
-                .collect();
-            if request.show_call_sites {
-                for i in 0..nv.len().saturating_sub(1) {
-                    let caller_id = &p[i];
-                    let next_name = nv[i + 1].name.clone();
-                    let line = call_site_index
-                        .get(&(caller_id.clone(), next_name.clone()))
-                        .copied();
-                    nv[i].call_site_line = line;
-                }
-            }
-            nv
-        })
+    let graph = ResolvedGraph::build(project, &allowed_ids);
+    let from_nodes = graph.indices(&from_ids);
+    let to_nodes: HashSet<usize> = graph.indices(&to_ids).into_iter().collect();
+    let search = search_paths(
+        &graph,
+        &from_nodes,
+        &to_nodes,
+        max_nodes,
+        request.max_results,
+        request.max_expansions,
+    );
+    let mapped_paths = search
+        .paths
+        .iter()
+        .map(|path| map_path(path, &graph, &by_id, request.show_call_sites))
         .collect();
 
 
@@ -209,40 +151,31 @@ pub fn run(
             .filter_map(|id| by_id.get(id).map(|f| node_view(f)))
             .collect(),
         paths: mapped_paths,
-        cap_hit,
+        cap_hit: search.cap_hit,
+        search_truncated: search.expansion_limit_hit,
+        expansions: search.expansions,
+        max_expansions: request.max_expansions,
         reverse_suggestion: None,
     };
 
     if report.paths.is_empty() {
-
-
-        let from_set: HashSet<String> = from_ids.iter().cloned().collect();
-        let reverse_path_cap = if args.json { 3 } else { 1 };
-        let mut reverse_paths: Vec<Vec<String>> = Vec::new();
-        for to in &to_ids {
-            let mut stack: Vec<String> = vec![to.clone()];
-            let mut visited: HashSet<String> = HashSet::new();
-            visited.insert(to.clone());
-            dfs(
-                to,
-                &from_set,
-                &project.call_map,
-                &by_name,
-                &by_id,
-                &mut stack,
-                &mut visited,
-                &mut reverse_paths,
-                max_depth,
-                reverse_path_cap,
-                strict_only,
-                &mut resolution_stats,
+        if search.expansion_limit_hit && search.reachable {
+            eprintln!(
+                "a path from '{}' to '{}' exists within --depth={}, but enumeration stopped after --max-expansions={}; raise the limit to materialize it",
+                request.from, to_display, request.depth, request.max_expansions
             );
-            if reverse_paths.len() >= reverse_path_cap {
-                break;
-            }
-        }
-        let reverse_has_path = !reverse_paths.is_empty();
-        if reverse_has_path {
+        } else {
+            let from_set: HashSet<usize> = from_nodes.iter().copied().collect();
+            let reverse_path_cap = if args.json { 3 } else { 1 };
+            let reverse = search_paths(
+                &graph,
+                &to_nodes.iter().copied().collect::<Vec<_>>(),
+                &from_set,
+                max_nodes,
+                reverse_path_cap,
+                request.max_expansions,
+            );
+            if !reverse.paths.is_empty() {
 
 
             let to_label_for_revcmd = if request.to.is_empty() {
@@ -256,27 +189,24 @@ pub fn run(
             );
 
 
-            if args.json {
-                reverse_paths.truncate(3);
-                let mut suggestion: Vec<Vec<NodeView>> = reverse_paths
-                    .into_iter()
-                    .map(|p| {
-                        p.iter()
-                            .filter_map(|id| by_id.get(id).map(|f| node_view(f)))
-                            .collect()
-                    })
-                    .collect();
-
-                suggestion.retain(|p| !p.is_empty());
-                if !suggestion.is_empty() {
-                    report.reverse_suggestion = Some(suggestion);
+                if args.json {
+                    let mut suggestion: Vec<Vec<NodeView>> = reverse
+                        .paths
+                        .iter()
+                        .take(3)
+                        .map(|path| map_path(path, &graph, &by_id, false))
+                        .collect();
+                    suggestion.retain(|path| !path.is_empty());
+                    if !suggestion.is_empty() {
+                        report.reverse_suggestion = Some(suggestion);
+                    }
                 }
+            } else {
+                eprintln!(
+                    "no path from '{}' to '{}' within --depth={} (call graph reachability)",
+                    request.from, to_display, request.depth
+                );
             }
-        } else {
-            eprintln!(
-                "no path from '{}' to '{}' within --depth={} (call graph reachability)",
-                request.from, to_display, request.depth
-            );
         }
     }
 
@@ -286,71 +216,279 @@ pub fn run(
     } else {
         write_string_output(args.output.as_deref(), &render_text(&report))?;
     }
-
-
-    resolution_stats.emit_stderr_note();
-
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn dfs(
-    current: &str,
-    to_set: &HashSet<String>,
-    call_map: &HashMap<String, Vec<String>>,
-    by_name: &HashMap<&str, Vec<&FunctionInfo>>,
-    by_id: &HashMap<String, &FunctionInfo>,
-    stack: &mut Vec<String>,
-    visited: &mut HashSet<String>,
-    out: &mut Vec<Vec<String>>,
-    max_depth: usize,
-    max_paths: usize,
+#[derive(Clone, Debug)]
+struct ResolvedEdge {
+    target: usize,
+    call_site_line: usize,
+}
 
+#[derive(Debug)]
+struct ResolvedGraph {
+    ids: Vec<String>,
+    index: HashMap<String, usize>,
+    outgoing: Vec<Vec<ResolvedEdge>>,
+    incoming: Vec<Vec<usize>>,
+}
 
-    strict_only: bool,
-    stats: &mut ResolutionStats,
-) {
-    if out.len() >= max_paths {
-        return;
+impl ResolvedGraph {
+    fn build(project: &ProjectData, allowed_ids: &HashSet<String>) -> Self {
+        let mut ids: Vec<String> = allowed_ids.iter().cloned().collect();
+        ids.sort();
+        let index: HashMap<String, usize> = ids
+            .iter()
+            .enumerate()
+            .map(|(position, id)| (id.clone(), position))
+            .collect();
+        let allowed_functions: Vec<FunctionInfo> = project
+            .functions
+            .iter()
+            .filter(|function| allowed_ids.contains(&function_id(function)))
+            .cloned()
+            .collect();
+
+        let mut call_sites = project.call_sites.clone();
+        let mut file_cache = HashMap::new();
+        call_sites.extend(collect_framework_handler_refs(
+            &project.call_sites,
+            &mut file_cache,
+        ));
+        call_sites.retain(|site| {
+            matches!(
+                site.call_kind.as_str(),
+                "function" | "method" | "function_via_alias" | "method_via_alias"
+            )
+                && site
+                    .caller_id
+                    .as_ref()
+                    .is_some_and(|caller| allowed_ids.contains(caller))
+        });
+
+        let mut resolved = resolve_call_targets(&allowed_functions, &call_sites);
+        resolved.sort_by(|left, right| {
+            left.caller_id
+                .cmp(&right.caller_id)
+                .then(left.line.cmp(&right.line))
+                .then(left.column.cmp(&right.column))
+                .then(left.resolved_internal_id.cmp(&right.resolved_internal_id))
+        });
+
+        let mut outgoing = vec![Vec::new(); ids.len()];
+        let mut incoming = vec![Vec::new(); ids.len()];
+        let mut seen = HashSet::new();
+        for call in resolved {
+            let Some(target_id) = call.resolved_internal_id else {
+                continue;
+            };
+            let (Some(&caller), Some(&target)) =
+                (index.get(&call.caller_id), index.get(&target_id))
+            else {
+                continue;
+            };
+            if !seen.insert((caller, target)) {
+                continue;
+            }
+            outgoing[caller].push(ResolvedEdge {
+                target,
+                call_site_line: call.line,
+            });
+            incoming[target].push(caller);
+        }
+        for edges in &mut outgoing {
+            edges.sort_by(|left, right| {
+                left.call_site_line
+                    .cmp(&right.call_site_line)
+                    .then(ids[left.target].cmp(&ids[right.target]))
+            });
+        }
+        for callers in &mut incoming {
+            callers.sort_unstable();
+            callers.dedup();
+        }
+
+        Self {
+            ids,
+            index,
+            outgoing,
+            incoming,
+        }
     }
-    if to_set.contains(current) && stack.len() > 1 {
-        out.push(stack.clone());
-        return;
+
+    fn indices(&self, ids: &[String]) -> Vec<usize> {
+        let mut indices: Vec<usize> = ids
+            .iter()
+            .filter_map(|id| self.index.get(id).copied())
+            .collect();
+        indices.sort_unstable();
+        indices.dedup();
+        indices
     }
-    if stack.len() > max_depth {
-        return;
+
+    fn call_site_line(&self, caller: usize, target: usize) -> Option<usize> {
+        self.outgoing[caller]
+            .iter()
+            .find(|edge| edge.target == target)
+            .map(|edge| edge.call_site_line)
     }
-    let Some(callees) = call_map.get(current) else {
-        return;
+}
+
+#[derive(Debug)]
+struct PathSearch {
+    paths: Vec<Vec<usize>>,
+    cap_hit: bool,
+    expansion_limit_hit: bool,
+    expansions: usize,
+    reachable: bool,
+}
+
+fn search_paths(
+    graph: &ResolvedGraph,
+    sources: &[usize],
+    targets: &HashSet<usize>,
+    max_nodes: usize,
+    max_results: usize,
+    max_expansions: usize,
+) -> PathSearch {
+    let distances = reverse_distances(graph, targets);
+    let mut queue: BinaryHeap<Reverse<(usize, usize, Vec<usize>)>> = BinaryHeap::new();
+    let mut reachable = false;
+    let mut states_queued = 0usize;
+    let mut expansion_limit_hit = false;
+    for &source in sources {
+        let Some(distance) = distances[source] else {
+            continue;
+        };
+        if max_nodes != usize::MAX && distance.saturating_add(1) > max_nodes {
+            continue;
+        }
+        reachable = true;
+        if max_expansions != 0 && states_queued >= max_expansions {
+            expansion_limit_hit = true;
+            break;
+        }
+        queue.push(Reverse((distance.saturating_add(1), 1, vec![source])));
+        states_queued += 1;
+    }
+
+    let result_limit = if max_results == 0 {
+        usize::MAX
+    } else {
+        max_results.saturating_add(1)
     };
-    for callee_name in callees {
+    let mut paths = Vec::new();
+    let mut expansions = 0usize;
 
+    while let Some(Reverse((_estimate, _length, path))) = queue.pop() {
+        expansions += 1;
+        let current = *path.last().expect("queued paths are non-empty");
+        if path.len() > 1 && targets.contains(&current) {
+            paths.push(path);
+            if paths.len() >= result_limit {
+                break;
+            }
+            continue;
+        }
+        if path.len() >= max_nodes {
+            continue;
+        }
 
-        let bare = callee_name
-            .rsplit(|c: char| c == '.' || c == ':')
-            .next()
-            .unwrap_or(callee_name.as_str());
+        // The budget counts admitted path states, not only popped ones. Once
+        // exhausted, draining already-queued targets is safe, but creating
+        // successors would violate the CPU/memory bound.
+        if max_expansions != 0 && states_queued >= max_expansions {
+            expansion_limit_hit = true;
+            continue;
+        }
 
-
-        let (filtered, mode) = resolve_callee_candidates(callee_name, bare, by_name, strict_only);
-        stats.record(mode);
-        for m in filtered {
-            let id = function_id(m);
-            if !by_id.contains_key(&id) {
+        for (edge_position, edge) in graph.outgoing[current].iter().enumerate() {
+            if path.contains(&edge.target) {
                 continue;
             }
-            if !visited.insert(id.clone()) {
+            let Some(distance) = distances[edge.target] else {
+                continue;
+            };
+            let next_len = path.len().saturating_add(1);
+            let estimated_nodes = next_len.saturating_add(distance);
+            if max_nodes != usize::MAX && estimated_nodes > max_nodes {
                 continue;
             }
-            stack.push(id.clone());
-            dfs(&id, to_set, call_map, by_name, by_id, stack, visited, out, max_depth, max_paths, strict_only, stats);
-            stack.pop();
-            visited.remove(&id);
-            if out.len() >= max_paths {
-                return;
+            let mut next = path.clone();
+            next.push(edge.target);
+            queue.push(Reverse((estimated_nodes, next_len, next)));
+            states_queued += 1;
+            if max_expansions != 0 && states_queued >= max_expansions {
+                let has_omitted_successor = graph.outgoing[current][edge_position + 1..]
+                    .iter()
+                    .any(|candidate| {
+                        if path.contains(&candidate.target) {
+                            return false;
+                        }
+                        distances[candidate.target].is_some_and(|distance| {
+                            max_nodes == usize::MAX
+                                || next_len.saturating_add(distance) <= max_nodes
+                        })
+                    });
+                expansion_limit_hit |= has_omitted_successor;
+                break;
             }
         }
     }
+
+    let cap_hit = max_results != 0 && paths.len() > max_results;
+    if cap_hit {
+        paths.truncate(max_results);
+    }
+    PathSearch {
+        paths,
+        cap_hit,
+        expansion_limit_hit,
+        expansions,
+        reachable,
+    }
+}
+
+fn reverse_distances(graph: &ResolvedGraph, targets: &HashSet<usize>) -> Vec<Option<usize>> {
+    let mut distances: Vec<Option<usize>> = vec![None; graph.ids.len()];
+    let mut queue = VecDeque::new();
+    let mut ordered_targets: Vec<usize> = targets.iter().copied().collect();
+    ordered_targets.sort_unstable();
+    for target in ordered_targets {
+        distances[target] = Some(0);
+        queue.push_back(target);
+    }
+    while let Some(current) = queue.pop_front() {
+        let next_distance = distances[current]
+            .expect("queued nodes have a distance")
+            .saturating_add(1);
+        for &caller in &graph.incoming[current] {
+            if distances[caller].is_none() {
+                distances[caller] = Some(next_distance);
+                queue.push_back(caller);
+            }
+        }
+    }
+    distances
+}
+
+fn map_path(
+    path: &[usize],
+    graph: &ResolvedGraph,
+    by_id: &HashMap<String, &FunctionInfo>,
+    show_call_sites: bool,
+) -> Vec<NodeView> {
+    path.iter()
+        .enumerate()
+        .filter_map(|(position, &node)| {
+            let function = by_id.get(&graph.ids[node])?;
+            let mut view = node_view(function);
+            if show_call_sites && let Some(&next) = path.get(position + 1) {
+                view.call_site_line = graph.call_site_line(node, next);
+            }
+            Some(view)
+        })
+        .collect()
 }
 
 fn resolve_query(query: &str, project: &ProjectData) -> Vec<String> {
@@ -458,6 +596,13 @@ struct PathsReport {
     #[serde(skip)]
     cap_hit: bool,
 
+    /// True when the hard path-state budget stopped enumeration before the queue emptied.
+    search_truncated: bool,
+    /// Number of path states examined by the bounded enumerator.
+    expansions: usize,
+    /// Configured hard path-state budget (`0` means unlimited).
+    max_expansions: usize,
+
 
     #[serde(skip_serializing_if = "Option::is_none")]
     reverse_suggestion: Option<Vec<Vec<NodeView>>>,
@@ -471,6 +616,11 @@ fn render_text(report: &PathsReport) -> String {
         format!(
             "≥{} path(s) shown (search clamped — pass --max-results 0 for full enumeration)",
             report.paths.len()
+        )
+    } else if report.search_truncated {
+        format!(
+            "{} path(s) shown (search stopped after {} expansions — raise --max-expansions; current limit {})",
+            report.paths.len(), report.expansions, report.max_expansions
         )
     } else {
         format!("{} path(s)", report.paths.len())
@@ -501,67 +651,79 @@ fn render_text(report: &PathsReport) -> String {
     out
 }
 
-/// Deduplicate `paths` in-place while preserving insertion order.
-///
-/// Avoids the per-element clone that `paths.retain(|p| seen.insert(p.clone()))`
-/// would otherwise pay: phase 1 walks the input by reference to compute a
-/// keep-mask using borrowed slices as the set key; phase 2 moves only the
-/// kept entries via `mem::take` — duplicates are dropped without any clone.
-fn dedup_preserve_order(mut paths: Vec<Vec<String>>) -> Vec<Vec<String>> {
-    if paths.is_empty() {
-        return paths;
-    }
-    let mut keep: Vec<bool> = Vec::with_capacity(paths.len());
-    {
-        let mut seen: HashSet<&[String]> = HashSet::with_capacity(paths.len());
-        for p in &paths {
-            keep.push(seen.insert(p.as_slice()));
-        }
-    }
-    let mut deduped: Vec<Vec<String>> = Vec::with_capacity(paths.len());
-    for (i, p) in paths.iter_mut().enumerate() {
-        if keep[i] {
-            deduped.push(std::mem::take(p));
-        }
-    }
-    deduped
-}
-
 #[cfg(test)]
 mod tests {
-    use super::dedup_preserve_order;
+    use super::{ResolvedEdge, ResolvedGraph, search_paths};
+    use std::collections::{HashMap, HashSet};
 
-    fn p<const N: usize>(items: [&str; N]) -> Vec<String> {
-        items.iter().map(|s| (*s).to_string()).collect()
+    fn graph(node_count: usize, edges: &[(usize, usize)]) -> ResolvedGraph {
+        let ids: Vec<String> = (0..node_count).map(|node| format!("n{node}")).collect();
+        let index = ids
+            .iter()
+            .enumerate()
+            .map(|(node, id)| (id.clone(), node))
+            .collect::<HashMap<_, _>>();
+        let mut outgoing = vec![Vec::new(); node_count];
+        let mut incoming = vec![Vec::new(); node_count];
+        for (line, &(from, to)) in edges.iter().enumerate() {
+            outgoing[from].push(ResolvedEdge {
+                target: to,
+                call_site_line: line + 1,
+            });
+            incoming[to].push(from);
+        }
+        ResolvedGraph {
+            ids,
+            index,
+            outgoing,
+            incoming,
+        }
     }
 
     #[test]
-    fn dedup_preserves_first_occurrence_order() {
-        let input = vec![
-            p(["a", "b"]),
-            p(["c", "d"]),
-            p(["a", "b"]),
-            p(["e"]),
-            p(["c", "d"]),
-        ];
-        let out = dedup_preserve_order(input);
+    fn depth_is_a_strict_node_count_limit() {
+        let graph = graph(3, &[(0, 1), (1, 2)]);
+        let targets = HashSet::from([2]);
+        let too_shallow = search_paths(&graph, &[0], &targets, 2, 10, 100);
+        assert!(too_shallow.paths.is_empty());
+        assert!(!too_shallow.reachable);
+
+        let exact = search_paths(&graph, &[0], &targets, 3, 10, 100);
+        assert_eq!(exact.paths, vec![vec![0, 1, 2]]);
+    }
+
+    #[test]
+    fn reverse_reachability_prunes_dense_dead_ends() {
+        let mut edges = vec![(0, 1), (1, 2)];
+        for node in 3..100 {
+            edges.push((0, node));
+            if node + 1 < 100 {
+                edges.push((node, node + 1));
+            }
+        }
+        let graph = graph(100, &edges);
+        let result = search_paths(&graph, &[0], &HashSet::from([2]), usize::MAX, 1, 100);
+        assert_eq!(result.paths, vec![vec![0, 1, 2]]);
         assert_eq!(
-            out,
-            vec![p(["a", "b"]), p(["c", "d"]), p(["e"])],
-            "duplicates after the first must be dropped, order preserved"
+            result.expansions, 3,
+            "dead-end component must never enter the queue"
         );
     }
 
     #[test]
-    fn dedup_is_a_noop_when_no_duplicates() {
-        let input = vec![p(["a"]), p(["a", "b"]), p(["b"])];
-        let out = dedup_preserve_order(input.clone());
-        assert_eq!(out, input);
-    }
-
-    #[test]
-    fn dedup_handles_empty_input() {
-        let out = dedup_preserve_order(Vec::<Vec<String>>::new());
-        assert!(out.is_empty());
+    fn expansion_budget_is_a_hard_stop() {
+        let graph = graph(3, &[(0, 1), (1, 2)]);
+        let result = search_paths(
+            &graph,
+            &[0],
+            &HashSet::from([2]),
+            usize::MAX,
+            10,
+            1,
+        );
+        assert!(result.paths.is_empty());
+        assert!(result.reachable);
+        assert!(result.expansion_limit_hit);
+        assert_eq!(result.expansions, 1);
     }
 }

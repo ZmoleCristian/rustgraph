@@ -249,7 +249,7 @@ pub enum McpAction {
 }
 
 
-/// Arguments for the `paths-between` subcommand (DFS call-graph reachability).
+/// Arguments for the `paths-between` subcommand (bounded shortest-first call-graph search).
 #[derive(clap::Args, Debug, Clone)]
 pub struct PathsBetweenCommand {
     #[arg(help = "Source function (name, path.rs:LINE, or symbol_id)")]
@@ -264,7 +264,7 @@ pub struct PathsBetweenCommand {
     #[arg(
         long,
         default_value_t = 8,
-        help = "Maximum path length in nodes (0 = unlimited). Higher values explode combinatorially in dense graphs."
+        help = "Maximum path length in nodes (0 = unlimited)."
     )]
     pub depth: usize,
 
@@ -277,6 +277,13 @@ pub struct PathsBetweenCommand {
     pub max_results: usize,
 
     #[arg(
+        long,
+        default_value_t = 100_000,
+        help = "Maximum path states to queue and examine (0 = unlimited). Bounds CPU and memory during all-path enumeration."
+    )]
+    pub max_expansions: usize,
+
+    #[arg(
         long = "target-in",
         value_name = "PATH_SUBSTR",
         help = "TARGET filter: scope both FROM and TO candidate resolution by file_path SUBSTR."
@@ -285,7 +292,7 @@ pub struct PathsBetweenCommand {
 
     #[arg(
         long,
-        help = "Annotate each hop with the source line where the next call happens. Pulled from project.call_sites; first lookup wins when a fn calls the same callee from multiple sites."
+        help = "Annotate each hop with the exact resolved call-site line. First source-order edge wins when one function calls the same resolved callee more than once."
     )]
     pub show_call_sites: bool,
 
@@ -964,7 +971,7 @@ pub struct Args {
     pub match_signature: bool,
 
     #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Search",
-        help = "Drop matches whose enclosing fn is_test (grep/refs/find/dead-code/callers/ensemble/usages)"
+        help = "Drop matches whose enclosing fn is_test (grep/refs/find/dead-code/callers/ensemble/usages/paths-between)"
     )]
     pub exclude_tests: bool,
 
@@ -975,7 +982,7 @@ pub struct Args {
 
 
     #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Resolution",
-        help = "Drop call edges where type-strict matching returned 0 candidates instead of falling back to bare-name match (callers/call-graph/paths-between).",
+        help = "Drop call edges where type-strict matching returned 0 candidates instead of falling back to bare-name match (callers/call-graph; paths-between is conservative by default).",
         long_help = "When set, drop call edges that the strict resolver filters out instead of falling back to bare-name match. \
 Reduces false-positive edges at the cost of hiding some legit ones; see stderr for dropped count."
     )]

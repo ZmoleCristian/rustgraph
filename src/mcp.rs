@@ -1,7 +1,8 @@
 
 
-use std::process::Command;
+use std::process::Stdio;
 use std::sync::Arc;
+use std::time::Duration;
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -186,12 +187,27 @@ pub struct PathsBetweenArgs {
     /// Crate root (defaults to cwd).
     #[serde(default)]
     pub path: Option<String>,
-    /// Max paths (default 8, 0 = unlimited).
+    /// Maximum path length in nodes (default 8, 0 = unlimited).
+    #[serde(default)]
+    pub depth: Option<u32>,
+    /// Max paths (default 10, 0 = unlimited).
     #[serde(default)]
     pub max_results: Option<u32>,
+    /// Maximum path states examined (default 100000, 0 = unlimited).
+    #[serde(default)]
+    pub max_expansions: Option<u32>,
     /// Annotate each hop with the call-site line.
     #[serde(default)]
     pub show_call_sites: Option<bool>,
+    /// Drop test functions from endpoints and traversal.
+    #[serde(default)]
+    pub exclude_tests: Option<bool>,
+    /// Request conservative resolution explicitly (paths-between is conservative by default).
+    #[serde(default)]
+    pub strict_resolution: Option<bool>,
+    /// Subprocess deadline in milliseconds (default 30000; clamped to 100..300000).
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -286,7 +302,7 @@ impl RustgraphServer {
         if let Some(kind) = p.0.kind {
             argv.push(kind.flag().into());
         }
-        Ok(run_rustgraph(&self.binary, &argv))
+        Ok(run_rustgraph(&self.binary, &argv).await)
     }
 
 
@@ -316,7 +332,7 @@ impl RustgraphServer {
         if p.0.flat == Some(true) {
             argv.push("--flat".into());
         }
-        Ok(run_rustgraph(&self.binary, &argv))
+        Ok(run_rustgraph(&self.binary, &argv).await)
     }
 
 
@@ -343,7 +359,7 @@ impl RustgraphServer {
             argv.push("--preset".into());
             argv.push(pre.as_cli().into());
         }
-        Ok(run_rustgraph(&self.binary, &argv))
+        Ok(run_rustgraph(&self.binary, &argv).await)
     }
 
 
@@ -377,13 +393,13 @@ impl RustgraphServer {
             argv.push("--max-results".into());
             argv.push(n.to_string());
         }
-        Ok(run_rustgraph(&self.binary, &argv))
+        Ok(run_rustgraph(&self.binary, &argv).await)
     }
 
 
     #[tool(
         name = "rustgraph_paths_between",
-        description = "Use INSTEAD OF manual tracing for 'walk me through' / 'trace flow' / 'does A reach B'. Enumerates call-graph paths with file:line per hop. Deterministic; better than guessing."
+        description = "Use INSTEAD OF manual tracing for 'walk me through' / 'trace flow' / 'does A reach B'. Enumerates shortest-first call-graph paths with exact call-site lines, reverse-reachability pruning, and hard exploration/deadline bounds."
     )]
     async fn paths_between(
         &self,
@@ -394,17 +410,36 @@ impl RustgraphServer {
             argv.push("-p".into());
             argv.push(path.clone());
         }
+        if p.0.exclude_tests == Some(true) {
+            argv.push("--exclude-tests".into());
+        }
+        if p.0.strict_resolution == Some(true) {
+            argv.push("--strict-resolution".into());
+        }
         argv.push("paths-between".into());
         argv.push(p.0.from.clone());
         argv.push(p.0.to.clone());
+        if let Some(depth) = p.0.depth {
+            argv.push("--depth".into());
+            argv.push(depth.to_string());
+        }
         if let Some(n) = p.0.max_results {
             argv.push("--max-results".into());
+            argv.push(n.to_string());
+        }
+        if let Some(n) = p.0.max_expansions {
+            argv.push("--max-expansions".into());
             argv.push(n.to_string());
         }
         if p.0.show_call_sites == Some(true) {
             argv.push("--show-call-sites".into());
         }
-        Ok(run_rustgraph(&self.binary, &argv))
+        let timeout_ms = p
+            .0
+            .timeout_ms
+            .unwrap_or(PATHS_BETWEEN_TIMEOUT_MS)
+            .clamp(MIN_TIMEOUT_MS, MAX_TIMEOUT_MS);
+        Ok(run_rustgraph_with_timeout(&self.binary, &argv, timeout_ms).await)
     }
 
 
@@ -425,7 +460,7 @@ impl RustgraphServer {
         if p.0.files_only == Some(true) {
             argv.push("--files-only".into());
         }
-        Ok(run_rustgraph(&self.binary, &argv))
+        Ok(run_rustgraph(&self.binary, &argv).await)
     }
 }
 
@@ -468,59 +503,118 @@ impl ServerHandler for RustgraphServer {
 /// stdout, stderr, exit code, and (on Unix) the terminating signal so MCP
 /// clients can introspect the failure programmatically. The text content
 /// block remains human-readable for clients that ignore structured fields.
-fn run_rustgraph(binary: &str, args: &[String]) -> CallToolResult {
-    let output = Command::new(binary).args(args).output();
-    match output {
-        Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-            if out.status.success() {
-                let body = if stdout.is_empty() {
-                    log_misuse(args, "empty", &json!({}));
-                    "(no output)".to_string()
-                } else {
-                    stdout
-                };
-                CallToolResult::success(vec![Content::text(body)])
-            } else {
-                let exit_code = out.status.code();
-                #[cfg(unix)]
-                let signal = {
-                    use std::os::unix::process::ExitStatusExt;
-                    out.status.signal()
-                };
-                #[cfg(not(unix))]
-                let signal: Option<i32> = None;
+const DEFAULT_MCP_TIMEOUT_MS: u64 = 60_000;
+const PATHS_BETWEEN_TIMEOUT_MS: u64 = 30_000;
+const MIN_TIMEOUT_MS: u64 = 100;
+const MAX_TIMEOUT_MS: u64 = 300_000;
 
-                let summary = match (exit_code, signal) {
-                    (Some(code), _) => format!("rustgraph exited with status {code}"),
-                    (None, Some(sig)) => format!("rustgraph terminated by signal {sig}"),
-                    (None, None) => "rustgraph terminated abnormally".to_string(),
-                };
-                let payload = json!({
-                    "kind": "rustgraph_subprocess_failure",
-                    "summary": summary,
-                    "argv": args,
-                    "exit_code": exit_code,
-                    "signal": signal,
-                    "stdout": stdout,
-                    "stderr": stderr,
-                });
-                log_misuse(args, "subprocess_failure", &payload);
-                CallToolResult::structured_error(payload)
-            }
-        }
-        Err(e) => {
+async fn run_rustgraph(binary: &str, args: &[String]) -> CallToolResult {
+    run_rustgraph_with_timeout(binary, args, DEFAULT_MCP_TIMEOUT_MS).await
+}
+
+/// Spawn a cancellation-safe child with a wall-clock deadline.
+///
+/// `kill_on_drop(true)` is important here: cancelling an MCP request drops
+/// this future, which in turn terminates the CLI child instead of leaving a
+/// detached CPU-bound process behind.
+async fn run_rustgraph_with_timeout(
+    binary: &str,
+    args: &[String],
+    timeout_ms: u64,
+) -> CallToolResult {
+    let mut command = tokio::process::Command::new(binary);
+    command
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => return spawn_failure(binary, args, &error),
+    };
+
+    let output = match tokio::time::timeout(
+        Duration::from_millis(timeout_ms),
+        child.wait_with_output(),
+    )
+    .await
+    {
+        Ok(Ok(output)) => output,
+        Ok(Err(error)) => {
             let payload = json!({
-                "kind": "rustgraph_spawn_failure",
-                "summary": format!("failed to spawn rustgraph subprocess: {e}"),
+                "kind": "rustgraph_wait_failure",
+                "summary": format!("failed while waiting for rustgraph subprocess: {error}"),
                 "binary": binary,
                 "argv": args,
-                "io_error_kind": format!("{:?}", e.kind()),
+                "io_error_kind": format!("{:?}", error.kind()),
             });
-            log_misuse(args, "spawn_failure", &payload);
-            CallToolResult::structured_error(payload)
+            log_misuse(args, "wait_failure", &payload);
+            return CallToolResult::structured_error(payload);
         }
+        Err(_) => {
+            let payload = json!({
+                "kind": "rustgraph_subprocess_timeout",
+                "summary": format!("rustgraph exceeded the {timeout_ms} ms MCP deadline and was terminated"),
+                "binary": binary,
+                "argv": args,
+                "timeout_ms": timeout_ms,
+            });
+            log_misuse(args, "subprocess_timeout", &payload);
+            return CallToolResult::structured_error(payload);
+        }
+    };
+    translate_output(args, output)
+}
+
+fn spawn_failure(binary: &str, args: &[String], error: &std::io::Error) -> CallToolResult {
+    let payload = json!({
+        "kind": "rustgraph_spawn_failure",
+        "summary": format!("failed to spawn rustgraph subprocess: {error}"),
+        "binary": binary,
+        "argv": args,
+        "io_error_kind": format!("{:?}", error.kind()),
+    });
+    log_misuse(args, "spawn_failure", &payload);
+    CallToolResult::structured_error(payload)
+}
+
+fn translate_output(args: &[String], output: std::process::Output) -> CallToolResult {
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if output.status.success() {
+        let body = if stdout.is_empty() {
+            log_misuse(args, "empty", &json!({}));
+            "(no output)".to_string()
+        } else {
+            stdout
+        };
+        CallToolResult::success(vec![Content::text(body)])
+    } else {
+        let exit_code = output.status.code();
+        #[cfg(unix)]
+        let signal = {
+            use std::os::unix::process::ExitStatusExt;
+            output.status.signal()
+        };
+        #[cfg(not(unix))]
+        let signal: Option<i32> = None;
+
+        let summary = match (exit_code, signal) {
+            (Some(code), _) => format!("rustgraph exited with status {code}"),
+            (None, Some(signal)) => format!("rustgraph terminated by signal {signal}"),
+            (None, None) => "rustgraph terminated abnormally".to_string(),
+        };
+        let payload = json!({
+            "kind": "rustgraph_subprocess_failure",
+            "summary": summary,
+            "argv": args,
+            "exit_code": exit_code,
+            "signal": signal,
+            "stdout": stdout,
+            "stderr": stderr,
+        });
+        log_misuse(args, "subprocess_failure", &payload);
+        CallToolResult::structured_error(payload)
     }
 }
 
@@ -605,12 +699,36 @@ mod tests {
     }
 
     #[test]
-    fn run_rustgraph_spawn_failure_is_structured_error() {
+    fn paths_between_args_accept_all_search_guards() {
+        let args: PathsBetweenArgs = serde_json::from_value(json!({
+            "from": "main",
+            "to": "splice",
+            "depth": 8,
+            "max_results": 3,
+            "max_expansions": 5000,
+            "show_call_sites": true,
+            "exclude_tests": true,
+            "strict_resolution": true,
+            "timeout_ms": 2500
+        }))
+        .expect("valid paths-between MCP arguments");
+        assert_eq!(args.depth, Some(8));
+        assert_eq!(args.max_results, Some(3));
+        assert_eq!(args.max_expansions, Some(5000));
+        assert_eq!(args.show_call_sites, Some(true));
+        assert_eq!(args.exclude_tests, Some(true));
+        assert_eq!(args.strict_resolution, Some(true));
+        assert_eq!(args.timeout_ms, Some(2500));
+    }
+
+    #[tokio::test]
+    async fn run_rustgraph_spawn_failure_is_structured_error() {
         // Use a path that cannot exist as an executable.
         let result = run_rustgraph(
             "/nonexistent/no-such-binary-rustgraph-test",
             &["find".to_string(), "x".to_string()],
-        );
+        )
+        .await;
         assert_eq!(result.is_error, Some(true), "must be flagged as error");
         let payload = result
             .structured_content
@@ -702,14 +820,14 @@ mod tests {
         assert!(err.is_some(), "unknown preset must fail deserialization");
     }
 
-    #[test]
-    fn run_rustgraph_subprocess_nonzero_is_structured_error() {
+    #[tokio::test]
+    async fn run_rustgraph_subprocess_nonzero_is_structured_error() {
         // `false` exits 1 with no output on every Unix-like system. On Windows
         // this test is skipped because we don't ship `false`.
         if cfg!(not(unix)) {
             return;
         }
-        let result = run_rustgraph("false", &[]);
+        let result = run_rustgraph("false", &[]).await;
         assert_eq!(result.is_error, Some(true));
         let payload = result
             .structured_content
@@ -727,6 +845,30 @@ mod tests {
         assert!(
             !text.contains("--- stderr ---"),
             "old marker should not appear in restructured output: {text}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn run_rustgraph_timeout_returns_structured_error_promptly() {
+        let started = std::time::Instant::now();
+        let result = run_rustgraph_with_timeout("sleep", &["5".to_string()], 100).await;
+        assert_eq!(result.is_error, Some(true));
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "timeout must not wait for the child to finish"
+        );
+        let payload = result
+            .structured_content
+            .as_ref()
+            .expect("structured payload required");
+        assert_eq!(
+            payload.get("kind").and_then(|value| value.as_str()),
+            Some("rustgraph_subprocess_timeout")
+        );
+        assert_eq!(
+            payload.get("timeout_ms").and_then(|value| value.as_u64()),
+            Some(100)
         );
     }
 }

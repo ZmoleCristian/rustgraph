@@ -41,16 +41,17 @@ pub fn resolve_call_targets(
         }
 
         let resolved_internal_id = name_to_ids.get(&call_site.callee_base).and_then(|candidate_ids| {
+            let compatible_ids = compatible_candidate_ids(call_site, candidate_ids, &function_by_id);
             resolve_owner_qualified_method_target(
                 call_site,
-                candidate_ids,
+                &compatible_ids,
                 &function_by_id,
                 &module_lookup,
             )
             .or_else(|| {
                 resolve_ambiguous_call_target(
                     call_site,
-                    candidate_ids,
+                    &compatible_ids,
                     &function_by_id,
                     &module_lookup,
                 )
@@ -69,6 +70,46 @@ pub fn resolve_call_targets(
     }
 
     resolved
+}
+
+/// Keep only definitions that can be invoked by the syntactic call kind.
+///
+/// Without this guard, a variable method call such as `listener.accept()` can
+/// resolve to an unrelated free function named `accept`, creating a phantom
+/// edge that is especially damaging to transitive path searches.
+fn compatible_candidate_ids(
+    call_site: &CallSite,
+    candidate_ids: &[String],
+    function_by_id: &HashMap<String, &FunctionInfo>,
+) -> Vec<String> {
+    let call_kind = call_site
+        .call_kind
+        .strip_suffix("_via_alias")
+        .unwrap_or(call_site.call_kind.as_str());
+    let type_qualified = call_site
+        .callee
+        .rsplit_once("::")
+        .and_then(|(owner, _)| owner.rsplit("::").next())
+        .and_then(|owner| owner.trim().chars().next())
+        .is_some_and(|first| first.is_ascii_uppercase());
+
+    candidate_ids
+        .iter()
+        .filter(|id| {
+            let Some(function) = function_by_id.get(*id).copied() else {
+                return false;
+            };
+            let is_method = function.kind.starts_with("method(")
+                || function.kind.starts_with("trait_fn(");
+            match call_kind {
+                "method" => is_method,
+                "function" if type_qualified => is_method,
+                "function" => !is_method,
+                _ => false,
+            }
+        })
+        .cloned()
+        .collect()
 }
 
 fn resolve_owner_qualified_method_target(
@@ -116,7 +157,12 @@ fn resolve_owner_qualified_method_target(
 }
 
 fn method_owner_segments(function: &FunctionInfo) -> Option<Vec<String>> {
-    let kind = function.kind.strip_prefix("method(")?.strip_suffix(')')?.trim();
+    let kind = function
+        .kind
+        .strip_prefix("method(")
+        .or_else(|| function.kind.strip_prefix("trait_fn("))?
+        .strip_suffix(')')?
+        .trim();
     if kind.is_empty() {
         return None;
     }
@@ -327,5 +373,103 @@ mod tests {
         let resolved = resolve_call_targets(&[caller], &[cs]);
         assert_eq!(resolved.len(), 1);
         assert!(resolved[0].resolved_internal_id.is_none());
+    }
+
+    #[test]
+    fn method_call_never_resolves_to_same_name_free_function() {
+        let caller = function("caller", "src/lib.rs", "function", 1);
+        let free_accept = function("accept", "src/listen.rs", "function", 5);
+        let cs = CallSite {
+            caller_id: Some(function_id(&caller)),
+            caller_name: Some("caller".to_string()),
+            callee: "listener.accept".to_string(),
+            callee_base: "accept".to_string(),
+            call_kind: "method".to_string(),
+            file_path: "src/lib.rs".to_string(),
+            line: 2,
+            column: 0,
+        };
+        let resolved = resolve_call_targets(&[caller, free_accept], &[cs]);
+        assert!(resolved[0].resolved_internal_id.is_none());
+    }
+
+    #[test]
+    fn external_qualified_call_never_resolves_to_same_name_local_function() {
+        let caller = function("caller", "src/lib.rs", "function", 1);
+        let local_spawn = function("spawn", "src/runtime.rs", "function", 5);
+        let cs = CallSite {
+            caller_id: Some(function_id(&caller)),
+            caller_name: Some("caller".to_string()),
+            callee: "tokio::spawn".to_string(),
+            callee_base: "spawn".to_string(),
+            call_kind: "function".to_string(),
+            file_path: "src/lib.rs".to_string(),
+            line: 2,
+            column: 0,
+        };
+        let resolved = resolve_call_targets(&[caller, local_spawn], &[cs]);
+        assert!(resolved[0].resolved_internal_id.is_none());
+    }
+
+    #[test]
+    fn module_qualified_call_resolves_only_matching_module() {
+        let caller = function("caller", "src/lib.rs", "function", 1);
+        let status_serve = function("serve", "src/status.rs", "function", 5);
+        let edge_serve = function("serve", "src/edge.rs", "function", 5);
+        let expected = function_id(&status_serve);
+        let cs = CallSite {
+            caller_id: Some(function_id(&caller)),
+            caller_name: Some("caller".to_string()),
+            callee: "status::serve".to_string(),
+            callee_base: "serve".to_string(),
+            call_kind: "function".to_string(),
+            file_path: "src/lib.rs".to_string(),
+            line: 2,
+            column: 0,
+        };
+        let resolved = resolve_call_targets(&[caller, status_serve, edge_serve], &[cs]);
+        assert_eq!(resolved[0].resolved_internal_id.as_deref(), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn variable_method_call_prefers_method_over_free_function() {
+        let caller = function("caller", "src/lib.rs", "function", 1);
+        let free_refresh = function("refresh", "src/api.rs", "function", 5);
+        let method_refresh = function("refresh", "src/state.rs", "method(Daemon)", 5);
+        let expected = function_id(&method_refresh);
+        let cs = CallSite {
+            caller_id: Some(function_id(&caller)),
+            caller_name: Some("caller".to_string()),
+            callee: "daemon.refresh".to_string(),
+            callee_base: "refresh".to_string(),
+            call_kind: "method".to_string(),
+            file_path: "src/lib.rs".to_string(),
+            line: 2,
+            column: 0,
+        };
+        let resolved = resolve_call_targets(
+            &[caller, free_refresh, method_refresh],
+            &[cs],
+        );
+        assert_eq!(resolved[0].resolved_internal_id.as_deref(), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn function_alias_call_resolves_to_the_original_function() {
+        let caller = function("caller", "src/lib.rs", "function", 1);
+        let original = function("handle_get", "src/inner.rs", "function", 5);
+        let expected = function_id(&original);
+        let cs = CallSite {
+            caller_id: Some(function_id(&caller)),
+            caller_name: Some("caller".to_string()),
+            callee: "handle_session_get".to_string(),
+            callee_base: "handle_get".to_string(),
+            call_kind: "function_via_alias".to_string(),
+            file_path: "src/lib.rs".to_string(),
+            line: 2,
+            column: 0,
+        };
+        let resolved = resolve_call_targets(&[caller, original], &[cs]);
+        assert_eq!(resolved[0].resolved_internal_id.as_deref(), Some(expected.as_str()));
     }
 }
