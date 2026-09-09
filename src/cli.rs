@@ -21,6 +21,38 @@ pub const REFS_KIND_VALUES: &[&str] = &[
     "macro",
 ];
 
+/// Allowed source-origin filters for `stringly --origin`.
+pub const STRINGLY_ORIGIN_VALUES: &[&str] = &[
+    "standard-library",
+    "existing-dependency",
+    "external-crate",
+    "local-type",
+];
+
+/// Typed CLI representation of the `stringly` suggestion source filter.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+pub enum StringlyOriginArg {
+    /// A type from `core`, `alloc`, or `std`.
+    StandardLibrary,
+    /// A type from a dependency already declared by the project.
+    ExistingDependency,
+    /// A type from a crate that would need to be added.
+    ExternalCrate,
+    /// A project-owned enum, newtype, or nominal type.
+    LocalType,
+}
+
+impl From<StringlyOriginArg> for crate::stringly::TypeOrigin {
+    fn from(origin: StringlyOriginArg) -> Self {
+        match origin {
+            StringlyOriginArg::StandardLibrary => Self::StandardLibrary,
+            StringlyOriginArg::ExistingDependency => Self::ExistingDependency,
+            StringlyOriginArg::ExternalCrate => Self::ExternalCrate,
+            StringlyOriginArg::LocalType => Self::LocalType,
+        }
+    }
+}
+
 
 const GLOBALS_FOOTER_SHORT: &str =
     "Globals: -p / --also / -o / -j / --search / --exclude-tests / --color … (run `rustgraph --help` for the full Globals reference)";
@@ -168,6 +200,14 @@ Shell quoting trap (most-common cause of cryptic regex errors):\n  \
         arg_required_else_help = true
     )]
     Members(MembersCommand),
+    #[command(
+        about = "Find direct String/&str fields, parameters, and typed locals that have evidence for a stronger type. Reports whether each suggestion comes from the standard library, an existing dependency, a new external crate, or a local enum/newtype.",
+        long_about = "Find direct String/&str struct fields, function parameters, and explicitly typed local bindings that have evidence for a stronger type.\n\n\
+Signals include explicit parse/conversion targets, repeated literal vocabularies, and lower-confidence semantic names such as *_path, *_url, *_uuid, and *_id. Every result includes its evidence, confidence, and dependency impact; findings are recommendations, not compiler verdicts.",
+        after_help = GLOBALS_FOOTER_SHORT,
+        after_long_help = GLOBALS_FOOTER_LONG
+    )]
+    Stringly(StringlyCommand),
     #[command(
         about = "Dump every fn/struct/enum/const/trait/alias in the project (parse-only baseline). Same as bare `rustgraph` with no subcommand + --func/--struct/--enum/--const. Useful for piping to wc -l for symbol counts."
     )]
@@ -351,6 +391,59 @@ pub struct MembersCommand {
         help = "Cap on access sites rendered PER FIELD (default 50; 0 = unlimited). Each field's site list is truncated independently with a footer; field counts in the header stay un-capped."
     )]
     pub max_results: usize,
+}
+
+/// Arguments for the evidence-ranked stringly-typing detector.
+#[derive(clap::Args, Debug, Clone)]
+pub struct StringlyCommand {
+    #[arg(
+        long,
+        default_value_t = 0.85,
+        value_parser = parse_confidence,
+        help = "Minimum confidence in [0,1]. Lower values include weaker name-only newtype candidates."
+    )]
+    pub min_confidence: f64,
+
+    #[arg(
+        long = "origin",
+        value_name = "ORIGIN",
+        value_enum,
+        help = "Filter by suggestion source; repeat to allow several: standard-library, existing-dependency, external-crate, local-type."
+    )]
+    pub origins: Vec<StringlyOriginArg>,
+
+    #[arg(
+        long,
+        help = "Also emit normally withheld prose/diagnostic labels, parser/ingestion boundaries, trait contracts, generated/vendor code, and representation machinery. Findings retain machine-readable caveats."
+    )]
+    pub include_suppressed: bool,
+
+    #[arg(
+        long = "in",
+        value_name = "PATH_SUBSTR",
+        help = "Only show declaration sites whose file path contains this substring."
+    )]
+    pub in_path: Option<String>,
+
+    #[arg(
+        short = 'n',
+        long = "max-results",
+        value_name = "N",
+        default_value_t = 100,
+        help = "Cap findings emitted (default 100; 0 = unlimited). Summary counts remain uncapped."
+    )]
+    pub max_results: usize,
+}
+
+fn parse_confidence(raw: &str) -> Result<f64, String> {
+    let value: f64 = raw
+        .parse()
+        .map_err(|_| format!("expected a number in [0,1], got `{raw}`"))?;
+    if value.is_finite() && (0.0..=1.0).contains(&value) {
+        Ok(value)
+    } else {
+        Err(format!("expected a finite number in [0,1], got `{raw}`"))
+    }
 }
 
 /// Arguments for the `usages` subcommand (combined callers + refs for an
@@ -971,7 +1064,7 @@ pub struct Args {
     pub match_signature: bool,
 
     #[arg(long, global = true, hide_short_help = true, hide_long_help = true, help_heading = "Search",
-        help = "Drop matches whose enclosing fn is_test (grep/refs/find/dead-code/callers/ensemble/usages/paths-between)"
+        help = "Drop matches whose enclosing fn is_test (grep/refs/find/dead-code/callers/ensemble/usages/paths-between/stringly)"
     )]
     pub exclude_tests: bool,
 
@@ -1126,5 +1219,15 @@ mod tests {
     fn args_dead_code_alias_orphans_works() {
         let parsed = Args::try_parse_from(["rustgraph", "orphans"]).expect("parse");
         assert!(matches!(parsed.command, Some(ModeCommand::DeadCode(_))));
+    }
+
+    #[test]
+    fn stringly_origin_enum_matches_the_documented_boundary_values() {
+        let values: Vec<String> = StringlyOriginArg::value_variants()
+            .iter()
+            .filter_map(ValueEnum::to_possible_value)
+            .map(|value| value.get_name().to_string())
+            .collect();
+        assert_eq!(values, STRINGLY_ORIGIN_VALUES);
     }
 }

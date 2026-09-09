@@ -6,6 +6,7 @@
 
 use crate::api::{CallGraphDetail, EnsemblePreset, EnsembleView};
 use crate::cli::{AnalyzeMode, Args, ModeCommand};
+use crate::stringly::TypeOrigin;
 
 /// Which symbol kinds to include in an inventory or find operation.
 ///
@@ -321,6 +322,21 @@ pub struct MembersRequest {
     pub max_results: usize,
 }
 
+/// Parameters for the evidence-ranked `String`/`&str` replacement detector.
+#[derive(Clone, Debug)]
+pub struct StringlyRequest {
+    /// Minimum confidence score in `[0.0, 1.0]`.
+    pub min_confidence: f64,
+    /// Optional allow-list of suggestion origins.
+    pub origins: Vec<TypeOrigin>,
+    /// Include candidates that are non-actionable by default, with caveats.
+    pub include_suppressed: bool,
+    /// Restrict declaration sites by file path substring.
+    pub in_path: Option<String>,
+    /// Maximum number of findings to render (`0` = unlimited).
+    pub max_results: usize,
+}
+
 /// Selects which analysis pipeline to execute and carries its typed request parameters.
 ///
 /// Constructed by [`ExecutionMode::from_args`] from the parsed CLI args. Each variant maps
@@ -350,6 +366,7 @@ pub enum ExecutionMode {
     Usages(UsagesRequest),
     Def(DefRequest),
     Members(MembersRequest),
+    Stringly(StringlyRequest),
 }
 
 /// Rendering and traversal configuration for the `call-graph` subcommand.
@@ -514,6 +531,13 @@ impl ExecutionMode {
                     type_name: m.type_name,
                     in_path: m.in_path,
                     max_results: m.max_results,
+                }),
+                ModeCommand::Stringly(s) => Self::Stringly(StringlyRequest {
+                    min_confidence: s.min_confidence,
+                    origins: s.origins.into_iter().map(Into::into).collect(),
+                    include_suppressed: s.include_suppressed,
+                    in_path: s.in_path,
+                    max_results: s.max_results,
                 }),
                 ModeCommand::Inventory(inv) => Self::Inventory {
                     selection: AnalyzeSelection::from_flags(

@@ -1,6 +1,6 @@
 .\" Man page for rustgraph (AST-aware Rust codebase navigation)
 .\" Copyright (c) 2026 Zmole Cristian. License: 0BSD.
-.TH RUSTGRAPH 1 "July 2026" "rustgraph 0.8.2" "User Commands"
+.TH RUSTGRAPH 1 "September 2026" "rustgraph 0.8.4" "User Commands"
 .SH NAME
 rustgraph \- AST\-aware Rust codebase navigation built for AiDX
 .SH SYNOPSIS
@@ -31,6 +31,12 @@ rustgraph \- AST\-aware Rust codebase navigation built for AiDX
 .RB [ \-\-show\-call\-sites ]
 .I FROM
 .I TO
+.br
+.B rustgraph stringly
+.RB [ \-\-min\-confidence
+.IR F ]
+.RB [ \-\-origin
+.IR ORIGIN ]...
 .br
 .B rustgraph mcp
 .RB [ install | uninstall | list | serve ]
@@ -288,6 +294,51 @@ type. Each field's site list is truncated independently (default
 \(lqrefs \fI<Enum>\fR \-\-kind variant\(rq instead.
 .PP
 \fBExample:\fR \fBrustgraph members ProjectSummary\fR
+.SS stringly
+\fBrustgraph stringly\fR [\fB\-\-min\-confidence\fR \fIF\fR]
+[\fB\-\-origin\fR \fIORIGIN\fR]...
+[\fB\-\-include\-suppressed\fR]
+[\fB\-\-in\fR \fIPATH_SUBSTR\fR] [\fB\-n\fR \fIN\fR]
+.PP
+Find direct \fBString\fR and \fB&str\fR struct fields, function parameters,
+and explicitly typed local bindings whose existing usage is evidence for a
+stronger type. Signals include an explicit
+\fBparse\fR/\fBfrom_str\fR target, a small vocabulary reused across calls or
+declarations, recognized protocol literals, and lower\-confidence semantic
+names such as \fI*_path\fR, \fI*_url\fR, \fI*_uuid\fR, and \fI*_id\fR.
+Literal findings include distinct and observed counts. Findings are ranked
+recommendations, not compiler verdicts, and each one includes source lines
+explaining its score.
+.PP
+Every suggestion has one dependency\-impact origin:
+\fBstandard-library\fR (\fBcore\fR/\fBalloc\fR/\fBstd\fR, no dependency),
+\fBexisting-dependency\fR (including renamed Cargo dependencies),
+\fBexternal-crate\fR (would add a dependency), or \fBlocal-type\fR
+(project enum/newtype). Workspace, target, build, and dev dependency tables
+are inspected.
+.TP
+\fB\-\-min\-confidence\fR \fIF\fR
+Minimum score in \fB0..1\fR (default \fB0.85\fR). Lower toward \fB0.70\fR
+to include name\-only candidates.
+.TP
+\fB\-\-origin\fR \fIORIGIN\fR
+Filter by one of the four origins above. Repeat to allow multiple origins.
+.TP
+\fB\-\-include\-suppressed\fR
+Also emit normally withheld diagnostic prose and labels, parser/ingestion
+boundaries, trait contracts, generated/vendor code, and representation
+machinery. Every such finding retains a machine\-readable caveat explaining
+why it is withheld.
+.TP
+\fB\-\-in\fR \fIPATH_SUBSTR\fR
+Restrict declaration sites by file path substring.
+.TP
+\fB\-n\fR, \fB\-\-max\-results\fR \fIN\fR
+Cap rendered findings (default \fB100\fR; \fB0\fR for unlimited). Summary
+counts remain uncapped. \fB\-j\fR emits the full evidence and dependency
+metadata as JSON.
+.PP
+\fBExample:\fR \fBrustgraph stringly \-\-origin standard-library \-j\fR
 .SS impls
 \fBrustgraph impls\fR [\fB\-\-derived\-only\fR | \fB\-\-handwritten\-only\fR]
 [\fB\-\-in\fR \fIPATH_SUBSTR\fR] [\fB\-n\fR \fIN\fR] \fITRAIT\fR
@@ -590,7 +641,7 @@ TOML table.
 with \fBtrust = true\fR.
 .PP
 Each entry invokes the binary as \(lq\fBrustgraph mcp serve\fR\(rq. The server
-announces itself as \fBrustgraph\fR on the MCP wire and exposes six
+announces itself as \fBrustgraph\fR on the MCP wire and exposes seven
 tools that map to the highest\-leverage CLI subcommands. Agents should
 reach for the MCP tools over text \fBgrep\fR(1) when navigating Rust
 because they resolve on the parsed AST and never match string literals
@@ -640,6 +691,14 @@ traversal nodes. \fBtimeout_ms\fR controls the cancellation\-safe
 subprocess deadline (default \fB30000\fR, clamped to
 \fB100..300000\fR milliseconds). A cancelled or timed\-out MCP request
 terminates its child process.
+.TP
+.B rustgraph_stringly
+Rank \fBString\fR/\fB&str\fR declarations that can likely become enums,
+newtypes, standard\-library types, or crate types. Returns JSON containing
+evidence, confidence, canonical type path, source origin, dependency alias,
+and whether adoption adds a dependency. Optional \fBmin_confidence\fR,
+\fBorigin\fR, \fBin_path\fR, \fBmax_results\fR, and \fBexclude_tests\fR
+arguments mirror the CLI.
 .TP
 .B rustgraph_tree
 Module/file tree with per\-file symbol counts (fn, struct, enum, plus

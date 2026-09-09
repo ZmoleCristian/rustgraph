@@ -82,6 +82,30 @@ impl RefKind {
     }
 }
 
+/// Strongly-typed origin filter for `rustgraph_stringly`.
+///
+/// Variants remain doc-free so schemars emits a flat enum accepted by strict
+/// MCP tool-schema validators; descriptions live on [`StringlyArgs::origin`].
+#[derive(Debug, Deserialize, JsonSchema, Clone, Copy)]
+#[serde(rename_all = "kebab-case")]
+pub enum StringlyOrigin {
+    StandardLibrary,
+    ExistingDependency,
+    ExternalCrate,
+    LocalType,
+}
+
+impl StringlyOrigin {
+    fn as_cli(self) -> &'static str {
+        match self {
+            Self::StandardLibrary => "standard-library",
+            Self::ExistingDependency => "existing-dependency",
+            Self::ExternalCrate => "external-crate",
+            Self::LocalType => "local-type",
+        }
+    }
+}
+
 /// Strongly-typed `view` selector for `rustgraph_ensemble`.
 ///
 /// Variants are doc-free on purpose — see the note on [`FindKind`]; value
@@ -237,6 +261,38 @@ pub struct UsagesArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct StringlyArgs {
+    /// Crate root (defaults to cwd).
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Minimum evidence confidence in `[0,1]` (default 0.85). Lower values expose
+    /// name-only suggestions such as *_path and *_id.
+    #[serde(default)]
+    #[schemars(range(min = 0.0, max = 1.0))]
+    pub min_confidence: Option<f64>,
+    /// Suggestion source filter: `standard-library` (no dependency),
+    /// `existing-dependency`, `external-crate` (adds dependency), or
+    /// `local-type` (enum/newtype). Repeatable array; omit for all.
+    #[serde(default)]
+    pub origin: Option<Vec<StringlyOrigin>>,
+    /// Include normally withheld prose/diagnostic labels, parser/ingestion
+    /// boundaries, trait-constrained signatures, generated/vendor code, and
+    /// representation machinery.
+    /// Returned findings explain every caveat. Default false.
+    #[serde(default)]
+    pub include_suppressed: Option<bool>,
+    /// Restrict declaration sites to files containing this substring.
+    #[serde(default)]
+    pub in_path: Option<String>,
+    /// Cap findings emitted (default 100; 0 = unlimited).
+    #[serde(default)]
+    pub max_results: Option<u32>,
+    /// Drop test declarations and test-origin call/construction evidence.
+    #[serde(default)]
+    pub exclude_tests: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct TreeArgs {
     /// Crate root (defaults to cwd).
     #[serde(default)]
@@ -249,7 +305,7 @@ pub struct TreeArgs {
     pub files_only: Option<bool>,
 }
 
-/// MCP server that exposes the six core rustgraph tools over stdio JSON-RPC.
+/// MCP server that exposes the seven core rustgraph tools over stdio JSON-RPC.
 ///
 /// Each tool is implemented by building a `rustgraph` CLI argv and spawning
 /// the current executable as a subprocess, so the server is always in sync
@@ -442,6 +498,46 @@ impl RustgraphServer {
         Ok(run_rustgraph_with_timeout(&self.binary, &argv, timeout_ms).await)
     }
 
+    #[tool(
+        name = "rustgraph_stringly",
+        description = "Detect String/&str declarations that likely encode a stronger type. Use for 'find stringly-typed code' / 'where should String become an enum, newtype, PathBuf, URL, UUID, IP, protocol type, or parsed type'. Returns ranked JSON with concrete evidence, literal cardinality/reuse, suppression caveats, and separate standard-library, already-present dependency, new external crate, and local type origins."
+    )]
+    async fn stringly(
+        &self,
+        p: Parameters<StringlyArgs>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let mut argv: Vec<String> = Vec::new();
+        if let Some(path) = &p.0.path {
+            argv.push("-p".into());
+            argv.push(path.clone());
+        }
+        if p.0.exclude_tests == Some(true) {
+            argv.push("--exclude-tests".into());
+        }
+        argv.push("--json".into());
+        argv.push("stringly".into());
+        if p.0.include_suppressed == Some(true) {
+            argv.push("--include-suppressed".into());
+        }
+        if let Some(confidence) = p.0.min_confidence {
+            argv.push("--min-confidence".into());
+            argv.push(confidence.to_string());
+        }
+        for origin in p.0.origin.iter().flatten() {
+            argv.push("--origin".into());
+            argv.push(origin.as_cli().into());
+        }
+        if let Some(needle) = &p.0.in_path {
+            argv.push("--in".into());
+            argv.push(needle.clone());
+        }
+        if let Some(max_results) = p.0.max_results {
+            argv.push("--max-results".into());
+            argv.push(max_results.to_string());
+        }
+        Ok(run_rustgraph(&self.binary, &argv).await)
+    }
+
 
     #[tool(
         name = "rustgraph_tree",
@@ -487,6 +583,7 @@ impl ServerHandler for RustgraphServer {
                  \x20 'where is TYPE/field X used' / 'who constructs X' / 'what breaks if I add a field' → rustgraph_usages\n\
                  \x20 'understand X' / 'how does X work'    → rustgraph_ensemble  (one call > 5 Reads)\n\
                  \x20 'walk me through' / 'trace flow'      → rustgraph_paths_between\n\
+                 \x20 'find stringly-typed code' / 'String → type opportunities' → rustgraph_stringly\n\
                  \x20 'show me X' / 'read source of X'      → use the Read tool (rustgraph_find gives you the path:line to Read)\n\
                  \x20 'what's in module X' / 'project layout' / unknown symbol name → rustgraph_tree (replaces ls/find/tree)"
                     .into(),
@@ -689,6 +786,7 @@ mod tests {
             ("PathsBetweenArgs", arg_schema_json::<PathsBetweenArgs>()),
             ("TreeArgs", arg_schema_json::<TreeArgs>()),
             ("UsagesArgs", arg_schema_json::<UsagesArgs>()),
+            ("StringlyArgs", arg_schema_json::<StringlyArgs>()),
         ];
         for (name, json) in schemas {
             assert!(
@@ -779,6 +877,26 @@ mod tests {
     fn ref_kind_serde_rejects_unknown_values() {
         let err = serde_json::from_str::<RefKind>("\"banana\"").err();
         assert!(err.is_some(), "unknown ref kinds must be rejected");
+    }
+
+    #[test]
+    fn stringly_origin_serde_round_trips_cli_value_set() {
+        for value in crate::cli::STRINGLY_ORIGIN_VALUES {
+            let raw = format!("\"{value}\"");
+            let origin: StringlyOrigin = serde_json::from_str(&raw)
+                .unwrap_or_else(|error| panic!("MCP must accept origin `{value}`: {error}"));
+            assert_eq!(&origin.as_cli(), value);
+        }
+        assert!(serde_json::from_str::<StringlyOrigin>("\"mystery\"").is_err());
+    }
+
+    #[test]
+    fn stringly_schema_bounds_confidence() {
+        let schema: serde_json::Value =
+            serde_json::from_str(&arg_schema_json::<StringlyArgs>()).expect("schema JSON");
+        let confidence = &schema["properties"]["min_confidence"];
+        assert_eq!(confidence["minimum"], 0.0, "{schema}");
+        assert_eq!(confidence["maximum"], 1.0, "{schema}");
     }
 
     #[test]

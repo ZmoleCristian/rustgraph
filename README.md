@@ -62,8 +62,8 @@ rustgraph is built AiDX-first. Humans get a fast CLI for free.
 ## What it does
 
 Parses Rust source via `syn`, builds a symbol index + call graph, and exposes
-it through 13 subcommands. AST-driven, so it doesn't false-positive on string
-literals, comments, or unrelated tokens the way `grep` does.
+it through 15 analysis subcommands. AST-driven, so it doesn't false-positive
+on string literals, comments, or unrelated tokens the way `grep` does.
 
 ```bash
 rustgraph find <name>            # locate fn/struct/enum
@@ -74,6 +74,7 @@ rustgraph dead-code              # unreachable pub fns
 rustgraph impls <Trait>          # types implementing a trait
 rustgraph refs <ident>           # every reference (field/path/type/etc.)
 rustgraph usages <Type>          # who constructs/mentions a type (callers + refs)
+rustgraph stringly               # where String/&str can become a stronger type
 # + def, members, tree, grep, inventory, call-graph
 ```
 
@@ -86,10 +87,37 @@ or ambiguous graphs bounded; JSON output reports when that budget truncated a
 search. The MCP wrapper also terminates cancelled subprocesses and applies a
 30-second default deadline to this tool (`timeout_ms` can override it).
 
+`stringly` ranks direct `String`/`&str` struct fields, function parameters, and
+explicitly typed local bindings whose usage points to a stronger type: an
+explicit `parse`/`from_str` target, a small vocabulary reused across call sites
+or declarations, a recognized protocol value (for example an HTTP status), or
+(at lower confidence) a semantic name such as `*_path`, `*_url`, `*_uuid`, or
+`*_id`. Literal findings report both distinct values and observation count, so
+an enum-like vocabulary can be distinguished from one unrelated label per
+call.
+
+Every finding includes its evidence and separates four adoption costs:
+`standard-library`, `existing-dependency`, `external-crate`, and `local-type`.
+Local name collisions count as an existing replacement only when the type has
+a compatible shape (an enum or textual wrapper), not merely the same name.
+Parser/ingestion boundaries, diagnostic prose, formatting/tracing labels,
+trait contracts, generated code, and vendored code are withheld by default but
+remain auditable with `--include-suppressed`. `--exclude-tests` excludes test
+evidence as well as test declarations. The default confidence is deliberately
+conservative (`0.85`); lower it to see name-only candidates.
+
+```bash
+rustgraph stringly
+rustgraph stringly --origin standard-library --origin existing-dependency
+rustgraph stringly --min-confidence 0.70 --json | jq '.findings[]'
+rustgraph --exclude-tests stringly --include-suppressed --json
+```
+
 ## MCP server (Claude / Codex / Gemini)
 
-`rustgraph` ships an MCP server that exposes 6 of the most-used subcommands as
-agent-callable tools (find, callers, usages, ensemble, paths-between, tree).
+`rustgraph` ships an MCP server that exposes 7 of the most-used subcommands as
+agent-callable tools (find, callers, usages, ensemble, paths-between, stringly,
+tree).
 Self-register with one command:
 
 ```bash
@@ -103,7 +131,7 @@ Detects and registers with `~/.claude.json`, `~/.codex/config.toml`, and
 
 ## What the agents are saying
 
-*All agents were spawned cold in the same mid-size Rust codebase and asked for an honest opinion.*
+*Hands-on impressions from agents using rustgraph on real Rust codebases. The process notes record each test's scope.*
 
 ### **Claude Fable 5 (1M context) - Max**
 
@@ -225,6 +253,38 @@ You've actually solved the problem. Not "find faster," but "understand the shape
 
 
 
+
+
+### **Codex - gpt-6-astra Max**
+
+> "One `ensemble` call gave me a new command's dispatch, types, value flow, and I/O sites; rustgraph earns its place by making code context inspectable."
+
+<details>
+<summary><b>Process</b></summary>
+<br/>
+
+```
+Exercised all seven MCP tools on rustgraph itself (191 Rust files), then
+repeated the calls against the newly built 0.8.4 MCP server.
+
+tree mapped the crate; find located StringlyFinding; ensemble on the
+stringly runner exposed its dispatcher, detector, output writer, structs,
+and value-flow hints. callers traced the route through execute back to
+app::run. usages returned eight production references, including the
+finding construction. paths-between traced execute -> run -> detect_stringly
+with the call-site line at each hop.
+
+Two limits showed up: conservative paths-between missed app::run's
+re-exported execute hop, although callers and ensemble showed it. stringly
+reported four candidates across 436 production string sites, but its top
+FunctionInfo.name suggestion overread a partial match as a closed vocabulary.
+The output supplied the source locations needed to check both findings.
+
+Release validation: 1,236 tests passed; library builds passed with no default
+features, CLI only, and MCP only; all seven tools passed a stdio MCP smoke test.
+```
+
+</details>
 
 
 ### **Codex - gpt-5.6-sol Max**

@@ -1,6 +1,6 @@
 [package]
 name = "rustgraph"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 authors = ["Zmole Cristian"]
 description = "Rust code navigation built for AiDX — AST-aware, MCP-native, token-efficient."
@@ -24,7 +24,7 @@ default = ["cli", "mcp"]
 # Clap-derived CLI structs plus the app dispatch/render layer.
 cli = ["dep:clap", "dep:clap_complete", "dep:clap_mangen", "dep:libc"]
 # MCP stdio server and AI-client self-registration.
-mcp = ["dep:rmcp", "dep:schemars", "dep:tokio", "dep:anyhow", "dep:toml_edit", "dep:dirs"]
+mcp = ["dep:rmcp", "dep:schemars", "dep:tokio", "dep:anyhow", "dep:dirs"]
 
 [dependencies]
 syn = { version = "2.0", features = ["full", "extra-traits", "visit", "parsing"] }
@@ -45,7 +45,7 @@ rmcp = { version = "0.8", features = ["server", "transport-io", "macros", "schem
 schemars = { version = "1.0", optional = true }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "sync", "process", "time"], optional = true }
 anyhow = { version = "1", optional = true }
-toml_edit = { version = "0.22", optional = true }
+toml_edit = "0.22"
 dirs = { version = "6", optional = true }
 
 [dev-dependencies]

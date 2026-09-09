@@ -263,7 +263,10 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
     if !matches!(
         mode,
-        ExecutionMode::Ensemble(_) | ExecutionMode::Callers(_) | ExecutionMode::CallGraph { .. }
+        ExecutionMode::Ensemble(_)
+            | ExecutionMode::Callers(_)
+            | ExecutionMode::CallGraph { .. }
+            | ExecutionMode::Stringly(_)
     ) && let Some(search_terms) = &args.search
     {
         project.apply_search_filter_with_options(

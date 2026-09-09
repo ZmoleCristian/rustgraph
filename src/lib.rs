@@ -36,6 +36,9 @@ pub mod cli;
 pub mod project;
 /// Symbol search helpers (fuzzy matching, filter pipelines).
 pub mod query;
+/// Ranked detector for stringly-typed declarations that have evidence for a
+/// more precise standard-library, dependency, or local type.
+pub mod stringly;
 
 /// MCP (Model Context Protocol) stdio server exposing rustgraph tools to AI
 /// clients.

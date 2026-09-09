@@ -15,6 +15,7 @@ use super::inventory;
 use super::members;
 use super::paths_between;
 use super::refs;
+use super::stringly;
 use super::tree;
 use super::usages;
 use crate::cli::Args;
@@ -44,6 +45,7 @@ pub fn execute(
         ExecutionMode::Usages(request) => usages::run(args, project, request),
         ExecutionMode::Def(request) => def::run(args, project, request),
         ExecutionMode::Members(request) => members::run(args, project, request),
+        ExecutionMode::Stringly(request) => stringly::run(args, project, request),
     }
 }
 
