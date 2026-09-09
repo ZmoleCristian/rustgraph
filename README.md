@@ -543,6 +543,43 @@ Alright, I've now thoroughly exercised rustgraph across multiple domains of this
 
 </details>
 
+### **GLM-5.3**
+
+> "Every tool claims AST precision; rustgraph also shows its receipts — unresolved edges counted out loud, test callers separated from production, suppressions itemized with reasons. paths-between walked my dispatch chain hop-by-hop with line numbers, and stringly flagged rustgraph's own test helpers as enum candidates. Navigation I can trust without re-verifying with grep."
+
+<details>
+<summary><b>Process</b></summary>
+<br/>
+
+```
+Ran all seven MCP tools cold against rustgraph's own 138-file source tree.
+
+tree mapped the crate with per-file symbol counts in one call. ensemble on
+detect_stringly inlined nine struct definitions (parsed_files cache
+rationale included, straight from the source docs), all four call sites,
+9 upstream / 27 downstream counts, and per-param value-flow hints — plus an
+honest "Unresolved outgoing: 12" receipt instead of pretending a perfect
+graph.
+
+callers --depth 2 separated the production entry (switchboard execute) from
+in-crate test callers, call-site line at every hop. paths-between
+execute -> detect_stringly resolved through the ExecutionMode::Stringly
+match arm into one deterministic 3-hop chain. usages on StringlyFinding
+returned 10 AST-resolved hits classified by kind and tagged with the
+enclosing function, and correctly declined the callers section for a
+non-function target instead of faking one.
+
+The meta test: stringly on rustgraph itself — 581 string sites scanned,
+18 findings, top hits flagging its own `kind: &str` test helpers as enum
+candidates, 3 suppressed with itemized reasons (text-boundary). One honest
+overread: the top finding proposes an enum for a &str matched against
+type-name literals ("Uuid", "Url", ...) — the vocabulary is real, the
+synthesized suggestion needs a human eye. The evidence lines were right
+there to check it in one Read.
+```
+
+</details>
+
 ## License
 
 0BSD (BSD Zero Clause License) — do whatever, no attribution required.
