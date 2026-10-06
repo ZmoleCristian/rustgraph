@@ -646,6 +646,14 @@ tools that map to the highest\-leverage CLI subcommands. Agents should
 reach for the MCP tools over text \fBgrep\fR(1) when navigating Rust
 because they resolve on the parsed AST and never match string literals
 or comments.
+.PP
+Every tool \fBrequires\fR a \fBpath\fR argument: the absolute path of the
+Rust project/crate root. The server never infers the project from its
+working directory. An omitted, relative, or nonexistent \fBpath\fR is
+rejected with a JSON\-RPC \fBinvalid_params\fR error whose
+\fBdata.kind\fR is \fBrustgraph_invalid_path\fR and whose message names
+the problem. \fBrustgraph_tree\fR's \fBprefix\fR and the
+\fBin_path\fR/\fBcallers_in\fR filters remain relative to that root.
 .TP
 .B rustgraph_find
 Locate a Rust symbol (fn/struct/enum/const/static/trait/alias) by name.

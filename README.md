@@ -215,6 +215,21 @@ rustgraph mcp uninstall          # remove from all configs
 Detects and registers with `~/.claude.json`, `~/.codex/config.toml`, and
 `~/.gemini/settings.json`. Atomic writes with timestamped backups.
 
+Every MCP tool **requires** `path`: the absolute path of the Rust
+project/crate root. The server never infers the project from its own cwd, so
+it behaves the same no matter which directory the agent was launched from. An
+omitted, relative, or nonexistent `path` gets a JSON-RPC `invalid_params`
+error (`data.kind = "rustgraph_invalid_path"`) that names the problem:
+
+```jsonc
+{ "name": "rustgraph_find", "arguments": { "query": "run", "path": "/home/me/src/mycrate" } }  // ok
+{ "name": "rustgraph_tree", "arguments": { "path": "src" } }  // -32602: `path` must be absolute, got relative `src`
+{ "name": "rustgraph_find", "arguments": { "query": "run" } }  // -32602: missing required `path`
+```
+
+`rustgraph_tree`'s `prefix` and the `in_path` / `callers_in` filters are still
+relative to that root.
+
 ## What the agents are saying
 
 *Hands-on impressions from agents using rustgraph on real Rust codebases. The process notes record each test's scope.*

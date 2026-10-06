@@ -153,12 +153,14 @@ impl EnsemblePreset {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(transform = require_path)]
 pub struct FindArgs {
     /// Symbol name; `a|b` for OR. Single identifiers only — no phrases.
     pub query: String,
-    /// Crate root (defaults to cwd).
+    /// Absolute path of the Rust project/crate root, e.g. `/home/me/src/mycrate`.
+    /// Relative or omitted paths are rejected; cwd is never used.
     #[serde(default)]
-    pub path: Option<String>,
+    pub path: String,
     /// Kind filter: `func`, `struct`, `enum`, `const` (consts + statics), `trait`, or `alias` (type aliases).
     #[serde(default)]
     pub kind: Option<FindKind>,
@@ -168,12 +170,14 @@ pub struct FindArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(transform = require_path)]
 pub struct CallersArgs {
     /// Function name, `path.rs:LINE`, or symbol id.
     pub target: String,
-    /// Crate root (defaults to cwd).
+    /// Absolute path of the Rust project/crate root, e.g. `/home/me/src/mycrate`.
+    /// Relative or omitted paths are rejected; cwd is never used.
     #[serde(default)]
-    pub path: Option<String>,
+    pub path: String,
     /// Transitive depth: 1 = direct, 0 = unlimited.
     #[serde(default)]
     pub depth: Option<u32>,
@@ -186,12 +190,14 @@ pub struct CallersArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(transform = require_path)]
 pub struct EnsembleArgs {
     /// Function name, `path.rs:LINE`, or symbol id.
     pub target: String,
-    /// Crate root (defaults to cwd).
+    /// Absolute path of the Rust project/crate root, e.g. `/home/me/src/mycrate`.
+    /// Relative or omitted paths are rejected; cwd is never used.
     #[serde(default)]
-    pub path: Option<String>,
+    pub path: String,
     /// View: `summary` (default, concise), `usage` (caller/use-site), `flow` (dataflow), `full` (all three).
     #[serde(default)]
     pub view: Option<EnsembleView>,
@@ -203,14 +209,16 @@ pub struct EnsembleArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(transform = require_path)]
 pub struct PathsBetweenArgs {
     /// Source fn (name, `path.rs:LINE`, or symbol id).
     pub from: String,
     /// Target fn (name, `path.rs:LINE`, or symbol id).
     pub to: String,
-    /// Crate root (defaults to cwd).
+    /// Absolute path of the Rust project/crate root, e.g. `/home/me/src/mycrate`.
+    /// Relative or omitted paths are rejected; cwd is never used.
     #[serde(default)]
-    pub path: Option<String>,
+    pub path: String,
     /// Maximum path length in nodes (default 8, 0 = unlimited).
     #[serde(default)]
     pub depth: Option<u32>,
@@ -235,12 +243,14 @@ pub struct PathsBetweenArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(transform = require_path)]
 pub struct UsagesArgs {
     /// Exact identifier: type, field, or fn name (single ident — not a path or phrase).
     pub target: String,
-    /// Crate root (defaults to cwd).
+    /// Absolute path of the Rust project/crate root, e.g. `/home/me/src/mycrate`.
+    /// Relative or omitted paths are rejected; cwd is never used.
     #[serde(default)]
-    pub path: Option<String>,
+    pub path: String,
     /// Restrict results to files whose path contains this substring.
     #[serde(default)]
     pub in_path: Option<String>,
@@ -261,10 +271,12 @@ pub struct UsagesArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(transform = require_path)]
 pub struct StringlyArgs {
-    /// Crate root (defaults to cwd).
+    /// Absolute path of the Rust project/crate root, e.g. `/home/me/src/mycrate`.
+    /// Relative or omitted paths are rejected; cwd is never used.
     #[serde(default)]
-    pub path: Option<String>,
+    pub path: String,
     /// Minimum evidence confidence in `[0,1]` (default 0.85). Lower values expose
     /// name-only suggestions such as *_path and *_id.
     #[serde(default)]
@@ -293,10 +305,12 @@ pub struct StringlyArgs {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(transform = require_path)]
 pub struct TreeArgs {
-    /// Crate root (defaults to cwd).
+    /// Absolute path of the Rust project/crate root, e.g. `/home/me/src/mycrate`.
+    /// Relative or omitted paths are rejected; cwd is never used.
     #[serde(default)]
-    pub path: Option<String>,
+    pub path: String,
     /// Optional path prefix (relative to project root) to limit the tree to a subtree, e.g. `src/governor`.
     #[serde(default)]
     pub prefix: Option<String>,
@@ -344,11 +358,7 @@ impl RustgraphServer {
         description = "Use INSTEAD OF Grep for 'where is X' / 'find fn|struct|enum|const|trait|alias X'. Returns file:line + signature. Doesn't match comments or strings."
     )]
     async fn find(&self, p: Parameters<FindArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
-        let mut argv: Vec<String> = Vec::new();
-        if let Some(path) = &p.0.path {
-            argv.push("-p".into());
-            argv.push(path.clone());
-        }
+        let mut argv = project_argv(&p.0.path)?;
         if let Some(t) = p.0.threshold {
             argv.push("--search-threshold".into());
             argv.push(t.to_string());
@@ -370,11 +380,7 @@ impl RustgraphServer {
         &self,
         p: Parameters<CallersArgs>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let mut argv: Vec<String> = Vec::new();
-        if let Some(path) = &p.0.path {
-            argv.push("-p".into());
-            argv.push(path.clone());
-        }
+        let mut argv = project_argv(&p.0.path)?;
         argv.push("callers".into());
         argv.push(p.0.target.clone());
         if let Some(d) = p.0.depth {
@@ -400,11 +406,7 @@ impl RustgraphServer {
         &self,
         p: Parameters<EnsembleArgs>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let mut argv: Vec<String> = Vec::new();
-        if let Some(path) = &p.0.path {
-            argv.push("-p".into());
-            argv.push(path.clone());
-        }
+        let mut argv = project_argv(&p.0.path)?;
         argv.push("ensemble".into());
         argv.push(p.0.target.clone());
         if let Some(v) = p.0.view {
@@ -427,11 +429,7 @@ impl RustgraphServer {
         &self,
         p: Parameters<UsagesArgs>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let mut argv: Vec<String> = Vec::new();
-        if let Some(path) = &p.0.path {
-            argv.push("-p".into());
-            argv.push(path.clone());
-        }
+        let mut argv = project_argv(&p.0.path)?;
         if p.0.exclude_tests == Some(true) {
             argv.push("--exclude-tests".into());
         }
@@ -461,11 +459,7 @@ impl RustgraphServer {
         &self,
         p: Parameters<PathsBetweenArgs>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let mut argv: Vec<String> = Vec::new();
-        if let Some(path) = &p.0.path {
-            argv.push("-p".into());
-            argv.push(path.clone());
-        }
+        let mut argv = project_argv(&p.0.path)?;
         if p.0.exclude_tests == Some(true) {
             argv.push("--exclude-tests".into());
         }
@@ -506,11 +500,7 @@ impl RustgraphServer {
         &self,
         p: Parameters<StringlyArgs>,
     ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let mut argv: Vec<String> = Vec::new();
-        if let Some(path) = &p.0.path {
-            argv.push("-p".into());
-            argv.push(path.clone());
-        }
+        let mut argv = project_argv(&p.0.path)?;
         if p.0.exclude_tests == Some(true) {
             argv.push("--exclude-tests".into());
         }
@@ -544,11 +534,7 @@ impl RustgraphServer {
         description = "Use INSTEAD OF ls/find/tree for 'what's in this module' / 'show project layout' / 'what files are under src/X'. Returns the module/file tree with per-file fn/struct/enum counts. Pass `prefix` (e.g. `src/governor`) to scope to a subtree. Topology view, not symbol search — use this when you DON'T yet know the symbol name."
     )]
     async fn tree(&self, p: Parameters<TreeArgs>) -> Result<CallToolResult, rmcp::ErrorData> {
-        let mut argv: Vec<String> = Vec::new();
-        if let Some(path) = &p.0.path {
-            argv.push("-p".into());
-            argv.push(path.clone());
-        }
+        let mut argv = project_argv(&p.0.path)?;
         argv.push("tree".into());
         if let Some(prefix) = &p.0.prefix {
             argv.push(prefix.clone());
@@ -577,6 +563,9 @@ impl ServerHandler for RustgraphServer {
                 "Rust nav for this codebase. PREFER these over Grep/Read for any Rust \
                  symbol / function / call-chain question. AST-resolved (no false-match on \
                  comments/strings) and one call here saves 4-10 Grep+Read cycles.\n\n\
+                 EVERY tool REQUIRES `path` = ABSOLUTE path of the Rust project/crate root \
+                 (e.g. /home/me/src/mycrate). Omitted or relative paths are rejected; the \
+                 project is never inferred from the server's cwd.\n\n\
                  When you see:\n\
                  \x20 'where is X'                          → rustgraph_find\n\
                  \x20 'who calls X' (X = fn)                → rustgraph_callers\n\
@@ -604,6 +593,63 @@ const DEFAULT_MCP_TIMEOUT_MS: u64 = 60_000;
 const PATHS_BETWEEN_TIMEOUT_MS: u64 = 30_000;
 const MIN_TIMEOUT_MS: u64 = 100;
 const MAX_TIMEOUT_MS: u64 = 300_000;
+
+fn require_path(schema: &mut schemars::Schema) {
+    let object = schema.ensure_object();
+    match object["properties"]["path"].as_object_mut() {
+        Some(path) => path.remove("default"),
+        None => panic!("MCP tool args must declare `path`: {object:?}"),
+    };
+    match object
+        .entry("required")
+        .or_insert_with(|| json!([]))
+        .as_array_mut()
+    {
+        Some(required) => required.push(json!("path")),
+        None => panic!("schema `required` must be an array: {object:?}"),
+    }
+}
+
+fn project_argv(path: &str) -> Result<Vec<String>, rmcp::ErrorData> {
+    let root = std::path::Path::new(path);
+    if path.trim().is_empty() {
+        return Err(invalid_path(
+            path,
+            "missing required `path`: pass the absolute path of the Rust project/crate root \
+             (e.g. /home/me/src/mycrate); rustgraph never infers the project from cwd"
+                .into(),
+        ));
+    }
+    if !root.is_absolute() {
+        return Err(invalid_path(
+            path,
+            format!(
+                "`path` must be absolute, got relative `{path}`: pass the full path of the Rust \
+                 project/crate root; relative paths are never resolved against cwd"
+            ),
+        ));
+    }
+    if !root.exists() {
+        return Err(invalid_path(
+            path,
+            format!(
+                "`path` `{path}` does not exist: pass the absolute path of an existing Rust \
+                 project/crate root"
+            ),
+        ));
+    }
+    Ok(vec!["-p".into(), path.into()])
+}
+
+fn invalid_path(path: &str, message: String) -> rmcp::ErrorData {
+    let detail = json!({ "kind": "rustgraph_invalid_path", "path": path });
+    log_misuse(
+        &[],
+        "invalid_path",
+        &json!({ "summary": &message, "path": path }),
+    );
+    rmcp::ErrorData::invalid_params(message, Some(detail))
+}
 
 async fn run_rustgraph(binary: &str, args: &[String]) -> CallToolResult {
     run_rustgraph_with_timeout(binary, args, DEFAULT_MCP_TIMEOUT_MS).await
