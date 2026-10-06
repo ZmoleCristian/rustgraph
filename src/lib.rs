@@ -39,6 +39,8 @@ pub mod query;
 /// Ranked detector for stringly-typed declarations that have evidence for a
 /// more precise standard-library, dependency, or local type.
 pub mod stringly;
+/// Test reachability, optional LLVM execution evidence, and Graphviz rendering.
+pub mod test_coverage;
 
 /// MCP (Model Context Protocol) stdio server exposing rustgraph tools to AI
 /// clients.

@@ -12,6 +12,7 @@ pub(super) mod members;
 pub(super) mod paths_between;
 pub(super) mod refs;
 pub(super) mod stringly;
+pub(super) mod test_coverage;
 mod switchboard;
 pub(super) mod tree;
 pub(super) mod usages;

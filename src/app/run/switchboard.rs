@@ -31,6 +31,7 @@ pub fn execute(
     changed: Option<&ChangedRanges>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match mode {
+        ExecutionMode::TestCoverage(request) => super::test_coverage::run(args, project, request),
         ExecutionMode::Ensemble(request) => ensemble::run(args, project, request),
         ExecutionMode::Callers(request) => callers::run(args, project, request, changed),
         ExecutionMode::CallGraph { detail, config } => call_graph::run(args, project, detail, config),

@@ -208,6 +208,11 @@ pub fn run(mut args: Args) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mode = ExecutionMode::from_args(&args);
+    if matches!(mode, ExecutionMode::TestCoverage(_))
+        && (args.exclude_tests || args.search.is_some() || args.changed)
+    {
+        return Err("test-coverage needs the full index: --exclude-tests, --search and --changed are unsupported; use --test to select roots".into());
+    }
     let mut project = ProjectData::load(&args.path, args.include_ignored);
 
     for extra in &args.also {

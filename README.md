@@ -62,7 +62,7 @@ rustgraph is built AiDX-first. Humans get a fast CLI for free.
 ## What it does
 
 Parses Rust source via `syn`, builds a symbol index + call graph, and exposes
-it through 15 analysis subcommands. AST-driven, so it doesn't false-positive
+it through analysis subcommands. AST-driven, so it doesn't false-positive
 on string literals, comments, or unrelated tokens the way `grep` does.
 
 ```bash
@@ -75,10 +75,96 @@ rustgraph impls <Trait>          # types implementing a trait
 rustgraph refs <ident>           # every reference (field/path/type/etc.)
 rustgraph usages <Type>          # who constructs/mentions a type (callers + refs)
 rustgraph stringly               # where String/&str can become a stronger type
+rustgraph test-coverage          # possible test paths + test-coverage.dot (not runtime coverage)
 # + def, members, tree, grep, inventory, call-graph
 ```
 
 Run `rustgraph --help` for the full list, `rustgraph <cmd> --help` for flags.
+
+`test-coverage` prints a static test-to-function map and writes a standalone
+Graphviz file, grouped by source file. The image shows every indexed production
+function, labeled only with its name. Tests and test helpers seed the analysis
+but are hidden from the drawing. Amber functions have a possible static path
+from a selected test; other functions and edges stay gray. Node labels contain
+no diagnostics or coverage counters; evidence, branches and blind spots remain
+in the text/JSON report and SVG tooltips. Repeated call sites share one arrow.
+
+The compact legend explains the colors and line styles. A function containing
+path splits (`if`, multi-arm/guarded `match`, loops, `?`, short circuits) gets a
+**dotted border and dotted outgoing edges**. All outgoing calls are marked
+conservatively; these are not exact branch-to-call assignments. Multiple
+sequential calls alone do not constitute a split. Other static edges and node
+borders are dashed. **Solid lines are reserved for execution proof**: this
+static analysis collects no runtime evidence, so no real graph edge is solid.
+Highlighting means a possible test path, never that the function executed.
+
+```bash
+rustgraph -p ../my-crate test-coverage --dot coverage.dot
+dot -Tsvg coverage.dot -o coverage.svg
+dot -Tpng coverage.dot -o coverage.png
+rustgraph test-coverage --test checks_parser --dot parser.dot
+rustgraph test-coverage --include-ignored-tests -j -o coverage.json
+```
+
+Only explicit `#[test]` / `#[...::test]` annotations select roots; helpers in
+`cfg(test)` modules are traversed but are not independent tests. `--test` selects
+roots by name/path substring while retaining the full production inventory in
+the drawing and the complete index (including tests) in text/JSON.
+Ignored tests need `--include-ignored-tests`. Annotation candidates are not
+verified against Cargo's test discovery, and `cfg`/features are not evaluated.
+
+**Execution, branch and path coverage remain UNKNOWN.** The report identifies
+`if`/`match`, guards, loops, `?`, short circuits, early exits and deferred bodies,
+but does not solve their values. Passing `false` does not prove which branch ran.
+No percentage of executed coverage is reported (`execution_coverage_percent` is
+`null` in JSON). No known path does not mean untested. Receiver dispatch, local
+callable bindings, indirect calls, macros and deferred closure/async bodies stop
+propagation and are listed with locations and reasons. Parse failures remain
+visible in text, JSON and the DOT legend. Source resolution is heuristic;
+callbacks, generated code, doctests and custom harnesses remain blind spots.
+
+Library API: `rustgraph::test_coverage::map_test_coverage(&project, &options)`;
+the returned report provides `to_text()` and `to_dot()` and implements `Serialize`.
+
+For a map based on actual execution, collect LLVM counters and render them with:
+
+```bash
+python3 tools/test_coverage.py -p ../my-crate -o target/measured-coverage
+# Or select a subset of test binaries:
+python3 tools/test_coverage.py -p ../my-crate -o target/measured-coverage -- --test accounting
+```
+
+The collector requires Cargo/rustc, matching `llvm-cov`/`llvm-profdata`, Graphviz,
+`rg`, and the built `target/debug/rustgraph` (override with `--rustgraph`). It
+inherits Cargo environment such as `CARGO_HOME`. It creates fresh instrumented
+builds and counters, runs the selected tests, includes their executable artifacts
+and subprocess binaries, and writes `coverage.png`, `coverage.svg`, `coverage.dot`
+and `coverage.json`. Exact source snapshots before and after the run must agree.
+No source files are modified. A failed test run does not produce a new map.
+
+Green means an LLVM code region inside that function executed; gray means
+instrumentation exists but no mapped code region executed; white means no
+instrumentation was mapped. Amber remains possible static evidence only. Tests
+stay hidden. Observed functions without known splits get solid borders; splits
+keep dotted borders. **Arrows remain static, even between two green functions.**
+Function execution proves neither a particular caller/callee edge nor complete
+branch/path coverage, and aggregate counters do not identify individual tests.
+
+To render a previously collected export again:
+
+```bash
+rustgraph -p ../my-crate test-coverage \
+  --llvm-coverage target/measured-coverage/run-XXXX/llvm.json --dot coverage.dot
+```
+
+The CLI requires the companion `llvm.json.sources.json` and rejects changed or
+missing source files. LLVM JSON alone carries no source checksums. `--test`
+cannot be combined with `--llvm-coverage`: select tests during collection.
+`import_llvm_coverage` is also available to library callers; verify the source
+snapshot with `verify_coverage_sources` before importing. Unknown paths,
+ambiguous same-line functions and missing instrumentation are not counted as
+zero execution. Runtime region counts and source-verification details stay in
+text/JSON/tooltips rather than node labels.
 
 `paths-between` resolves the internal call graph once, prunes nodes that cannot
 reach the destination, and emits shorter paths first. Its exact node-depth

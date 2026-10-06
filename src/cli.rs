@@ -89,6 +89,8 @@ pub enum AnalyzeMode {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum ModeCommand {
+    #[command(about = "Map static test paths with optional LLVM execution evidence; print text/JSON and write Graphviz DOT. Does not prove branch/path coverage.")]
+    TestCoverage(TestCoverageCommand),
     #[command(
         about = "List callers of a target function. Tip: use `-p ../sibling-crate callers <fn>` to look up callers in another crate.",
         after_help = GLOBALS_FOOTER_SHORT,
@@ -227,6 +229,24 @@ Signals include explicit parse/conversion targets, repeated literal vocabularies
         hide = true
     )]
     GenerateMan,
+}
+
+/// Static test mapping and its Graphviz artifact.
+#[derive(clap::Args, Debug, Clone)]
+pub struct TestCoverageCommand {
+    /// Graphviz output path (render with dot -Tsvg or dot -Tpng).
+    #[arg(long, default_value = "test-coverage.dot")]
+    pub dot: PathBuf,
+    /// Select annotated test roots by name or file path substring.
+    #[arg(long)]
+    pub test: Option<String>,
+    /// Include #[ignore] tests as possible roots (execution still unproven).
+    #[arg(long)]
+    pub include_ignored_tests: bool,
+    /// Import LLVM JSON plus its .sources.json snapshot from tools/test_coverage.py.
+    /// Aggregate profiles cannot be filtered to a test after collection.
+    #[arg(long, value_name = "JSON", conflicts_with = "test")]
+    pub llvm_coverage: Option<PathBuf>,
 }
 
 /// Arguments for the `inventory` subcommand (dump all symbols with optional

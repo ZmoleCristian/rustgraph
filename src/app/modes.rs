@@ -367,6 +367,7 @@ pub enum ExecutionMode {
     Def(DefRequest),
     Members(MembersRequest),
     Stringly(StringlyRequest),
+    TestCoverage(crate::cli::TestCoverageCommand),
 }
 
 /// Rendering and traversal configuration for the `call-graph` subcommand.
@@ -407,6 +408,7 @@ impl ExecutionMode {
     pub fn from_args(args: &Args) -> Self {
         if let Some(command) = args.command.clone() {
             return match command {
+                ModeCommand::TestCoverage(request) => Self::TestCoverage(request),
                 ModeCommand::Callers(callers) => {
                     let (before_context, after_context) = callers.resolved_before_after();
 
