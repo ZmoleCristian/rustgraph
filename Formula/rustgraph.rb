@@ -1,20 +1,20 @@
 class Rustgraph < Formula
   desc "Rust code navigation built for AiDX — AST-aware, MCP-native, token-efficient"
   homepage "https://github.com/ZmoleCristian/rustgraph"
-  version "0.8.3"
+  version "0.8.5"
   license "0BSD"
 
   on_macos do
     on_arm do
-      url "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.8.3/rustgraph-aarch64-apple-darwin.tar.gz"
-      sha256 "de398e37ccc843290ec3b3fc28921022ae51e32629fb431290e836ac6bfaf58d"
+      url "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.8.5/rustgraph-aarch64-apple-darwin.tar.gz"
+      sha256 "70ce36a2a1b8feac387584f8d907aa24ec9f1e3c444a1b0f37f718a98acd0cbc"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.8.3/rustgraph-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "301f1643bbfa26c73149de8e32b0dd6f1b0bf4da682c7595d16db7107ec7cec7"
+      url "https://github.com/ZmoleCristian/rustgraph/releases/download/v0.8.5/rustgraph-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "b4d2657ff696eef80ffcdd84325898708fe2c2649794388b440f054e58627bc0"
     end
   end
 
